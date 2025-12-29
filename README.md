@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/oven-sh/bun/main/assets/bun-logo.png" alt="Bun Logo" width="80" />
-</p>
-
 <h1 align="center">binja</h1>
 
 <p align="center">
