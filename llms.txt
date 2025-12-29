@@ -1,0 +1,275 @@
+# binja
+
+> High-performance Jinja2/Django template engine for Bun
+
+## Quick Start
+
+```typescript
+import { render, Environment } from 'binja'
+
+// Simple render
+const html = await render('Hello, {{ name }}!', { name: 'World' })
+
+// With Environment (recommended for multiple renders)
+const env = new Environment({ templates: './templates' })
+const html = await env.render('page.html', { title: 'Home' })
+```
+
+## Core API
+
+### render(template, context, options?)
+Render a template string directly.
+
+```typescript
+await render('{{ name|upper }}', { name: 'john' })
+// Output: JOHN
+```
+
+### Environment
+Main class for template management.
+
+```typescript
+const env = new Environment({
+  templates: './templates',    // Template directory
+  autoescape: true,            // HTML escape (default: true)
+  cache: true,                 // Cache templates (default: true)
+  filters: {},                 // Custom filters
+  globals: {},                 // Global variables
+})
+
+// Methods
+await env.render('page.html', context)        // Render file
+await env.renderString('{{ x }}', context)   // Render string
+env.addFilter('name', fn)                     // Add filter
+env.addGlobal('name', value)                  // Add global
+```
+
+## Template Syntax
+
+### Variables
+```django
+{{ variable }}
+{{ user.name }}
+{{ items[0] }}
+{{ items.0 }}
+```
+
+### Filters
+```django
+{{ name|upper }}
+{{ name|lower|truncatechars:10 }}
+{{ price|floatformat:2 }}
+{{ items|join:", " }}
+```
+
+### Conditionals
+```django
+{% if user.is_admin %}
+  Admin
+{% elif user.is_staff %}
+  Staff
+{% else %}
+  User
+{% endif %}
+```
+
+### Loops
+```django
+{% for item in items %}
+  {{ loop.index }}. {{ item.name }}
+{% empty %}
+  No items
+{% endfor %}
+```
+
+Loop variables:
+- `loop.index` / `forloop.counter` - 1-indexed
+- `loop.index0` / `forloop.counter0` - 0-indexed
+- `loop.first` / `forloop.first` - True if first
+- `loop.last` / `forloop.last` - True if last
+- `loop.length` / `forloop.length` - Total items
+
+### Template Inheritance
+```django
+{# base.html #}
+<!DOCTYPE html>
+<html>
+<head><title>{% block title %}{% endblock %}</title></head>
+<body>{% block content %}{% endblock %}</body>
+</html>
+
+{# page.html #}
+{% extends "base.html" %}
+{% block title %}My Page{% endblock %}
+{% block content %}<h1>Hello</h1>{% endblock %}
+```
+
+### Include
+```django
+{% include "header.html" %}
+{% include "card.html" with title="Hello" %}
+```
+
+### Variables Assignment
+```django
+{% set name = "John" %}
+{% with total = price * quantity %}
+  {{ total }}
+{% endwith %}
+```
+
+## Built-in Filters
+
+### String
+- `upper` - Uppercase
+- `lower` - Lowercase
+- `capitalize` - Capitalize first letter
+- `title` - Title Case
+- `trim` - Remove whitespace
+- `truncatechars:N` - Truncate to N chars
+- `truncatewords:N` - Truncate to N words
+- `slugify` - URL-safe slug
+- `striptags` - Remove HTML tags
+- `escape` / `e` - HTML escape
+- `safe` - Mark as safe (no escape)
+- `cut:"x"` - Remove all "x"
+- `center:N` - Center in N width
+- `ljust:N` - Left justify
+- `rjust:N` - Right justify
+
+### Number
+- `abs` - Absolute value
+- `round:N` - Round to N decimals
+- `floatformat:N` - Format decimal
+- `add:N` - Add N
+- `filesizeformat` - Human readable size
+- `divisibleby:N` - Check divisibility
+
+### List/Array
+- `length` - Count items
+- `first` - First item
+- `last` - Last item
+- `join:"x"` - Join with "x"
+- `reverse` - Reverse order
+- `sort` - Sort items
+- `unique` - Remove duplicates
+- `slice:":N"` - Slice array
+- `batch:N` - Group by N
+- `random` - Random item
+
+### Date/Time
+- `date:"Y-m-d"` - Format date
+- `time:"H:i"` - Format time
+- `timesince` - Time since (e.g., "2 days")
+- `timeuntil` - Time until
+
+### Default/Conditional
+- `default:"x"` / `d:"x"` - Default value
+- `default_if_none:"x"` - Default if null
+- `yesno:"yes,no"` - Boolean to text
+- `pluralize:"s"` - Pluralization
+
+### Other
+- `json` / `tojson` - JSON stringify
+- `urlencode` - URL encode
+- `urlize` - Auto-link URLs
+
+## Test Functions (is operator)
+
+```django
+{% if x is defined %}
+{% if x is none %}
+{% if x is even %}
+{% if x is odd %}
+{% if x is divisibleby(3) %}
+{% if x is string %}
+{% if x is number %}
+{% if items is empty %}
+{% if x is equalto(y) %}
+```
+
+## Custom Filters
+
+```typescript
+const env = new Environment({
+  filters: {
+    currency: (value) => `$${Number(value).toFixed(2)}`,
+    reverse: (value) => String(value).split('').reverse().join(''),
+  }
+})
+```
+
+## Framework Integration
+
+### Elysia
+```typescript
+import { Elysia } from 'elysia'
+import { Environment } from 'binja'
+
+const templates = new Environment({ templates: './views' })
+
+const app = new Elysia()
+  .get('/', async () => {
+    const html = await templates.render('index.html', { title: 'Home' })
+    return new Response(html, {
+      headers: { 'Content-Type': 'text/html' }
+    })
+  })
+  .listen(3000)
+```
+
+### Hono
+```typescript
+import { Hono } from 'hono'
+import { Environment } from 'binja'
+
+const app = new Hono()
+const templates = new Environment({ templates: './views' })
+
+app.get('/', async (c) => {
+  return c.html(await templates.render('index.html', { title: 'Home' }))
+})
+```
+
+## Common Patterns
+
+### Conditional Classes
+```django
+<div class="{{ 'active' if item.selected else '' }}">
+```
+
+### Safe HTML
+```django
+{{ trusted_html|safe }}
+```
+
+### Loop with Index
+```django
+{% for item in items %}
+  <li class="{% if loop.first %}first{% endif %}">
+    {{ loop.index }}. {{ item }}
+  </li>
+{% endfor %}
+```
+
+### Default Values
+```django
+{{ username|default:"Anonymous" }}
+{{ settings.theme|default:"light" }}
+```
+
+### Nested Access
+```django
+{{ user.profile.avatar.url|default:"/default.png" }}
+```
+
+## Installation
+
+```bash
+bun add binja
+```
+
+## Links
+
+- Repository: https://github.com/egeominotti/binja
+- Issues: https://github.com/egeominotti/binja/issues
