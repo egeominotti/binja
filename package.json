@@ -5,10 +5,38 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "test": "bun test",
-    "dev": "bun --watch src/index.ts"
+    "dev": "bun --watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
+    "release:patch": "bun run version:patch && bun run build",
+    "release:minor": "bun run version:minor && bun run build",
+    "release:major": "bun run version:major && bun run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/egeominotti/binja.git"
+  },
+  "homepage": "https://github.com/egeominotti/binja#readme",
+  "bugs": {
+    "url": "https://github.com/egeominotti/binja/issues"
   },
   "keywords": [
     "jinja2",
@@ -16,12 +44,18 @@
     "template",
     "dtl",
     "bun",
-    "ssr"
+    "ssr",
+    "template-engine",
+    "django-templates",
+    "typescript"
   ],
-  "author": "Funer24",
+  "author": "egeominotti",
   "license": "BSD-3-Clause",
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
   }
 }

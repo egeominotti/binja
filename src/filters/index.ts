@@ -331,7 +331,7 @@ export const date: FilterFunction = (value, format = 'N j, Y') => {
     h: () => String(d.getHours() % 12 || 12).padStart(2, '0'),
   }
 
-  return format.replace(/[a-zA-Z]/g, (char) => formatMap[char]?.() ?? char)
+  return format.replace(/[a-zA-Z]/g, (char: string) => formatMap[char]?.() ?? char)
 }
 
 export const time: FilterFunction = (value, format = 'H:i') => date(value, format)

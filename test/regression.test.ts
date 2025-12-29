@@ -171,8 +171,8 @@ describe('Regression Tests', () => {
 
   // ==================== Edge Cases in Expressions ====================
   describe('Edge Cases in Expressions', () => {
-    test('division by zero returns Infinity', async () => {
-      expect(await render('{{ 10 / 0 }}', {})).toBe('Infinity')
+    test('division by zero returns zero (safe handling)', async () => {
+      expect(await render('{{ 10 / 0 }}', {})).toBe('0')
     })
 
     test('modulo by zero returns NaN', async () => {
@@ -597,10 +597,11 @@ describe('Regression Tests', () => {
       expect(await render(tmpl, { a: false, b: false })).toBe('none')
     })
 
-    test('comparison with different types', async () => {
-      // String vs number comparison
-      expect(await render('{% if "1" == 1 %}yes{% else %}no{% endif %}', {})).toBe('yes')
+    test('comparison with different types (strict equality like Python)', async () => {
+      // String vs number comparison - strict equality (Python behavior)
+      expect(await render('{% if "1" == 1 %}yes{% else %}no{% endif %}', {})).toBe('no')
       expect(await render('{% if "1" == "1" %}yes{% else %}no{% endif %}', {})).toBe('yes')
+      expect(await render('{% if 1 == 1 %}yes{% else %}no{% endif %}', {})).toBe('yes')
     })
 
     test('not operator', async () => {

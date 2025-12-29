@@ -481,7 +481,9 @@ export class Runtime {
       case '*':
         return Number(left) * Number(right)
       case '/':
-        return Number(left) / Number(right)
+        const divisor = Number(right)
+        if (divisor === 0) return 0
+        return Number(left) / divisor
       case '%':
         return Number(left) % Number(right)
       case '~':
@@ -515,10 +517,10 @@ export class Runtime {
 
       switch (operator) {
         case '==':
-          result = left == right
+          result = left === right
           break
         case '!=':
-          result = left != right
+          result = left !== right
           break
         case '<':
           result = left < right
