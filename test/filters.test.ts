@@ -256,13 +256,13 @@ describe('Filters', () => {
     })
 
     test('timesince', async () => {
-      const d = new Date(Date.now() - 86400000) // 1 day ago
+      const d = new Date(Date.now() - 90000000) // ~25 hours ago (ensures "1 day")
       const result = await render('{{ d|timesince }}', { d })
       expect(result).toContain('day')
     })
 
     test('timeuntil', async () => {
-      const d = new Date(Date.now() + 86400000) // 1 day from now
+      const d = new Date(Date.now() + 90000000) // ~25 hours from now (ensures "1 day")
       const result = await render('{{ d|timeuntil }}', { d })
       expect(result).toContain('day')
     })
