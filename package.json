@@ -1,0 +1,27 @@
+{
+  "name": "binja",
+  "version": "1.0.0",
+  "description": "High-performance Jinja2/Django template engine for Bun",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "test": "bun test",
+    "dev": "bun --watch src/index.ts"
+  },
+  "keywords": [
+    "jinja2",
+    "django",
+    "template",
+    "dtl",
+    "bun",
+    "ssr"
+  ],
+  "author": "Funer24",
+  "license": "BSD-3-Clause",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}
