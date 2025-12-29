@@ -1,15 +1,16 @@
 {
   "name": "binja",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "High-performance Jinja2/Django template engine for Bun",
   "main": "dist/index.js",
-  "module": "dist/index.mjs",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "bun": "./dist/index.js"
     }
   },
   "files": [
@@ -18,7 +19,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun run build:types",
+    "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist",
     "test": "bun test",
     "dev": "bun --watch src/index.ts",
     "typecheck": "tsc --noEmit",
