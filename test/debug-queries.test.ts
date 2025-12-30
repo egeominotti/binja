@@ -225,7 +225,7 @@ describe('Query Telemetry', () => {
       const html = generateDebugPanel(data)
 
       expect(html).toContain('N+1')
-      expect(html).toContain('dbg-query-badge n1')
+      expect(html).toContain('query-badge n1')
     })
 
     test('panel shows slow query indicator', () => {
@@ -236,7 +236,7 @@ describe('Query Telemetry', () => {
 
       const html = generateDebugPanel(data)
 
-      expect(html).toContain('dbg-query.slow')
+      expect(html).toContain('query-item slow')
     })
 
     test('panel hides queries section when no queries', () => {
@@ -246,9 +246,9 @@ describe('Query Telemetry', () => {
 
       const html = generateDebugPanel(data)
 
-      // CSS contains class definitions, but actual section should not be rendered
-      expect(html).not.toContain('dbg-section-title">\${icons.database} Queries')
-      expect(html).not.toContain('<div class="dbg-query">')
+      // Should show empty state for queries, not actual query items
+      expect(html).toContain('No queries recorded')
+      expect(html).not.toContain('<div class="query-item">')
     })
 
     test('panel shows query stats', () => {

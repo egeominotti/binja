@@ -135,7 +135,7 @@ describe('Debug Panel', () => {
       const html = generateDebugPanel(data)
 
       expect(html).toContain('Binja Debug Panel')
-      expect(html).toContain('binja-debug-')
+      expect(html).toContain('binja-dbg-')
       expect(html).toContain('<style>')
       expect(html).toContain('<script>')
     })
@@ -148,8 +148,8 @@ describe('Debug Panel', () => {
       const darkHtml = generateDebugPanel(data, { dark: true })
       const lightHtml = generateDebugPanel(data, { dark: false })
 
-      expect(darkHtml).toContain('#0f0f0f') // Dark bg
-      expect(lightHtml).toContain('#ffffff') // Light bg
+      expect(darkHtml).toContain('#1e1e1e') // Dark bg (VS Code style)
+      expect(lightHtml).toContain('#f3f3f3') // Light bg
     })
 
     test('shows performance breakdown', () => {

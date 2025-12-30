@@ -1,526 +1,566 @@
 /**
- * Debug Panel - Professional template debugging interface
+ * Debug Panel - Chrome DevTools-style debugging interface
  */
 
-import type { DebugData, TemplateInfo, ContextValue } from './collector'
+import type { DebugData, ContextValue } from './collector'
 
 export interface PanelOptions {
-  /** Panel position */
-  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
-  /** Start collapsed */
-  collapsed?: boolean
-  /** Dark mode */
-  dark?: boolean
-  /** Panel width in pixels */
+  /** Panel position: 'bottom' (default), 'right', or 'popup' */
+  position?: 'bottom' | 'right' | 'popup'
+  /** Initial height in pixels (for bottom dock) */
+  height?: number
+  /** Initial width in pixels (for right dock) */
   width?: number
+  /** Start with panel open */
+  open?: boolean
+  /** Dark mode (default: true) */
+  dark?: boolean
 }
 
 const DEFAULT_OPTIONS: Required<PanelOptions> = {
-  position: 'bottom-right',
-  collapsed: true,
+  position: 'bottom',
+  height: 300,
+  width: 400,
+  open: false,
   dark: true,
-  width: 420,
 }
 
 export function generateDebugPanel(data: DebugData, options: PanelOptions = {}): string {
   const opts = { ...DEFAULT_OPTIONS, ...options }
-  const id = `binja-debug-${Date.now()}`
-  const colors = opts.dark ? darkTheme : lightTheme
+  const id = `binja-dbg-${Date.now()}`
+  const c = opts.dark ? darkTheme : lightTheme
 
   return `
 <!-- Binja Debug Panel -->
-<div id="${id}" class="binja-debugger" data-theme="${opts.dark ? 'dark' : 'light'}">
-<style>${generateStyles(id, colors, opts)}</style>
-${generateToggle(id, data, colors)}
-${generatePanel(id, data, colors, opts)}
-<script>${generateScript(id)}</script>
+<div id="${id}" class="binja-devtools" data-position="${opts.position}" data-open="${opts.open}">
+<style>${generateStyles(id, c, opts)}</style>
+${generateHTML(id, data, c, opts)}
+<script>${generateScript(id, data, opts)}</script>
 </div>
 <!-- /Binja Debug Panel -->
 `
 }
 
 const darkTheme = {
-  bg: '#0f0f0f',
-  bgSecondary: '#1a1a1a',
-  bgTertiary: '#242424',
-  border: '#2a2a2a',
-  borderLight: '#333',
-  text: '#e5e5e5',
-  textSecondary: '#a0a0a0',
-  textMuted: '#666',
-  accent: '#3b82f6',
-  accentHover: '#2563eb',
-  success: '#22c55e',
-  warning: '#eab308',
-  error: '#ef4444',
-  info: '#06b6d4',
+  bg: '#1e1e1e',
+  bgPanel: '#252526',
+  bgHover: '#2a2d2e',
+  bgActive: '#37373d',
+  border: '#3c3c3c',
+  text: '#cccccc',
+  textSecondary: '#969696',
+  textMuted: '#6e6e6e',
+  accent: '#0078d4',
+  accentHover: '#1c86d8',
+  success: '#4ec9b0',
+  warning: '#dcdcaa',
+  error: '#f14c4c',
+  info: '#75beff',
+  string: '#ce9178',
+  number: '#b5cea8',
+  keyword: '#569cd6',
 }
 
 const lightTheme = {
-  bg: '#ffffff',
-  bgSecondary: '#f8f9fa',
-  bgTertiary: '#f1f3f4',
-  border: '#e5e7eb',
-  borderLight: '#d1d5db',
-  text: '#111827',
-  textSecondary: '#4b5563',
-  textMuted: '#9ca3af',
-  accent: '#2563eb',
-  accentHover: '#1d4ed8',
-  success: '#16a34a',
-  warning: '#ca8a04',
-  error: '#dc2626',
-  info: '#0891b2',
+  bg: '#f3f3f3',
+  bgPanel: '#ffffff',
+  bgHover: '#e8e8e8',
+  bgActive: '#d4d4d4',
+  border: '#d4d4d4',
+  text: '#1e1e1e',
+  textSecondary: '#616161',
+  textMuted: '#a0a0a0',
+  accent: '#0078d4',
+  accentHover: '#106ebe',
+  success: '#16825d',
+  warning: '#bf8803',
+  error: '#cd3131',
+  info: '#0078d4',
+  string: '#a31515',
+  number: '#098658',
+  keyword: '#0000ff',
 }
 
 function generateStyles(id: string, c: typeof darkTheme, opts: Required<PanelOptions>): string {
-  const pos = getPosition(opts.position)
-
   return `
-#${id} { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; font-size: 13px; line-height: 1.5; position: fixed; ${pos} z-index: 2147483647; }
+#${id} { --bg: ${c.bg}; --bg-panel: ${c.bgPanel}; --bg-hover: ${c.bgHover}; --bg-active: ${c.bgActive}; --border: ${c.border}; --text: ${c.text}; --text-secondary: ${c.textSecondary}; --text-muted: ${c.textMuted}; --accent: ${c.accent}; --success: ${c.success}; --warning: ${c.warning}; --error: ${c.error}; --string: ${c.string}; --number: ${c.number}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; font-size: 12px; line-height: 1.4; color: var(--text); }
 #${id} * { box-sizing: border-box; margin: 0; padding: 0; }
-#${id} .dbg-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; background: ${c.bg}; border: 1px solid ${c.border}; border-radius: 8px; color: ${c.text}; cursor: pointer; font-size: 12px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: all 0.2s ease; }
-#${id} .dbg-toggle:hover { border-color: ${c.accent}; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-#${id} .dbg-toggle svg { width: 16px; height: 16px; }
-#${id} .dbg-toggle .dbg-time { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 11px; padding: 2px 8px; background: ${c.bgTertiary}; border-radius: 4px; color: ${c.success}; }
-#${id} .dbg-panel { display: none; width: ${opts.width}px; max-height: 85vh; background: ${c.bg}; border: 1px solid ${c.border}; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.24); overflow: hidden; margin-top: 8px; }
-#${id} .dbg-panel.open { display: block; }
-#${id} .dbg-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: ${c.bgSecondary}; border-bottom: 1px solid ${c.border}; }
-#${id} .dbg-logo { display: flex; align-items: center; gap: 10px; font-weight: 600; color: ${c.text}; }
-#${id} .dbg-logo svg { width: 20px; height: 20px; color: ${c.accent}; }
-#${id} .dbg-meta { display: flex; align-items: center; gap: 12px; }
-#${id} .dbg-badge { font-family: 'SF Mono', Monaco, monospace; font-size: 11px; padding: 3px 10px; border-radius: 4px; font-weight: 500; }
-#${id} .dbg-badge.time { background: rgba(34,197,94,0.1); color: ${c.success}; }
-#${id} .dbg-badge.mode { background: rgba(59,130,246,0.1); color: ${c.accent}; }
-#${id} .dbg-close { background: none; border: none; color: ${c.textMuted}; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; }
-#${id} .dbg-close:hover { background: ${c.bgTertiary}; color: ${c.text}; }
-#${id} .dbg-close svg { width: 18px; height: 18px; }
-#${id} .dbg-body { max-height: calc(85vh - 52px); overflow-y: auto; }
-#${id} .dbg-section { border-bottom: 1px solid ${c.border}; }
-#${id} .dbg-section:last-child { border-bottom: none; }
-#${id} .dbg-section-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; cursor: pointer; user-select: none; transition: background 0.15s; }
-#${id} .dbg-section-header:hover { background: ${c.bgSecondary}; }
-#${id} .dbg-section-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: ${c.textSecondary}; }
-#${id} .dbg-section-title svg { width: 14px; height: 14px; opacity: 0.7; }
-#${id} .dbg-section-meta { font-size: 11px; color: ${c.textMuted}; font-family: 'SF Mono', Monaco, monospace; }
-#${id} .dbg-section-content { display: none; padding: 12px 16px; background: ${c.bgSecondary}; }
-#${id} .dbg-section.open .dbg-section-content { display: block; }
-#${id} .dbg-section .dbg-chevron { transition: transform 0.2s; color: ${c.textMuted}; }
-#${id} .dbg-section.open .dbg-chevron { transform: rotate(90deg); }
-#${id} .dbg-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid ${c.border}; }
-#${id} .dbg-row:last-child { border-bottom: none; }
-#${id} .dbg-label { color: ${c.textSecondary}; font-size: 12px; }
-#${id} .dbg-value { color: ${c.text}; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; text-align: right; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#${id} .dbg-bar { height: 3px; background: ${c.bgTertiary}; border-radius: 2px; margin-top: 4px; overflow: hidden; }
-#${id} .dbg-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
-#${id} .dbg-bar-fill.lexer { background: ${c.info}; }
-#${id} .dbg-bar-fill.parser { background: ${c.warning}; }
-#${id} .dbg-bar-fill.render { background: ${c.success}; }
-#${id} .dbg-templates { display: flex; flex-direction: column; gap: 6px; }
-#${id} .dbg-template { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: ${c.bg}; border-radius: 6px; font-size: 12px; }
-#${id} .dbg-template-icon { width: 16px; height: 16px; color: ${c.textMuted}; flex-shrink: 0; }
-#${id} .dbg-template-name { color: ${c.text}; font-family: 'SF Mono', Monaco, monospace; }
-#${id} .dbg-template-tag { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500; text-transform: uppercase; }
-#${id} .dbg-template-tag.root { background: rgba(59,130,246,0.15); color: ${c.accent}; }
-#${id} .dbg-template-tag.extends { background: rgba(168,85,247,0.15); color: #a855f7; }
-#${id} .dbg-template-tag.include { background: rgba(34,197,94,0.15); color: ${c.success}; }
-#${id} .dbg-ctx-grid { display: flex; flex-direction: column; gap: 4px; }
-#${id} .dbg-ctx-item { background: ${c.bg}; border-radius: 6px; overflow: hidden; }
-#${id} .dbg-ctx-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; cursor: default; }
-#${id} .dbg-ctx-row.expandable { cursor: pointer; }
-#${id} .dbg-ctx-row.expandable:hover { background: ${c.bgTertiary}; }
-#${id} .dbg-ctx-key { display: flex; align-items: center; gap: 6px; }
-#${id} .dbg-ctx-arrow { width: 12px; height: 12px; color: ${c.textMuted}; transition: transform 0.15s; flex-shrink: 0; }
-#${id} .dbg-ctx-item.open > .dbg-ctx-row .dbg-ctx-arrow { transform: rotate(90deg); }
-#${id} .dbg-ctx-name { color: ${c.text}; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
-#${id} .dbg-ctx-type { font-size: 10px; color: ${c.accent}; background: rgba(59,130,246,0.1); padding: 1px 5px; border-radius: 3px; }
-#${id} .dbg-ctx-preview { color: ${c.textSecondary}; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#${id} .dbg-ctx-children { display: none; padding-left: 16px; border-left: 1px solid ${c.border}; margin-left: 10px; }
-#${id} .dbg-ctx-item.open > .dbg-ctx-children { display: block; }
-#${id} .dbg-ctx-children .dbg-ctx-item { background: transparent; }
-#${id} .dbg-ctx-children .dbg-ctx-row { padding: 4px 8px; }
-#${id} .dbg-filters { display: flex; flex-wrap: wrap; gap: 6px; }
-#${id} .dbg-filter { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: ${c.bg}; border-radius: 5px; font-size: 12px; font-family: 'SF Mono', Monaco, monospace; color: ${c.text}; }
-#${id} .dbg-filter-count { font-size: 10px; color: ${c.accent}; font-weight: 600; }
-#${id} .dbg-cache { display: flex; gap: 16px; }
-#${id} .dbg-cache-stat { flex: 1; padding: 12px; background: ${c.bg}; border-radius: 6px; text-align: center; }
-#${id} .dbg-cache-num { font-size: 24px; font-weight: 600; font-family: 'SF Mono', Monaco, monospace; }
-#${id} .dbg-cache-num.hit { color: ${c.success}; }
-#${id} .dbg-cache-num.miss { color: ${c.error}; }
-#${id} .dbg-cache-label { font-size: 11px; color: ${c.textMuted}; margin-top: 4px; }
-#${id} .dbg-warnings { display: flex; flex-direction: column; gap: 6px; }
-#${id} .dbg-warning { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: rgba(234,179,8,0.1); border-radius: 6px; border-left: 3px solid ${c.warning}; }
-#${id} .dbg-warning-icon { color: ${c.warning}; flex-shrink: 0; margin-top: 1px; }
-#${id} .dbg-warning-text { color: ${c.text}; font-size: 12px; }
-#${id} .dbg-queries { display: flex; flex-direction: column; gap: 8px; }
-#${id} .dbg-query { background: ${c.bg}; border-radius: 6px; overflow: hidden; }
-#${id} .dbg-query.n1 { border-left: 3px solid ${c.error}; }
-#${id} .dbg-query.slow { border-left: 3px solid ${c.warning}; }
-#${id} .dbg-query-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; gap: 8px; }
-#${id} .dbg-query-sql { flex: 1; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; color: ${c.text}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#${id} .dbg-query-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-#${id} .dbg-query-time { font-family: 'SF Mono', Monaco, monospace; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: ${c.bgTertiary}; }
-#${id} .dbg-query-time.slow { background: rgba(234,179,8,0.15); color: ${c.warning}; }
-#${id} .dbg-query-rows { font-size: 10px; color: ${c.textMuted}; }
-#${id} .dbg-query-source { font-size: 9px; padding: 2px 5px; border-radius: 3px; background: rgba(59,130,246,0.1); color: ${c.accent}; text-transform: uppercase; }
-#${id} .dbg-query-badge { font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: 600; }
-#${id} .dbg-query-badge.n1 { background: rgba(239,68,68,0.15); color: ${c.error}; }
-#${id} .dbg-query-stats { display: flex; gap: 12px; margin-bottom: 12px; padding: 10px; background: ${c.bg}; border-radius: 6px; }
-#${id} .dbg-query-stat { flex: 1; text-align: center; }
-#${id} .dbg-query-stat-num { font-size: 18px; font-weight: 600; font-family: 'SF Mono', Monaco, monospace; color: ${c.text}; }
-#${id} .dbg-query-stat-num.warning { color: ${c.warning}; }
-#${id} .dbg-query-stat-num.error { color: ${c.error}; }
-#${id} .dbg-query-stat-label { font-size: 10px; color: ${c.textMuted}; margin-top: 2px; }
-`
-}
 
-function getPosition(pos: string): string {
-  switch (pos) {
-    case 'bottom-left': return 'bottom: 16px; left: 16px;'
-    case 'top-right': return 'top: 16px; right: 16px;'
-    case 'top-left': return 'top: 16px; left: 16px;'
-    default: return 'bottom: 16px; right: 16px;'
-  }
+/* Toggle Button */
+#${id} .devtools-toggle { position: fixed; bottom: 10px; right: 10px; z-index: 2147483646; display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-size: 11px; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: all 0.15s; }
+#${id} .devtools-toggle:hover { background: var(--bg-hover); border-color: var(--accent); }
+#${id} .devtools-toggle svg { width: 14px; height: 14px; color: var(--accent); }
+#${id} .devtools-toggle .badge { padding: 2px 6px; background: var(--accent); color: #fff; border-radius: 3px; font-size: 10px; }
+#${id}[data-open="true"] .devtools-toggle { display: none; }
+
+/* Panel Container */
+#${id} .devtools-panel { display: none; position: fixed; z-index: 2147483647; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 -2px 12px rgba(0,0,0,0.3); }
+#${id}[data-open="true"] .devtools-panel { display: flex; flex-direction: column; }
+#${id}[data-position="bottom"] .devtools-panel { left: 0; right: 0; bottom: 0; height: ${opts.height}px; border-left: none; border-right: none; border-bottom: none; }
+#${id}[data-position="right"] .devtools-panel { top: 0; right: 0; bottom: 0; width: ${opts.width}px; border-top: none; border-right: none; border-bottom: none; }
+#${id}[data-position="popup"] .devtools-panel { bottom: 50px; right: 20px; width: 700px; height: 500px; border-radius: 8px; }
+
+/* Resize Handle */
+#${id} .devtools-resize { position: absolute; background: transparent; }
+#${id}[data-position="bottom"] .devtools-resize { top: 0; left: 0; right: 0; height: 4px; cursor: ns-resize; }
+#${id}[data-position="right"] .devtools-resize { top: 0; left: 0; bottom: 0; width: 4px; cursor: ew-resize; }
+#${id} .devtools-resize:hover { background: var(--accent); }
+
+/* Toolbar */
+#${id} .devtools-toolbar { display: flex; align-items: center; justify-content: space-between; height: 30px; padding: 0 8px; background: var(--bg-panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#${id} .devtools-tabs { display: flex; height: 100%; }
+#${id} .devtools-tab { display: flex; align-items: center; gap: 4px; padding: 0 12px; border: none; background: none; color: var(--text-secondary); font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.1s; }
+#${id} .devtools-tab:hover { color: var(--text); background: var(--bg-hover); }
+#${id} .devtools-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+#${id} .devtools-tab svg { width: 12px; height: 12px; opacity: 0.7; }
+#${id} .devtools-tab .count { margin-left: 4px; padding: 1px 5px; background: var(--bg-active); border-radius: 8px; font-size: 10px; }
+#${id} .devtools-tab .count.warn { background: rgba(241,76,76,0.2); color: var(--error); }
+#${id} .devtools-actions { display: flex; align-items: center; gap: 4px; }
+#${id} .devtools-btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-radius: 3px; }
+#${id} .devtools-btn:hover { background: var(--bg-hover); color: var(--text); }
+#${id} .devtools-btn svg { width: 14px; height: 14px; }
+
+/* Content Area */
+#${id} .devtools-content { flex: 1; overflow: hidden; }
+#${id} .devtools-pane { display: none; height: 100%; overflow: auto; padding: 8px; }
+#${id} .devtools-pane.active { display: block; }
+
+/* Performance Tab */
+#${id} .perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+#${id} .perf-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 10px; text-align: center; }
+#${id} .perf-card-value { font-size: 20px; font-weight: 600; font-family: 'SF Mono', Monaco, monospace; color: var(--success); }
+#${id} .perf-card-label { font-size: 10px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; }
+#${id} .perf-breakdown { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+#${id} .perf-row { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+#${id} .perf-row:last-child { border-bottom: none; }
+#${id} .perf-row-label { flex: 1; font-size: 11px; color: var(--text-secondary); }
+#${id} .perf-row-value { font-family: 'SF Mono', Monaco, monospace; font-size: 11px; min-width: 60px; text-align: right; }
+#${id} .perf-row-bar { flex: 2; height: 4px; background: var(--bg-active); border-radius: 2px; margin: 0 12px; overflow: hidden; }
+#${id} .perf-row-fill { height: 100%; border-radius: 2px; }
+#${id} .perf-row-fill.lexer { background: ${c.info}; }
+#${id} .perf-row-fill.parser { background: ${c.warning}; }
+#${id} .perf-row-fill.render { background: ${c.success}; }
+
+/* Context Tab - Tree View */
+#${id} .tree { font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 11px; }
+#${id} .tree-item { }
+#${id} .tree-row { display: flex; align-items: center; padding: 2px 4px; cursor: default; border-radius: 2px; }
+#${id} .tree-row:hover { background: var(--bg-hover); }
+#${id} .tree-row.expandable { cursor: pointer; }
+#${id} .tree-arrow { width: 12px; height: 12px; color: var(--text-muted); transition: transform 0.1s; flex-shrink: 0; }
+#${id} .tree-item.open > .tree-row .tree-arrow { transform: rotate(90deg); }
+#${id} .tree-key { color: var(--keyword); margin-right: 4px; }
+#${id} .tree-colon { color: var(--text-muted); margin-right: 6px; }
+#${id} .tree-value { color: var(--text); }
+#${id} .tree-value.string { color: var(--string); }
+#${id} .tree-value.number { color: var(--number); }
+#${id} .tree-value.null { color: var(--text-muted); font-style: italic; }
+#${id} .tree-type { color: var(--text-muted); margin-left: 6px; font-size: 10px; }
+#${id} .tree-children { display: none; padding-left: 16px; }
+#${id} .tree-item.open > .tree-children { display: block; }
+
+/* Templates Tab */
+#${id} .template-list { display: flex; flex-direction: column; gap: 4px; }
+#${id} .template-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; }
+#${id} .template-icon { width: 14px; height: 14px; color: var(--text-muted); }
+#${id} .template-name { font-family: 'SF Mono', Monaco, monospace; font-size: 11px; }
+#${id} .template-badge { font-size: 9px; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; font-weight: 500; }
+#${id} .template-badge.root { background: rgba(0,120,212,0.15); color: var(--accent); }
+#${id} .template-badge.extends { background: rgba(156,86,246,0.15); color: #9c56f6; }
+#${id} .template-badge.include { background: rgba(78,201,176,0.15); color: var(--success); }
+
+/* Queries Tab */
+#${id} .queries-stats { display: flex; gap: 16px; padding: 8px 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px; }
+#${id} .queries-stat { text-align: center; }
+#${id} .queries-stat-value { font-size: 16px; font-weight: 600; font-family: 'SF Mono', Monaco, monospace; }
+#${id} .queries-stat-value.warn { color: var(--warning); }
+#${id} .queries-stat-value.error { color: var(--error); }
+#${id} .queries-stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
+#${id} .query-list { display: flex; flex-direction: column; gap: 4px; }
+#${id} .query-item { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+#${id} .query-item.n1 { border-left: 3px solid var(--error); }
+#${id} .query-item.slow { border-left: 3px solid var(--warning); }
+#${id} .query-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+#${id} .query-sql { flex: 1; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+#${id} .query-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+#${id} .query-badge { font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: 600; }
+#${id} .query-badge.n1 { background: rgba(241,76,76,0.15); color: var(--error); }
+#${id} .query-source { font-size: 9px; padding: 2px 5px; border-radius: 3px; background: var(--bg-active); color: var(--text-muted); text-transform: uppercase; }
+#${id} .query-time { font-family: 'SF Mono', Monaco, monospace; font-size: 10px; color: var(--text-secondary); }
+#${id} .query-time.slow { color: var(--warning); }
+#${id} .query-rows { font-size: 10px; color: var(--text-muted); }
+
+/* Filters Tab */
+#${id} .filter-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+#${id} .filter-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; }
+#${id} .filter-count { color: var(--accent); font-weight: 600; font-size: 10px; }
+
+/* Cache Tab */
+#${id} .cache-stats { display: flex; gap: 20px; }
+#${id} .cache-stat { flex: 1; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 16px; text-align: center; }
+#${id} .cache-value { font-size: 32px; font-weight: 600; font-family: 'SF Mono', Monaco, monospace; }
+#${id} .cache-value.hit { color: var(--success); }
+#${id} .cache-value.miss { color: var(--error); }
+#${id} .cache-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* Warnings Tab */
+#${id} .warning-list { display: flex; flex-direction: column; gap: 6px; }
+#${id} .warning-item { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: rgba(241,76,76,0.08); border: 1px solid rgba(241,76,76,0.2); border-radius: 4px; }
+#${id} .warning-icon { color: var(--error); flex-shrink: 0; width: 14px; height: 14px; }
+#${id} .warning-text { font-size: 11px; color: var(--text); }
+
+/* Empty State */
+#${id} .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 12px; }
+#${id} .empty-state svg { width: 32px; height: 32px; margin-bottom: 8px; opacity: 0.5; }
+`
 }
 
 const icons = {
   logo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>`,
   close: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`,
-  chevron: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>`,
+  minimize: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>`,
+  dock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15h18"/></svg>`,
+  dockRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg>`,
+  popup: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v6h6"/></svg>`,
+  arrow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>`,
   perf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
-  template: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>`,
   context: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>`,
+  template: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>`,
   filter: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>`,
+  database: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
   cache: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10H12V2z"/><path d="M12 2a10 10 0 00-8.66 15"/></svg>`,
   warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  file: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/></svg>`,
-  database: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
 }
 
-function generateToggle(id: string, data: DebugData, c: typeof darkTheme): string {
+function generateHTML(id: string, data: DebugData, c: typeof darkTheme, opts: Required<PanelOptions>): string {
   const time = (data.totalTime || 0).toFixed(1)
+  const queryCount = data.queries?.length || 0
+  const hasWarnings = data.warnings.length > 0 || data.queryStats?.n1Count > 0
+
+  // Build tabs array with counts
+  const tabs = [
+    { id: 'perf', icon: icons.perf, label: 'Performance', count: `${time}ms` },
+    { id: 'context', icon: icons.context, label: 'Context', count: Object.keys(data.contextSnapshot).length || null },
+    { id: 'templates', icon: icons.template, label: 'Templates', count: data.templateChain.length || null },
+    { id: 'filters', icon: icons.filter, label: 'Filters', count: data.filtersUsed.size || null },
+    { id: 'queries', icon: icons.database, label: 'Queries', count: queryCount || null, warn: data.queryStats?.n1Count > 0 },
+    { id: 'cache', icon: icons.cache, label: 'Cache', count: (data.cacheHits + data.cacheMisses) || null },
+    { id: 'warnings', icon: icons.warning, label: 'Warnings', count: data.warnings.length || null, warn: hasWarnings },
+  ]
+
+  const tabsHtml = tabs.map((t, i) => {
+    const countHtml = t.count !== null ? `<span class="count${t.warn ? ' warn' : ''}">${t.count}</span>` : ''
+    return `<button class="devtools-tab${i === 0 ? ' active' : ''}" data-tab="${t.id}">${t.icon}${t.label}${countHtml}</button>`
+  }).join('')
+
   return `
-<button class="dbg-toggle" onclick="document.querySelector('#${id} .dbg-panel').classList.add('open');this.style.display='none'">
+<button class="devtools-toggle" onclick="document.getElementById('${id}').dataset.open='true'">
   ${icons.logo}
   <span>Binja</span>
-  <span class="dbg-time">${time}ms</span>
-</button>`
-}
+  <span class="badge">${time}ms</span>
+</button>
 
-function generatePanel(id: string, data: DebugData, c: typeof darkTheme, opts: Required<PanelOptions>): string {
-  const time = (data.totalTime || 0).toFixed(2)
-  const mode = data.mode === 'aot' ? 'AOT' : 'Runtime'
-
-  return `
-<div class="dbg-panel">
-  <div class="dbg-header">
-    <div class="dbg-logo">${icons.logo} Binja Debugger</div>
-    <div class="dbg-meta">
-      <span class="dbg-badge mode">${mode}</span>
-      <span class="dbg-badge time">${time}ms</span>
-      <button class="dbg-close" onclick="document.querySelector('#${id} .dbg-panel').classList.remove('open');document.querySelector('#${id} .dbg-toggle').style.display='inline-flex'">${icons.close}</button>
+<div class="devtools-panel">
+  <div class="devtools-resize"></div>
+  <div class="devtools-toolbar">
+    <div class="devtools-tabs">${tabsHtml}</div>
+    <div class="devtools-actions">
+      <button class="devtools-btn" title="Dock to bottom" data-dock="bottom">${icons.dock}</button>
+      <button class="devtools-btn" title="Dock to right" data-dock="right">${icons.dockRight}</button>
+      <button class="devtools-btn" title="Popup" data-dock="popup">${icons.popup}</button>
+      <button class="devtools-btn" title="Close" onclick="document.getElementById('${id}').dataset.open='false'">${icons.close}</button>
     </div>
   </div>
-  <div class="dbg-body">
-    ${generatePerfSection(data)}
-    ${generateTemplatesSection(data)}
-    ${generateContextSection(data)}
-    ${generateFiltersSection(data)}
-    ${generateQueriesSection(data)}
-    ${generateCacheSection(data)}
-    ${generateWarningsSection(data)}
+  <div class="devtools-content">
+    ${generatePerfPane(data)}
+    ${generateContextPane(data)}
+    ${generateTemplatesPane(data)}
+    ${generateFiltersPane(data)}
+    ${generateQueriesPane(data)}
+    ${generateCachePane(data)}
+    ${generateWarningsPane(data)}
   </div>
 </div>`
 }
 
-function generatePerfSection(data: DebugData): string {
+function generatePerfPane(data: DebugData): string {
   const total = data.totalTime || 0.01
   const lexer = data.lexerTime || 0
   const parser = data.parserTime || 0
   const render = data.renderTime || 0
+  const mode = data.mode === 'aot' ? 'AOT' : 'Runtime'
 
   return `
-<div class="dbg-section open">
-  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span class="dbg-section-title">${icons.perf} Performance</span>
-    <span class="dbg-chevron">${icons.chevron}</span>
+<div class="devtools-pane active" data-pane="perf">
+  <div class="perf-grid">
+    <div class="perf-card">
+      <div class="perf-card-value">${total.toFixed(2)}ms</div>
+      <div class="perf-card-label">Total Time</div>
+    </div>
+    <div class="perf-card">
+      <div class="perf-card-value" style="color:var(--accent)">${mode}</div>
+      <div class="perf-card-label">Mode</div>
+    </div>
+    <div class="perf-card">
+      <div class="perf-card-value">${data.templateChain.length}</div>
+      <div class="perf-card-label">Templates</div>
+    </div>
+    <div class="perf-card">
+      <div class="perf-card-value">${data.queries?.length || 0}</div>
+      <div class="perf-card-label">Queries</div>
+    </div>
   </div>
-  <div class="dbg-section-content">
-    <div class="dbg-row">
-      <span class="dbg-label">Lexer</span>
-      <span class="dbg-value">${lexer.toFixed(2)}ms</span>
+  <div class="perf-breakdown">
+    <div class="perf-row">
+      <span class="perf-row-label">Lexer</span>
+      <div class="perf-row-bar"><div class="perf-row-fill lexer" style="width:${(lexer/total)*100}%"></div></div>
+      <span class="perf-row-value">${lexer.toFixed(2)}ms</span>
     </div>
-    <div class="dbg-bar"><div class="dbg-bar-fill lexer" style="width:${(lexer/total)*100}%"></div></div>
-    <div class="dbg-row">
-      <span class="dbg-label">Parser</span>
-      <span class="dbg-value">${parser.toFixed(2)}ms</span>
+    <div class="perf-row">
+      <span class="perf-row-label">Parser</span>
+      <div class="perf-row-bar"><div class="perf-row-fill parser" style="width:${(parser/total)*100}%"></div></div>
+      <span class="perf-row-value">${parser.toFixed(2)}ms</span>
     </div>
-    <div class="dbg-bar"><div class="dbg-bar-fill parser" style="width:${(parser/total)*100}%"></div></div>
-    <div class="dbg-row">
-      <span class="dbg-label">Render</span>
-      <span class="dbg-value">${render.toFixed(2)}ms</span>
-    </div>
-    <div class="dbg-bar"><div class="dbg-bar-fill render" style="width:${(render/total)*100}%"></div></div>
-    <div class="dbg-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1)">
-      <span class="dbg-label" style="font-weight:600">Total</span>
-      <span class="dbg-value" style="font-weight:600">${total.toFixed(2)}ms</span>
+    <div class="perf-row">
+      <span class="perf-row-label">Render</span>
+      <div class="perf-row-bar"><div class="perf-row-fill render" style="width:${(render/total)*100}%"></div></div>
+      <span class="perf-row-value">${render.toFixed(2)}ms</span>
     </div>
   </div>
 </div>`
 }
 
-function generateTemplatesSection(data: DebugData): string {
-  if (data.templateChain.length === 0) return ''
-
-  const templates = data.templateChain.map(t => `
-    <div class="dbg-template">
-      ${icons.file}
-      <span class="dbg-template-name">${t.name}</span>
-      <span class="dbg-template-tag ${t.type}">${t.type}</span>
-    </div>
-  `).join('')
-
-  return `
-<div class="dbg-section">
-  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span class="dbg-section-title">${icons.template} Templates</span>
-    <span class="dbg-section-meta">${data.templateChain.length}</span>
-    <span class="dbg-chevron">${icons.chevron}</span>
-  </div>
-  <div class="dbg-section-content">
-    <div class="dbg-templates">${templates}</div>
-  </div>
-</div>`
-}
-
-function generateContextSection(data: DebugData): string {
+function generateContextPane(data: DebugData): string {
   const keys = Object.keys(data.contextSnapshot)
-  if (keys.length === 0) return ''
+  if (keys.length === 0) {
+    return `<div class="devtools-pane" data-pane="context"><div class="empty-state">${icons.context}<span>No context variables</span></div></div>`
+  }
 
-  const items = keys.map(key => renderContextValue(key, data.contextSnapshot[key])).join('')
-
-  return `
-<div class="dbg-section">
-  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span class="dbg-section-title">${icons.context} Context</span>
-    <span class="dbg-section-meta">${keys.length} vars</span>
-    <span class="dbg-chevron">${icons.chevron}</span>
-  </div>
-  <div class="dbg-section-content">
-    <div class="dbg-ctx-grid">${items}</div>
-  </div>
-</div>`
+  const items = keys.map(key => renderTreeItem(key, data.contextSnapshot[key])).join('')
+  return `<div class="devtools-pane" data-pane="context"><div class="tree">${items}</div></div>`
 }
 
-function renderContextValue(key: string, ctx: ContextValue): string {
-  const arrow = ctx.expandable
-    ? `<svg class="dbg-ctx-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>`
-    : ''
+function renderTreeItem(key: string, ctx: ContextValue): string {
+  const hasChildren = ctx.expandable && ctx.children && Object.keys(ctx.children).length > 0
+  const arrowHtml = hasChildren ? `<span class="tree-arrow">${icons.arrow}</span>` : '<span class="tree-arrow" style="visibility:hidden">${icons.arrow}</span>'
+  const expandableClass = hasChildren ? 'expandable' : ''
+  const valueClass = getValueClass(ctx.type)
 
-  const expandableClass = ctx.expandable ? 'expandable' : ''
-  const onClick = ctx.expandable ? 'onclick="this.parentElement.classList.toggle(\'open\')"' : ''
-
-  let children = ''
-  if (ctx.expandable && ctx.children) {
-    const childItems = Object.entries(ctx.children)
-      .map(([k, v]) => renderContextValue(k, v))
-      .join('')
-    children = `<div class="dbg-ctx-children">${childItems}</div>`
+  let childrenHtml = ''
+  if (hasChildren && ctx.children) {
+    childrenHtml = `<div class="tree-children">${Object.entries(ctx.children).map(([k, v]) => renderTreeItem(k, v)).join('')}</div>`
   }
 
   return `
-  <div class="dbg-ctx-item">
-    <div class="dbg-ctx-row ${expandableClass}" ${onClick}>
-      <div class="dbg-ctx-key">
-        ${arrow}
-        <span class="dbg-ctx-name">${escapeHtml(key)}</span>
-        <span class="dbg-ctx-type">${ctx.type}</span>
-      </div>
-      <span class="dbg-ctx-preview">${escapeHtml(ctx.preview)}</span>
-    </div>
-    ${children}
-  </div>`
-}
-
-function generateFiltersSection(data: DebugData): string {
-  const filters = Array.from(data.filtersUsed.entries())
-  if (filters.length === 0) return ''
-
-  const items = filters.map(([name, count]) =>
-    `<span class="dbg-filter">${name}<span class="dbg-filter-count">×${count}</span></span>`
-  ).join('')
-
-  return `
-<div class="dbg-section">
-  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span class="dbg-section-title">${icons.filter} Filters</span>
-    <span class="dbg-section-meta">${filters.length}</span>
-    <span class="dbg-chevron">${icons.chevron}</span>
+<div class="tree-item">
+  <div class="tree-row ${expandableClass}">
+    ${arrowHtml}
+    <span class="tree-key">${escapeHtml(key)}</span>
+    <span class="tree-colon">:</span>
+    <span class="tree-value ${valueClass}">${escapeHtml(ctx.preview)}</span>
+    <span class="tree-type">${ctx.type}</span>
   </div>
-  <div class="dbg-section-content">
-    <div class="dbg-filters">${items}</div>
-  </div>
+  ${childrenHtml}
 </div>`
 }
 
-function generateCacheSection(data: DebugData): string {
-  const total = data.cacheHits + data.cacheMisses
-  if (total === 0) return ''
-
-  return `
-<div class="dbg-section">
-  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span class="dbg-section-title">${icons.cache} Cache</span>
-    <span class="dbg-section-meta">${((data.cacheHits/total)*100).toFixed(0)}% hit</span>
-    <span class="dbg-chevron">${icons.chevron}</span>
-  </div>
-  <div class="dbg-section-content">
-    <div class="dbg-cache">
-      <div class="dbg-cache-stat">
-        <div class="dbg-cache-num hit">${data.cacheHits}</div>
-        <div class="dbg-cache-label">Cache Hits</div>
-      </div>
-      <div class="dbg-cache-stat">
-        <div class="dbg-cache-num miss">${data.cacheMisses}</div>
-        <div class="dbg-cache-label">Cache Misses</div>
-      </div>
-    </div>
-  </div>
-</div>`
+function getValueClass(type: string): string {
+  if (type === 'string') return 'string'
+  if (type === 'number' || type === 'integer' || type === 'float') return 'number'
+  if (type === 'null' || type === 'undefined') return 'null'
+  return ''
 }
 
-function generateWarningsSection(data: DebugData): string {
-  if (data.warnings.length === 0) return ''
+function generateTemplatesPane(data: DebugData): string {
+  if (data.templateChain.length === 0) {
+    return `<div class="devtools-pane" data-pane="templates"><div class="empty-state">${icons.template}<span>No templates loaded</span></div></div>`
+  }
 
-  const items = data.warnings.map(w => `
-    <div class="dbg-warning">
-      ${icons.warning}
-      <span class="dbg-warning-text">${escapeHtml(w)}</span>
+  const items = data.templateChain.map(t => `
+    <div class="template-item">
+      <span class="template-icon">${icons.template}</span>
+      <span class="template-name">${escapeHtml(t.name)}</span>
+      <span class="template-badge ${t.type}">${t.type}</span>
     </div>
   `).join('')
 
-  return `
-<div class="dbg-section open">
-  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span class="dbg-section-title">${icons.warning} Warnings</span>
-    <span class="dbg-section-meta" style="color:#eab308">${data.warnings.length}</span>
-    <span class="dbg-chevron">${icons.chevron}</span>
-  </div>
-  <div class="dbg-section-content">
-    <div class="dbg-warnings">${items}</div>
-  </div>
-</div>`
+  return `<div class="devtools-pane" data-pane="templates"><div class="template-list">${items}</div></div>`
 }
 
-function generateQueriesSection(data: DebugData): string {
-  if (data.queries.length === 0) return ''
+function generateFiltersPane(data: DebugData): string {
+  const filters = Array.from(data.filtersUsed.entries())
+  if (filters.length === 0) {
+    return `<div class="devtools-pane" data-pane="filters"><div class="empty-state">${icons.filter}<span>No filters used</span></div></div>`
+  }
+
+  const items = filters.map(([name, count]) => `
+    <span class="filter-chip">${escapeHtml(name)}<span class="filter-count">×${count}</span></span>
+  `).join('')
+
+  return `<div class="devtools-pane" data-pane="filters"><div class="filter-grid">${items}</div></div>`
+}
+
+function generateQueriesPane(data: DebugData): string {
+  if (!data.queries || data.queries.length === 0) {
+    return `<div class="devtools-pane" data-pane="queries"><div class="empty-state">${icons.database}<span>No queries recorded</span></div></div>`
+  }
 
   const stats = data.queryStats
-  const hasIssues = stats.slowCount > 0 || stats.n1Count > 0
-
-  // Generate stats row
   const statsHtml = `
-    <div class="dbg-query-stats">
-      <div class="dbg-query-stat">
-        <div class="dbg-query-stat-num">${stats.count}</div>
-        <div class="dbg-query-stat-label">Queries</div>
+    <div class="queries-stats">
+      <div class="queries-stat">
+        <div class="queries-stat-value">${stats.count}</div>
+        <div class="queries-stat-label">Queries</div>
       </div>
-      <div class="dbg-query-stat">
-        <div class="dbg-query-stat-num">${stats.totalDuration.toFixed(1)}ms</div>
-        <div class="dbg-query-stat-label">Total Time</div>
+      <div class="queries-stat">
+        <div class="queries-stat-value">${stats.totalDuration.toFixed(1)}ms</div>
+        <div class="queries-stat-label">Total</div>
       </div>
-      <div class="dbg-query-stat">
-        <div class="dbg-query-stat-num ${stats.slowCount > 0 ? 'warning' : ''}">${stats.slowCount}</div>
-        <div class="dbg-query-stat-label">Slow (&gt;100ms)</div>
+      <div class="queries-stat">
+        <div class="queries-stat-value ${stats.slowCount > 0 ? 'warn' : ''}">${stats.slowCount}</div>
+        <div class="queries-stat-label">Slow</div>
       </div>
-      <div class="dbg-query-stat">
-        <div class="dbg-query-stat-num ${stats.n1Count > 0 ? 'error' : ''}">${stats.n1Count}</div>
-        <div class="dbg-query-stat-label">N+1</div>
+      <div class="queries-stat">
+        <div class="queries-stat-value ${stats.n1Count > 0 ? 'error' : ''}">${stats.n1Count}</div>
+        <div class="queries-stat-label">N+1</div>
       </div>
     </div>`
 
-  // Generate query list
   const queries = data.queries.map(q => {
     const isSlow = q.duration > 100
-    const classes = [
-      'dbg-query',
-      q.isN1 ? 'n1' : '',
-      isSlow ? 'slow' : ''
-    ].filter(Boolean).join(' ')
-
-    const badges = []
-    if (q.isN1) {
-      badges.push('<span class="dbg-query-badge n1">N+1</span>')
-    }
-
-    const rowsText = q.rows !== undefined ? `<span class="dbg-query-rows">${q.rows} rows</span>` : ''
-    const sourceText = q.source ? `<span class="dbg-query-source">${escapeHtml(q.source)}</span>` : ''
+    const classes = ['query-item', q.isN1 ? 'n1' : '', isSlow ? 'slow' : ''].filter(Boolean).join(' ')
+    const badge = q.isN1 ? '<span class="query-badge n1">N+1</span>' : ''
+    const source = q.source ? `<span class="query-source">${escapeHtml(q.source)}</span>` : ''
+    const rows = q.rows !== undefined ? `<span class="query-rows">${q.rows} rows</span>` : ''
 
     return `
     <div class="${classes}">
-      <div class="dbg-query-header">
-        <span class="dbg-query-sql" title="${escapeHtml(q.sql)}">${escapeHtml(q.sql)}</span>
-        <div class="dbg-query-meta">
-          ${badges.join('')}
-          ${sourceText}
-          ${rowsText}
-          <span class="dbg-query-time ${isSlow ? 'slow' : ''}">${q.duration.toFixed(1)}ms</span>
+      <div class="query-header">
+        <span class="query-sql" title="${escapeHtml(q.sql)}">${escapeHtml(q.sql)}</span>
+        <div class="query-meta">
+          ${badge}${source}${rows}
+          <span class="query-time ${isSlow ? 'slow' : ''}">${q.duration.toFixed(1)}ms</span>
         </div>
       </div>
     </div>`
   }).join('')
 
-  const metaColor = hasIssues ? 'style="color:#ef4444"' : ''
+  return `<div class="devtools-pane" data-pane="queries">${statsHtml}<div class="query-list">${queries}</div></div>`
+}
+
+function generateCachePane(data: DebugData): string {
+  const total = data.cacheHits + data.cacheMisses
+  if (total === 0) {
+    return `<div class="devtools-pane" data-pane="cache"><div class="empty-state">${icons.cache}<span>No cache activity</span></div></div>`
+  }
+
+  const hitRate = ((data.cacheHits / total) * 100).toFixed(0)
 
   return `
-<div class="dbg-section ${hasIssues ? 'open' : ''}">
-  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span class="dbg-section-title">${icons.database} Queries</span>
-    <span class="dbg-section-meta" ${metaColor}>${stats.count} (${stats.totalDuration.toFixed(1)}ms)</span>
-    <span class="dbg-chevron">${icons.chevron}</span>
-  </div>
-  <div class="dbg-section-content">
-    ${statsHtml}
-    <div class="dbg-queries">${queries}</div>
+<div class="devtools-pane" data-pane="cache">
+  <div class="cache-stats">
+    <div class="cache-stat">
+      <div class="cache-value hit">${data.cacheHits}</div>
+      <div class="cache-label">Cache Hits</div>
+    </div>
+    <div class="cache-stat">
+      <div class="cache-value miss">${data.cacheMisses}</div>
+      <div class="cache-label">Cache Misses</div>
+    </div>
+    <div class="cache-stat">
+      <div class="cache-value">${hitRate}%</div>
+      <div class="cache-label">Hit Rate</div>
+    </div>
   </div>
 </div>`
 }
 
-function generateScript(id: string): string {
+function generateWarningsPane(data: DebugData): string {
+  if (data.warnings.length === 0) {
+    return `<div class="devtools-pane" data-pane="warnings"><div class="empty-state">${icons.warning}<span>No warnings</span></div></div>`
+  }
+
+  const items = data.warnings.map(w => `
+    <div class="warning-item">
+      <span class="warning-icon">${icons.warning}</span>
+      <span class="warning-text">${escapeHtml(w)}</span>
+    </div>
+  `).join('')
+
+  return `<div class="devtools-pane" data-pane="warnings"><div class="warning-list">${items}</div></div>`
+}
+
+function generateScript(id: string, data: DebugData, opts: Required<PanelOptions>): string {
   return `
-(function(){
-  var panel = document.getElementById('${id}');
-  if (!panel) return;
-  var header = panel.querySelector('.dbg-header');
-  if (!header) return;
-  var isDrag = false, startX, startY, startL, startT;
-  header.style.cursor = 'grab';
-  header.onmousedown = function(e) {
-    if (e.target.closest('.dbg-close')) return;
-    isDrag = true;
-    header.style.cursor = 'grabbing';
-    startX = e.clientX;
-    startY = e.clientY;
-    var r = panel.getBoundingClientRect();
-    startL = r.left;
-    startT = r.top;
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-    panel.style.left = startL + 'px';
-    panel.style.top = startT + 'px';
-  };
-  document.onmousemove = function(e) {
-    if (!isDrag) return;
-    panel.style.left = (startL + e.clientX - startX) + 'px';
-    panel.style.top = (startT + e.clientY - startY) + 'px';
-  };
-  document.onmouseup = function() {
-    isDrag = false;
-    header.style.cursor = 'grab';
-  };
+(function() {
+  var root = document.getElementById('${id}');
+  if (!root) return;
+
+  // Tab switching
+  root.querySelectorAll('.devtools-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      root.querySelectorAll('.devtools-tab').forEach(function(t) { t.classList.remove('active'); });
+      root.querySelectorAll('.devtools-pane').forEach(function(p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      var pane = root.querySelector('[data-pane="' + tab.dataset.tab + '"]');
+      if (pane) pane.classList.add('active');
+    });
+  });
+
+  // Tree expand/collapse
+  root.querySelectorAll('.tree-row.expandable').forEach(function(row) {
+    row.addEventListener('click', function() {
+      row.parentElement.classList.toggle('open');
+    });
+  });
+
+  // Dock position switching
+  root.querySelectorAll('[data-dock]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      root.dataset.position = btn.dataset.dock;
+    });
+  });
+
+  // Resize functionality
+  var resize = root.querySelector('.devtools-resize');
+  var panel = root.querySelector('.devtools-panel');
+  if (resize && panel) {
+    var isResizing = false;
+    var startY, startX, startHeight, startWidth;
+
+    resize.addEventListener('mousedown', function(e) {
+      isResizing = true;
+      startY = e.clientY;
+      startX = e.clientX;
+      startHeight = panel.offsetHeight;
+      startWidth = panel.offsetWidth;
+      document.body.style.cursor = root.dataset.position === 'right' ? 'ew-resize' : 'ns-resize';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!isResizing) return;
+      if (root.dataset.position === 'bottom') {
+        var newHeight = startHeight - (e.clientY - startY);
+        if (newHeight > 100 && newHeight < window.innerHeight * 0.8) {
+          panel.style.height = newHeight + 'px';
+        }
+      } else if (root.dataset.position === 'right') {
+        var newWidth = startWidth - (e.clientX - startX);
+        if (newWidth > 200 && newWidth < window.innerWidth * 0.6) {
+          panel.style.width = newWidth + 'px';
+        }
+      }
+    });
+
+    document.addEventListener('mouseup', function() {
+      isResizing = false;
+      document.body.style.cursor = '';
+    });
+  }
 })();`
 }
 
 function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
