@@ -1,6 +1,6 @@
 {
   "name": "binja",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "High-performance Jinja2/Django template engine for Bun",
   "main": "dist/index.js",
   "module": "dist/index.js",
