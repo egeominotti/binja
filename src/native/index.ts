@@ -4,7 +4,7 @@
  * Automatically uses native Zig lexer when available,
  * falls back to pure TypeScript implementation otherwise.
  */
-import { dlopen, FFIType, ptr, CString } from 'bun:ffi'
+import { dlopen, FFIType, ptr, CString, toArrayBuffer } from 'bun:ffi'
 import { join, dirname, basename } from 'path'
 import { existsSync } from 'fs'
 
@@ -85,6 +85,19 @@ const symbols = {
   binja_lexer_error_line: {
     args: [FFIType.ptr] as const,
     returns: FFIType.u32,
+  },
+  // Batch API - single FFI call for all tokens
+  binja_lexer_get_tokens_buffer: {
+    args: [FFIType.ptr] as const,
+    returns: FFIType.ptr,
+  },
+  binja_lexer_tokens_buffer_size: {
+    args: [FFIType.ptr] as const,
+    returns: FFIType.u64,
+  },
+  binja_free_tokens_buffer: {
+    args: [FFIType.ptr, FFIType.u64] as const,
+    returns: FFIType.void,
   },
   binja_tokenize_count: {
     args: [FFIType.ptr, FFIType.u64] as const,
@@ -325,7 +338,7 @@ export function tokenizeCount(source: string): number {
 }
 
 /**
- * Tokenize with native lexer, auto-cleanup
+ * Tokenize with native lexer, auto-cleanup (OLD - per-token FFI calls)
  */
 export function tokenize(source: string): NativeToken[] {
   const lexer = new NativeLexer(source)
@@ -334,4 +347,90 @@ export function tokenize(source: string): NativeToken[] {
   } finally {
     lexer.free()
   }
+}
+
+// Error code messages (must match LexerError enum in Zig)
+const ERROR_MESSAGES: Record<number, string> = {
+  1: 'Unterminated string',
+  2: 'Unclosed template tag',
+  3: 'Invalid operator',
+  4: 'Unexpected character',
+}
+
+/**
+ * Batch tokenize - single FFI call for all tokens (FAST)
+ * Returns array of [type, start, end] tuples for maximum performance
+ */
+export function tokenizeBatch(source: string): Array<[number, number, number]> {
+  if (source.length === 0) {
+    return [[TokenType.EOF, 0, 0]]
+  }
+
+  const lib = loadLibrary()
+  if (!lib) {
+    throw new Error('Native library not available')
+  }
+
+  // Create lexer
+  const sourceBuffer = new TextEncoder().encode(source)
+  const lexerPtr = lib.symbols.binja_lexer_new(ptr(sourceBuffer), sourceBuffer.length)
+  if (!lexerPtr) {
+    throw new Error('Failed to create native lexer')
+  }
+
+  try {
+    // Check for lexer errors
+    if (lib.symbols.binja_lexer_has_error(lexerPtr)) {
+      const errorCode = Number(lib.symbols.binja_lexer_error_code(lexerPtr))
+      const errorLine = Number(lib.symbols.binja_lexer_error_line(lexerPtr))
+      const message = ERROR_MESSAGES[errorCode] ?? 'Unknown error'
+      throw new Error(`${message} at line ${errorLine}`)
+    }
+
+    // Get buffer with all tokens (single FFI call)
+    const bufferSize = Number(lib.symbols.binja_lexer_tokens_buffer_size(lexerPtr))
+    const bufferPtr = lib.symbols.binja_lexer_get_tokens_buffer(lexerPtr)
+    if (!bufferPtr) {
+      throw new Error('Failed to get tokens buffer')
+    }
+
+    try {
+      // Read buffer as Uint8Array
+      const buffer = new Uint8Array(toArrayBuffer(bufferPtr, 0, bufferSize))
+      const view = new DataView(buffer.buffer)
+
+      // Parse count (first 4 bytes, little-endian)
+      const count = view.getUint32(0, true)
+      const tokens: Array<[number, number, number]> = new Array(count)
+
+      // Parse tokens (9 bytes each: u8 type + u32 start + u32 end)
+      let offset = 4
+      for (let i = 0; i < count; i++) {
+        const type = buffer[offset]
+        const start = view.getUint32(offset + 1, true)
+        const end = view.getUint32(offset + 5, true)
+        tokens[i] = [type, start, end]
+        offset += 9
+      }
+
+      return tokens
+    } finally {
+      lib.symbols.binja_free_tokens_buffer(bufferPtr, bufferSize)
+    }
+  } finally {
+    lib.symbols.binja_lexer_free(lexerPtr)
+  }
+}
+
+/**
+ * Batch tokenize with full token objects (includes value extraction)
+ */
+export function tokenizeBatchFull(source: string): NativeToken[] {
+  const tuples = tokenizeBatch(source)
+  return tuples.map(([type, start, end]) => ({
+    type,
+    start,
+    end,
+    value: source.slice(start, end),
+  }))
 }

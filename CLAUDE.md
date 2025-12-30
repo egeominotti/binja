@@ -94,52 +94,41 @@ binja/
 ### Template Processing Pipeline
 
 ```
-Template String → Lexer (Zig/JS) → Tokens → Parser → AST → Runtime → Output String
+Template String → Lexer → Tokens → Parser → AST → Runtime → Output String
 ```
 
 1. **Lexer** (`src/lexer/`): Tokenizes template into tokens (TEXT, VAR_START, BLOCK_START, etc.)
-   - Uses native Zig lexer when available (3-5x faster)
-   - Automatically falls back to pure TypeScript implementation
+   - Pure TypeScript implementation optimized for Bun
+   - 2-4x faster than Nunjucks
 2. **Parser** (`src/parser/`): Converts tokens into Abstract Syntax Tree (AST)
 3. **Runtime** (`src/runtime/`): Executes AST with context to produce output
 
-### Native Zig Acceleration
+### Performance
 
-The lexer has a native Zig implementation for maximum performance:
+Binja is **2-4x faster** than Nunjucks in runtime mode:
 
-```typescript
-import { isNativeAvailable, nativeVersion } from 'binja/native'
+| Benchmark | binja | Nunjucks | Speedup |
+|-----------|-------|----------|---------|
+| Simple Template | 371K ops/s | 96K ops/s | **3.9x** |
+| Complex Template | 44K ops/s | 23K ops/s | **2.0x** |
+| Nested Loops | 76K ops/s | 26K ops/s | **3.0x** |
+| Conditionals | 84K ops/s | 25K ops/s | **3.4x** |
+| HTML Escaping | 985K ops/s | 242K ops/s | **4.1x** |
 
-// Check if native acceleration is active
-if (isNativeAvailable()) {
-  console.log(`Using native Zig lexer: ${nativeVersion()}`)
-}
-```
+### Native Zig (Currently Disabled)
 
-**Platform Support:**
-| Platform | Architecture | Status |
-|----------|-------------|--------|
-| macOS | Apple Silicon (arm64) | ✅ |
-| macOS | Intel (x64) | ✅ |
-| Linux | x64 | ✅ |
-| Linux | arm64 | ✅ |
-| Windows | x64 | 🔜 |
+There is a native Zig lexer implementation in `zig-native/` but it's currently disabled.
+The FFI overhead negates the performance benefits for lexer-only acceleration.
+Future work may include a full native pipeline (lexer + parser + runtime) in Zig.
 
-**Performance Comparison:**
-| Operation | TypeScript | Native Zig | Speedup |
-|-----------|-----------|------------|---------|
-| Simple template | 0.15ms | 0.04ms | 3.7x |
-| Complex template | 2.1ms | 0.42ms | 5x |
-| Large template | 8.5ms | 1.7ms | 5x |
+The native binaries are still included in the package for potential future use.
 
 ### Key Classes
 
 | Class | File | Purpose |
 |-------|------|---------|
 | `Environment` | `src/index.ts` | Main API, template loading, configuration, debug |
-| `HybridLexer` | `src/lexer/hybrid.ts` | Auto-selects native or JS lexer |
-| `NativeLexer` | `src/native/index.ts` | Zig FFI bindings |
-| `Lexer` | `src/lexer/index.ts` | Pure TypeScript lexer (fallback) |
+| `Lexer` | `src/lexer/index.ts` | Pure TypeScript lexer |
 | `Parser` | `src/parser/index.ts` | Generates AST from tokens |
 | `Runtime` | `src/runtime/index.ts` | Executes AST |
 | `Context` | `src/runtime/context.ts` | Variable scope management |
@@ -282,7 +271,10 @@ Filters returning HTML must return a `Markup` object or use `|safe`.
 ### Array Index in Parser
 The parser accepts NUMBER after DOT for DTL-style array access (`items.0`).
 
-## Building Native Library
+## Building Native Library (Optional - Currently Disabled)
+
+The native Zig lexer is currently disabled because pure TypeScript + Bun is faster
+due to FFI overhead. The native code is kept for potential future full-pipeline implementation.
 
 To build the Zig native library from source:
 
@@ -293,20 +285,7 @@ zig build -Doptimize=ReleaseFast
 
 The library will be output to `zig-native/zig-out/lib/libbinja.{dylib,so,dll}`.
 
-For cross-compilation:
-```bash
-# macOS ARM64
-zig build -Doptimize=ReleaseFast -Dtarget=aarch64-macos
-
-# macOS x64
-zig build -Doptimize=ReleaseFast -Dtarget=x86_64-macos
-
-# Linux x64
-zig build -Doptimize=ReleaseFast -Dtarget=x86_64-linux
-
-# Linux ARM64
-zig build -Doptimize=ReleaseFast -Dtarget=aarch64-linux
-```
+To re-enable native lexer, edit `src/lexer/hybrid.ts` and modify `checkNative()` to return true.
 
 ## Publishing to npm
 
@@ -370,5 +349,5 @@ import { DebugCollector } from 'binja/debug'      // Debug tools
 ## GitHub
 
 - **Repository**: binja
-- **Description**: High-performance Jinja2/Django Template Language engine for Bun. 100% DTL compatible. Native Zig acceleration.
-- **Topics**: `jinja2`, `django`, `template-engine`, `bun`, `typescript`, `dtl`, `django-templates`, `zig`
+- **Description**: High-performance Jinja2/Django Template Language engine for Bun. 2-4x faster than Nunjucks. 100% DTL compatible.
+- **Topics**: `jinja2`, `django`, `template-engine`, `bun`, `typescript`, `dtl`, `django-templates`

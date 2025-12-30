@@ -3,25 +3,16 @@
  */
 import { Token, TokenType } from './tokens'
 
-// Native module state
+// Native module state - DISABLED for now (pure TypeScript is faster for most cases)
+// Re-enable when native parser/runtime are implemented
 let _nativeChecked = false
 let _nativeAvailable = false
-let NativeLexerClass: any = null
+let _tokenizeBatchFn: ((source: string) => Array<[number, number, number]>) | null = null
 
 function checkNative(): boolean {
-  if (_nativeChecked) return _nativeAvailable
-
-  _nativeChecked = true
-  try {
-    const native = require('../native')
-    if (typeof native.isNativeAvailable === 'function' && native.isNativeAvailable()) {
-      _nativeAvailable = true
-      NativeLexerClass = native.NativeLexer
-      return true
-    }
-  } catch {
-    // Native not available
-  }
+  // Native Zig lexer disabled - using pure TypeScript
+  // The FFI overhead negates Zig's speed advantage for lexer-only
+  // Will re-enable when full native pipeline (lexer+parser+runtime) is ready
   return false
 }
 
@@ -83,72 +74,59 @@ export function isNativeAccelerated(): boolean {
 }
 
 /**
- * Tokenize using native FFI (returns null if not available)
+ * Tokenize using native FFI with batch API (single FFI call)
  */
 export function tokenizeNative(source: string): Token[] | null {
-  if (!checkNative() || !NativeLexerClass) return null
+  if (!checkNative() || !_tokenizeBatchFn) return null
   if (source.length === 0) {
     return [{ type: TokenType.EOF, value: '', line: 1, column: 1 }]
   }
 
-  const lexer = new NativeLexerClass(source)
-  try {
-    // Check for lexer errors
-    if (lexer.hasError()) {
-      const errorCode = lexer.getErrorCode()
-      const errorLine = lexer.getErrorLine()
-      const message = ERROR_MESSAGES[errorCode] ?? 'Unknown error'
-      throw new Error(`${message} at line ${errorLine}`)
-    }
+  // Get all tokens in single FFI call (batch API)
+  const rawTokens = _tokenizeBatchFn(source)
 
-    const tokens: Token[] = []
-    const count = lexer.tokenCount
-
-    // Pre-compute line starts for fast line/column lookup
-    const lineStarts: number[] = [0]
-    for (let i = 0; i < source.length; i++) {
-      if (source[i] === '\n') lineStarts.push(i + 1)
-    }
-
-    for (let i = 0; i < count; i++) {
-      const nativeType = lexer.getTokenType(i)
-      const value = lexer.getTokenValue(i)
-      const start = lexer.getTokenStart(i)
-
-      // Binary search for line number
-      let lo = 0, hi = lineStarts.length - 1
-      while (lo < hi) {
-        const mid = (lo + hi + 1) >> 1
-        if (lineStarts[mid] <= start) lo = mid
-        else hi = mid - 1
-      }
-      const line = lo + 1
-      const column = start - lineStarts[lo] + 1
-
-      // Determine token type
-      let type = NATIVE_TO_TS[nativeType] ?? TokenType.NAME
-      let finalValue = value
-
-      if (nativeType === 10 && OPERATOR_TO_TYPE[value]) {
-        type = OPERATOR_TO_TYPE[value]
-      } else if (type === TokenType.NAME && KEYWORD_TO_TYPE[value]) {
-        type = KEYWORD_TO_TYPE[value]
-      }
-
-      // Strip quotes from string values (Zig includes them, TS doesn't)
-      if (type === TokenType.STRING && finalValue.length >= 2) {
-        const first = finalValue[0]
-        const last = finalValue[finalValue.length - 1]
-        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-          finalValue = finalValue.slice(1, -1)
-        }
-      }
-
-      tokens.push({ type, value: finalValue, line, column })
-    }
-
-    return tokens
-  } finally {
-    lexer.free()
+  // Pre-compute line starts for fast line/column lookup
+  const lineStarts: number[] = [0]
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === '\n') lineStarts.push(i + 1)
   }
+
+  const tokens: Token[] = new Array(rawTokens.length)
+
+  for (let i = 0; i < rawTokens.length; i++) {
+    const [nativeType, start, end] = rawTokens[i]
+    let value = source.slice(start, end)
+
+    // Binary search for line number
+    let lo = 0, hi = lineStarts.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1
+      if (lineStarts[mid] <= start) lo = mid
+      else hi = mid - 1
+    }
+    const line = lo + 1
+    const column = start - lineStarts[lo] + 1
+
+    // Determine token type
+    let type = NATIVE_TO_TS[nativeType] ?? TokenType.NAME
+
+    if (nativeType === 10 && OPERATOR_TO_TYPE[value]) {
+      type = OPERATOR_TO_TYPE[value]
+    } else if (type === TokenType.NAME && KEYWORD_TO_TYPE[value]) {
+      type = KEYWORD_TO_TYPE[value]
+    }
+
+    // Strip quotes from string values (Zig includes them, TS doesn't)
+    if (type === TokenType.STRING && value.length >= 2) {
+      const first = value[0]
+      const last = value[value.length - 1]
+      if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+        value = value.slice(1, -1)
+      }
+    }
+
+    tokens[i] = { type, value, line, column }
+  }
+
+  return tokens
 }

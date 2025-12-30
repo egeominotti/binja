@@ -82,6 +82,57 @@ export fn binja_lexer_error_line(lex: *lexer.Lexer) u32 {
     return lex.getErrorLine();
 }
 
+/// Get all tokens as packed buffer (BATCH API - single FFI call)
+/// Format: [count:u32][token1: type:u8, start:u32, end:u32][token2: ...]
+/// Returns pointer to buffer, size via binja_lexer_tokens_buffer_size
+export fn binja_lexer_get_tokens_buffer(lex: *lexer.Lexer) ?[*]u8 {
+    const count = lex.tokens.items.len;
+    const buffer_size = 4 + (count * 9); // 4 bytes count + 9 bytes per token
+
+    const buffer = allocator.alloc(u8, buffer_size) catch return null;
+
+    // Write count (little-endian u32)
+    const count_u32: u32 = @intCast(count);
+    buffer[0] = @truncate(count_u32);
+    buffer[1] = @truncate(count_u32 >> 8);
+    buffer[2] = @truncate(count_u32 >> 16);
+    buffer[3] = @truncate(count_u32 >> 24);
+
+    // Write tokens
+    var offset: usize = 4;
+    for (lex.tokens.items) |token| {
+        // type (u8)
+        buffer[offset] = @intFromEnum(token.token_type);
+        offset += 1;
+
+        // start (u32 little-endian)
+        buffer[offset] = @truncate(token.start);
+        buffer[offset + 1] = @truncate(token.start >> 8);
+        buffer[offset + 2] = @truncate(token.start >> 16);
+        buffer[offset + 3] = @truncate(token.start >> 24);
+        offset += 4;
+
+        // end (u32 little-endian)
+        buffer[offset] = @truncate(token.end);
+        buffer[offset + 1] = @truncate(token.end >> 8);
+        buffer[offset + 2] = @truncate(token.end >> 16);
+        buffer[offset + 3] = @truncate(token.end >> 24);
+        offset += 4;
+    }
+
+    return buffer.ptr;
+}
+
+/// Get buffer size for tokens
+export fn binja_lexer_tokens_buffer_size(lex: *lexer.Lexer) usize {
+    return 4 + (lex.tokens.items.len * 9);
+}
+
+/// Free tokens buffer
+export fn binja_free_tokens_buffer(ptr: [*]u8, size: usize) void {
+    allocator.free(ptr[0..size]);
+}
+
 // ============================================================================
 // Parser API
 // ============================================================================
