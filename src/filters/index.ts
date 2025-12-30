@@ -802,6 +802,231 @@ export const unordered_list: FilterFunction = (value): any => {
   return safeString
 }
 
+// ==================== Additional Django Filters (DTL Complete) ====================
+
+// Django: addslashes - Escape backslash, single and double quotes
+export const addslashes: FilterFunction = (value) => {
+  const result = String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+  // Mark as safe since quotes are escaped for JS strings
+  const safeString = new String(result) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
+// Django: get_digit - Get nth digit from right (1=rightmost)
+export const get_digit: FilterFunction = (value, digit) => {
+  const num = parseInt(String(value), 10)
+  if (isNaN(num)) return value  // Return original for non-integers
+  const str = String(Math.abs(num))
+  const pos = Number(digit) || 1
+  if (pos < 1 || pos > str.length) return value
+  return parseInt(str[str.length - pos], 10)
+}
+
+// Django: iriencode - IRI encoding (like urlencode but preserves more chars)
+export const iriencode: FilterFunction = (value) => {
+  // IRI allows more characters than URI, only encode unsafe ones
+  return String(value)
+    .replace(/ /g, '%20')
+    .replace(/"/g, '%22')
+    .replace(/</g, '%3C')
+    .replace(/>/g, '%3E')
+    .replace(/\\/g, '%5C')
+    .replace(/\^/g, '%5E')
+    .replace(/`/g, '%60')
+    .replace(/\{/g, '%7B')
+    .replace(/\|/g, '%7C')
+    .replace(/\}/g, '%7D')
+}
+
+// Django: json_script - Output JSON in a <script> tag safely (for embedding in HTML)
+export const json_script: FilterFunction = (value, elementId) => {
+  const jsonStr = JSON.stringify(value)
+    .replace(/</g, '\\u003C')  // Escape < to prevent </script> injection
+    .replace(/>/g, '\\u003E')  // Escape > for safety
+    .replace(/&/g, '\\u0026') // Escape & for HTML safety
+
+  const id = elementId ? ` id="${String(elementId)}"` : ''
+  const html = `<script${id} type="application/json">${jsonStr}</script>`
+
+  const safeString = new String(html) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
+// Django: safeseq - Mark each item in sequence as safe
+export const safeseq: FilterFunction = (value) => {
+  if (!Array.isArray(value)) return value
+  return value.map(item => {
+    const safeString = new String(item) as any
+    safeString.__safe__ = true
+    return safeString
+  })
+}
+
+// Django: stringformat - Python-style % string formatting
+export const stringformat: FilterFunction = (value, formatStr) => {
+  const fmt = String(formatStr)
+  const val = value
+
+  // Support common Python format specifiers
+  if (fmt === 's') return String(val)
+  if (fmt === 'd' || fmt === 'i') return String(parseInt(String(val), 10) || 0)
+  if (fmt === 'f') return String(parseFloat(String(val)) || 0)
+  if (fmt === 'x') return (parseInt(String(val), 10) || 0).toString(16)  // hex lowercase
+  if (fmt === 'X') return (parseInt(String(val), 10) || 0).toString(16).toUpperCase()  // hex uppercase
+  if (fmt === 'o') return (parseInt(String(val), 10) || 0).toString(8)  // octal
+  if (fmt === 'b') return (parseInt(String(val), 10) || 0).toString(2)  // binary
+  if (fmt === 'e') return (parseFloat(String(val)) || 0).toExponential()  // exponential
+
+  // Handle precision: .2f, .3f, etc.
+  const precisionMatch = fmt.match(/^\.?(\d+)f$/)
+  if (precisionMatch) {
+    const precision = parseInt(precisionMatch[1], 10)
+    return (parseFloat(String(val)) || 0).toFixed(precision)
+  }
+
+  // Handle width and padding: 05d, 10s, etc.
+  const widthMatch = fmt.match(/^(\d+)([sd])$/)
+  if (widthMatch) {
+    const width = parseInt(widthMatch[1], 10)
+    const type = widthMatch[2]
+    const strVal = type === 'd' ? String(parseInt(String(val), 10) || 0) : String(val)
+    return strVal.padStart(width, type === 'd' ? '0' : ' ')
+  }
+
+  return String(val)
+}
+
+// Django: truncatechars_html - Truncate chars preserving HTML tags
+export const truncatechars_html: FilterFunction = (value, length = 30) => {
+  const str = String(value)
+  const maxLen = Number(length)
+
+  let result = ''
+  let textLen = 0
+  let inTag = false
+  const openTags: string[] = []
+
+  for (let i = 0; i < str.length && textLen < maxLen; i++) {
+    const char = str[i]
+
+    if (char === '<') {
+      inTag = true
+      // Check if closing tag
+      const closeMatch = str.slice(i).match(/^<\/(\w+)/)
+      const openMatch = str.slice(i).match(/^<(\w+)/)
+
+      if (closeMatch) {
+        const tagName = closeMatch[1].toLowerCase()
+        const lastOpen = openTags.lastIndexOf(tagName)
+        if (lastOpen !== -1) openTags.splice(lastOpen, 1)
+      } else if (openMatch && !str.slice(i).match(/^<\w+[^>]*\/>/)) {
+        // Not self-closing
+        openTags.push(openMatch[1].toLowerCase())
+      }
+    }
+
+    result += char
+
+    if (char === '>') {
+      inTag = false
+    } else if (!inTag) {
+      textLen++
+    }
+  }
+
+  // Add ellipsis if truncated
+  if (textLen >= maxLen && str.length > result.length) {
+    result += '...'
+  }
+
+  // Close any open tags
+  for (let i = openTags.length - 1; i >= 0; i--) {
+    result += `</${openTags[i]}>`
+  }
+
+  const safeString = new String(result) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
+// Django: truncatewords_html - Truncate words preserving HTML tags
+export const truncatewords_html: FilterFunction = (value, count = 15) => {
+  const str = String(value)
+  const maxWords = Number(count)
+
+  let result = ''
+  let wordCount = 0
+  let inTag = false
+  let inWord = false
+  const openTags: string[] = []
+
+  for (let i = 0; i < str.length && wordCount < maxWords; i++) {
+    const char = str[i]
+
+    if (char === '<') {
+      inTag = true
+      const closeMatch = str.slice(i).match(/^<\/(\w+)/)
+      const openMatch = str.slice(i).match(/^<(\w+)/)
+
+      if (closeMatch) {
+        const tagName = closeMatch[1].toLowerCase()
+        const lastOpen = openTags.lastIndexOf(tagName)
+        if (lastOpen !== -1) openTags.splice(lastOpen, 1)
+      } else if (openMatch && !str.slice(i).match(/^<\w+[^>]*\/>/)) {
+        openTags.push(openMatch[1].toLowerCase())
+      }
+    }
+
+    result += char
+
+    if (char === '>') {
+      inTag = false
+    } else if (!inTag) {
+      const isSpace = /\s/.test(char)
+      if (!isSpace && !inWord) {
+        inWord = true
+      } else if (isSpace && inWord) {
+        inWord = false
+        wordCount++
+      }
+    }
+  }
+
+  // If we're still in a word, count it
+  if (inWord) wordCount++
+
+  // Add ellipsis if truncated
+  if (wordCount >= maxWords) {
+    result = result.trimEnd() + '...'
+  }
+
+  // Close any open tags
+  for (let i = openTags.length - 1; i >= 0; i--) {
+    result += `</${openTags[i]}>`
+  }
+
+  const safeString = new String(result) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
+// Django: urlizetrunc - Convert URLs to links with truncation
+export const urlizetrunc: FilterFunction = (value, limit = 15) => {
+  const maxLen = Number(limit)
+  const html = String(value).replace(URLIZE_REGEX, (url) => {
+    const displayUrl = url.length > maxLen ? url.slice(0, maxLen) + '...' : url
+    return `<a href="${url}">${displayUrl}</a>`
+  })
+  const safeString = new String(html) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
 // ==================== Built-in Filters Registry ====================
 
 export const builtinFilters: Record<string, FilterFunction> = {
@@ -902,4 +1127,15 @@ export const builtinFilters: Record<string, FilterFunction> = {
   phone2numeric,
   linenumbers,
   unordered_list,
+
+  // DTL Complete filters
+  addslashes,
+  get_digit,
+  iriencode,
+  json_script,
+  safeseq,
+  stringformat,
+  truncatechars_html,
+  truncatewords_html,
+  urlizetrunc,
 }

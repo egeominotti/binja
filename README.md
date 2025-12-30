@@ -30,7 +30,7 @@
 | Django DTL Compatible | ✅ 100% | ❌ Partial |
 | Jinja2 Compatible | ✅ Full | ⚠️ Limited |
 | Template Inheritance | ✅ | ⚠️ |
-| 70+ Built-in Filters | ✅ | ❌ |
+| 80+ Built-in Filters | ✅ | ❌ |
 | 28 Built-in Tests | ✅ | ❌ |
 | Debug Panel | ✅ | ❌ |
 | CLI Tool | ✅ | ⚠️ |
@@ -260,6 +260,8 @@ app.get('/user/:id', ({ params }) => templates.user({ id: params.id }))
 | `ljust` | `{{ "hi"\|ljust:10 }}` | `hi        ` |
 | `rjust` | `{{ "hi"\|rjust:10 }}` | `        hi` |
 | `cut` | `{{ "hello"\|cut:"l" }}` | `heo` |
+| `addslashes` | `{{ "it's"\|addslashes }}` | `it\'s` |
+| `stringformat` | `{{ 5\|stringformat:"03d" }}` | `005` |
 
 ### Number Filters
 
@@ -270,6 +272,8 @@ app.get('/user/:id', ({ params }) => templates.user({ id: params.id }))
 | `floatformat` | `{{ 3.14159\|floatformat:2 }}` | `3.14` |
 | `filesizeformat` | `{{ 1048576\|filesizeformat }}` | `1.0 MB` |
 | `divisibleby` | `{{ 10\|divisibleby:2 }}` | `true` |
+| `get_digit` | `{{ 12345\|get_digit:2 }}` | `4` |
+| `widthratio` | `{% widthratio value max 100 %}` | Calculated ratio |
 
 ### List Filters
 
@@ -324,7 +328,12 @@ Common timezone values: `UTC`, `Europe/London`, `Europe/Rome`, `Europe/Paris`, `
 | `escape` | `{{ html\|escape }}` | HTML escape |
 | `safe` | `{{ html\|safe }}` | Mark as safe (no escape) |
 | `urlencode` | `{{ url\|urlencode }}` | URL encode |
+| `iriencode` | `{{ url\|iriencode }}` | IRI encode (unicode-safe) |
 | `json` | `{{ data\|json }}` | JSON stringify |
+| `json_script` | `{{ data\|json_script:"id" }}` | Safe JSON in script tag |
+| `truncatechars_html` | `{{ html\|truncatechars_html:10 }}` | Truncate preserving HTML |
+| `truncatewords_html` | `{{ html\|truncatewords_html:5 }}` | Truncate words in HTML |
+| `urlizetrunc` | `{{ text\|urlizetrunc:15 }}` | URLs with truncated display |
 
 ### Default Values
 
@@ -389,12 +398,27 @@ binja is designed to be a drop-in replacement for Django templates:
 {% url 'home' %}
 {% static 'css/style.css' %}
 
-{% csrf_token %}  {# Returns empty for JS compatibility #}
+{% csrf_token %}
 
 {{ forloop.counter }}
 {{ forloop.first }}
 {{ forloop.parentloop.counter }}
 ```
+
+### Django-Specific Tags
+
+| Tag | Description | Example |
+|-----|-------------|---------|
+| `{% csrf_token %}` | CSRF token input | `<input type="hidden" ...>` |
+| `{% cycle %}` | Cycle through values | `{% cycle 'odd' 'even' %}` |
+| `{% firstof %}` | First truthy value | `{% firstof var1 var2 "default" %}` |
+| `{% ifchanged %}` | Output on change | `{% ifchanged %}{{ item }}{% endifchanged %}` |
+| `{% ifequal %}` | Equality check | `{% ifequal a b %}equal{% endifequal %}` |
+| `{% lorem %}` | Lorem ipsum text | `{% lorem 3 p %}` |
+| `{% regroup %}` | Group list by attr | `{% regroup list by attr as grouped %}` |
+| `{% templatetag %}` | Literal tag chars | `{% templatetag openblock %}` → `{%` |
+| `{% widthratio %}` | Calculate ratio | `{% widthratio value max 100 %}` |
+| `{% debug %}` | Debug context | Outputs context as JSON |
 
 ---
 

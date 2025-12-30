@@ -34,6 +34,16 @@ import type {
   ConditionalNode,
   FunctionCallNode,
   TestExprNode,
+  // Django additional tags
+  CycleNode,
+  FirstofNode,
+  IfchangedNode,
+  RegroupNode,
+  WidthratioNode,
+  LoremNode,
+  CsrfTokenNode,
+  DebugNode,
+  TemplatetagNode,
 } from './nodes'
 
 export class Parser {
@@ -138,6 +148,30 @@ export class Parser {
       case 'autoescape':
       case 'verbatim':
         return this.parseSimpleBlock(start, tagName.value)
+      // Django additional tags
+      case 'cycle':
+        return this.parseCycle(start)
+      case 'firstof':
+        return this.parseFirstof(start)
+      case 'ifchanged':
+        return this.parseIfchanged(start)
+      case 'regroup':
+        return this.parseRegroup(start)
+      case 'widthratio':
+        return this.parseWidthratio(start)
+      case 'lorem':
+        return this.parseLorem(start)
+      case 'csrf_token':
+        return this.parseCsrfToken(start)
+      case 'debug':
+        return this.parseDebug(start)
+      case 'templatetag':
+        return this.parseTemplatetag(start)
+      // Deprecated but supported for compatibility
+      case 'ifequal':
+        return this.parseIfequal(start, false)
+      case 'ifnotequal':
+        return this.parseIfequal(start, true)
       default:
         // Unknown tag - skip to end
         this.skipToBlockEnd()
@@ -512,7 +546,7 @@ export class Parser {
     }
   }
 
-  private parseComment(start: Token): ASTNode | null {
+  private parseComment(_start: Token): ASTNode | null {
     this.expect(TokenType.BLOCK_END)
 
     // Skip until endcomment
@@ -525,7 +559,7 @@ export class Parser {
     return null
   }
 
-  private parseSimpleBlock(start: Token, tagName: string): ASTNode | null {
+  private parseSimpleBlock(_start: Token, tagName: string): ASTNode | null {
     this.skipToBlockEnd()
 
     // Skip until end tag
@@ -542,6 +576,283 @@ export class Parser {
     }
 
     return null
+  }
+
+  // ==================== Django Additional Tags ====================
+
+  private parseCycle(start: Token): CycleNode {
+    const values: ExpressionNode[] = []
+    let asVar: string | null = null
+    let silent = false
+
+    // Parse values
+    while (!this.check(TokenType.BLOCK_END)) {
+      if (this.check(TokenType.NAME) && this.peek().value === 'as') {
+        this.advance() // as
+        asVar = this.expect(TokenType.NAME).value
+        // Check for silent
+        if (this.check(TokenType.NAME) && this.peek().value === 'silent') {
+          this.advance()
+          silent = true
+        }
+        break
+      }
+      values.push(this.parseExpression())
+    }
+
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Cycle',
+      values,
+      asVar,
+      silent,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseFirstof(start: Token): FirstofNode {
+    const values: ExpressionNode[] = []
+    let fallback: ExpressionNode | null = null
+    let asVar: string | null = null
+
+    while (!this.check(TokenType.BLOCK_END)) {
+      if (this.check(TokenType.NAME) && this.peek().value === 'as') {
+        this.advance() // as
+        asVar = this.expect(TokenType.NAME).value
+        break
+      }
+      values.push(this.parseExpression())
+    }
+
+    // Last value can be a fallback string
+    if (values.length > 0) {
+      const last = values[values.length - 1]
+      if (last.type === 'Literal' && typeof (last as LiteralNode).value === 'string') {
+        fallback = values.pop()!
+      }
+    }
+
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Firstof',
+      values,
+      fallback,
+      asVar,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseIfchanged(start: Token): IfchangedNode {
+    const values: ExpressionNode[] = []
+
+    // Parse optional expressions to check
+    while (!this.check(TokenType.BLOCK_END)) {
+      values.push(this.parseExpression())
+    }
+
+    this.expect(TokenType.BLOCK_END)
+
+    const body: ASTNode[] = []
+    let else_: ASTNode[] = []
+
+    while (!this.isAtEnd()) {
+      if (this.checkBlockTag('else') || this.checkBlockTag('endifchanged')) break
+      const node = this.parseStatement()
+      if (node) body.push(node)
+    }
+
+    if (this.checkBlockTag('else')) {
+      this.advance() // {%
+      this.advance() // else
+      this.expect(TokenType.BLOCK_END)
+
+      while (!this.isAtEnd()) {
+        if (this.checkBlockTag('endifchanged')) break
+        const node = this.parseStatement()
+        if (node) else_.push(node)
+      }
+    }
+
+    this.expectBlockTag('endifchanged')
+
+    return {
+      type: 'Ifchanged',
+      values,
+      body,
+      else_,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseRegroup(start: Token): RegroupNode {
+    const target = this.parseExpression()
+    this.expectName('by')
+    const key = this.expect(TokenType.NAME).value
+    this.expectName('as')
+    const asVar = this.expect(TokenType.NAME).value
+
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Regroup',
+      target,
+      key,
+      asVar,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseWidthratio(start: Token): WidthratioNode {
+    const value = this.parseExpression()
+    const maxValue = this.parseExpression()
+    const maxWidth = this.parseExpression()
+    let asVar: string | null = null
+
+    if (this.check(TokenType.NAME) && this.peek().value === 'as') {
+      this.advance()
+      asVar = this.expect(TokenType.NAME).value
+    }
+
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Widthratio',
+      value,
+      maxValue,
+      maxWidth,
+      asVar,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseLorem(start: Token): LoremNode {
+    let count: ExpressionNode | null = null
+    let method: 'w' | 'p' | 'b' = 'p'
+    let random = false
+
+    // Parse optional count
+    if (this.check(TokenType.NUMBER)) {
+      count = {
+        type: 'Literal',
+        value: parseInt(this.advance().value, 10),
+        line: start.line,
+        column: start.column,
+      }
+    }
+
+    // Parse optional method (w, p, b)
+    if (this.check(TokenType.NAME)) {
+      const m = this.peek().value.toLowerCase()
+      if (m === 'w' || m === 'p' || m === 'b') {
+        method = m as 'w' | 'p' | 'b'
+        this.advance()
+      }
+    }
+
+    // Parse optional 'random'
+    if (this.check(TokenType.NAME) && this.peek().value === 'random') {
+      random = true
+      this.advance()
+    }
+
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Lorem',
+      count,
+      method,
+      random,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseCsrfToken(start: Token): CsrfTokenNode {
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'CsrfToken',
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseDebug(start: Token): DebugNode {
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Debug',
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseTemplatetag(start: Token): TemplatetagNode {
+    const tagType = this.expect(TokenType.NAME).value as TemplatetagNode['tagType']
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Templatetag',
+      tagType,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseIfequal(start: Token, negated: boolean): IfNode {
+    // {% ifequal a b %} is equivalent to {% if a == b %}
+    const left = this.parseExpression()
+    const right = this.parseExpression()
+    this.expect(TokenType.BLOCK_END)
+
+    const test: CompareNode = {
+      type: 'Compare',
+      left,
+      ops: [{ operator: negated ? '!=' : '==', right }],
+      line: start.line,
+      column: start.column,
+    }
+
+    const body: ASTNode[] = []
+    let else_: ASTNode[] = []
+    const endTag = negated ? 'endifnotequal' : 'endifequal'
+
+    while (!this.isAtEnd()) {
+      if (this.checkBlockTag('else') || this.checkBlockTag(endTag)) break
+      const node = this.parseStatement()
+      if (node) body.push(node)
+    }
+
+    if (this.checkBlockTag('else')) {
+      this.advance() // {%
+      this.advance() // else
+      this.expect(TokenType.BLOCK_END)
+
+      while (!this.isAtEnd()) {
+        if (this.checkBlockTag(endTag)) break
+        const node = this.parseStatement()
+        if (node) else_.push(node)
+      }
+    }
+
+    this.expectBlockTag(endTag)
+
+    return {
+      type: 'If',
+      test,
+      body,
+      elifs: [],
+      else_,
+      line: start.line,
+      column: start.column,
+    }
   }
 
   // ==================== Expression Parsing ====================

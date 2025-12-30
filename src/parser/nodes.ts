@@ -22,6 +22,16 @@ export type NodeType =
   | 'Static'
   | 'Cache'
   | 'Now'
+  // Django additional tags
+  | 'Cycle'
+  | 'Firstof'
+  | 'Ifchanged'
+  | 'Regroup'
+  | 'Widthratio'
+  | 'Lorem'
+  | 'CsrfToken'
+  | 'Debug'
+  | 'Templatetag'
   // Expressions
   | 'Name'
   | 'Literal'
@@ -148,6 +158,64 @@ export interface NowNode extends BaseNode {
   type: 'Now'
   format: ExpressionNode
   asVar: string | null
+}
+
+// ==================== Django Additional Tags ====================
+
+export interface CycleNode extends BaseNode {
+  type: 'Cycle'
+  values: ExpressionNode[]
+  asVar: string | null
+  silent: boolean
+}
+
+export interface FirstofNode extends BaseNode {
+  type: 'Firstof'
+  values: ExpressionNode[]
+  fallback: ExpressionNode | null
+  asVar: string | null
+}
+
+export interface IfchangedNode extends BaseNode {
+  type: 'Ifchanged'
+  values: ExpressionNode[]
+  body: ASTNode[]
+  else_: ASTNode[]
+}
+
+export interface RegroupNode extends BaseNode {
+  type: 'Regroup'
+  target: ExpressionNode
+  key: string
+  asVar: string
+}
+
+export interface WidthratioNode extends BaseNode {
+  type: 'Widthratio'
+  value: ExpressionNode
+  maxValue: ExpressionNode
+  maxWidth: ExpressionNode
+  asVar: string | null
+}
+
+export interface LoremNode extends BaseNode {
+  type: 'Lorem'
+  count: ExpressionNode | null
+  method: 'w' | 'p' | 'b'  // words, paragraphs, or plain/blocked
+  random: boolean
+}
+
+export interface CsrfTokenNode extends BaseNode {
+  type: 'CsrfToken'
+}
+
+export interface DebugNode extends BaseNode {
+  type: 'Debug'
+}
+
+export interface TemplatetagNode extends BaseNode {
+  type: 'Templatetag'
+  tagType: 'openblock' | 'closeblock' | 'openvariable' | 'closevariable' | 'openbrace' | 'closebrace' | 'opencomment' | 'closecomment'
 }
 
 // ==================== Expressions ====================
@@ -296,5 +364,15 @@ export type StatementNode =
   | MacroNode
   | CallNode
   | FilterNode
+  // Django additional tags
+  | CycleNode
+  | FirstofNode
+  | IfchangedNode
+  | RegroupNode
+  | WidthratioNode
+  | LoremNode
+  | CsrfTokenNode
+  | DebugNode
+  | TemplatetagNode
 
 export type ASTNode = StatementNode | ExpressionNode | TemplateNode

@@ -46,7 +46,7 @@ binja/
 │   │   ├── index.ts      # AOT compiler - generates JS functions
 │   │   └── flattener.ts  # Template flattener for AOT inheritance
 │   ├── filters/
-│   │   └── index.ts      # 70+ built-in filters
+│   │   └── index.ts      # 80+ built-in filters
 │   ├── tests/
 │   │   └── index.ts      # 28 built-in tests (is operator)
 │   ├── native/
@@ -177,23 +177,25 @@ The native binaries are still included in the package for potential future use.
 
 Tests for the `is` operator: `defined`, `undefined`, `none`, `true`, `false`, `boolean`, `string`, `number`, `integer`, `float`, `iterable`, `sequence`, `mapping`, `callable`, `even`, `odd`, `divisibleby`, `sameas`, `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `lower`, `upper`, `empty`
 
-### Built-in Filters (70+)
+### Built-in Filters (80+)
 
-**String**: `upper`, `lower`, `capitalize`, `title`, `trim`, `striptags`, `escape`, `safe`, `slugify`, `truncatechars`, `truncatewords`, `wordcount`, `center`, `ljust`, `rjust`, `cut`, `linebreaks`, `linebreaksbr`, `wordwrap`, `indent`, `replace`, `format`, `string`
+**String**: `upper`, `lower`, `capitalize`, `title`, `trim`, `striptags`, `escape`, `safe`, `slugify`, `truncatechars`, `truncatewords`, `wordcount`, `center`, `ljust`, `rjust`, `cut`, `linebreaks`, `linebreaksbr`, `wordwrap`, `indent`, `replace`, `format`, `string`, `addslashes`, `stringformat`
 
-**Number**: `abs`, `round`, `int`, `float`, `floatformat`, `add`, `divisibleby`, `filesizeformat`, `phone2numeric`
+**Number**: `abs`, `round`, `int`, `float`, `floatformat`, `add`, `divisibleby`, `filesizeformat`, `phone2numeric`, `get_digit`
 
-**List/Array**: `length`, `first`, `last`, `join`, `slice`, `reverse`, `sort`, `unique`, `batch`, `dictsort`, `random`, `list`, `map`, `select`, `reject`, `selectattr`, `rejectattr`, `attr`, `max`, `min`, `sum`
+**List/Array**: `length`, `first`, `last`, `join`, `slice`, `reverse`, `sort`, `unique`, `batch`, `dictsort`, `random`, `list`, `map`, `select`, `reject`, `selectattr`, `rejectattr`, `attr`, `max`, `min`, `sum`, `safeseq`
 
 **Date/Time**: `date`, `time`, `timesince`, `timeuntil`
 
 **Default**: `default`, `default_if_none`, `yesno`, `pluralize`
 
-**URL**: `urlencode`, `urlize`
+**URL**: `urlencode`, `urlize`, `iriencode`, `urlizetrunc`
 
-**JSON/Debug**: `json`, `pprint`, `linenumbers`, `unordered_list`
+**JSON/Debug**: `json`, `pprint`, `linenumbers`, `unordered_list`, `json_script`
 
 **Safety**: `escape`, `forceescape`, `safe`
+
+**HTML-aware**: `truncatechars_html`, `truncatewords_html`
 
 ## Code Patterns
 

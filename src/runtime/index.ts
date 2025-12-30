@@ -38,6 +38,16 @@ import type {
   ConditionalNode,
   FunctionCallNode,
   TestExprNode,
+  // Django additional tags
+  CycleNode,
+  FirstofNode,
+  IfchangedNode,
+  RegroupNode,
+  WidthratioNode,
+  LoremNode,
+  CsrfTokenNode,
+  DebugNode,
+  TemplatetagNode,
 } from '../parser/nodes'
 
 export interface RuntimeOptions {
@@ -219,6 +229,25 @@ export class Runtime {
       case 'Load':
       case 'Extends':
         return null
+      // Django additional tags
+      case 'Cycle':
+        return this.renderCycleSync(node as CycleNode, ctx)
+      case 'Firstof':
+        return this.renderFirstofSync(node as FirstofNode, ctx)
+      case 'Ifchanged':
+        return this.renderIfchangedSync(node as IfchangedNode, ctx)
+      case 'Regroup':
+        return this.renderRegroupSync(node as RegroupNode, ctx)
+      case 'Widthratio':
+        return this.renderWidthratioSync(node as WidthratioNode, ctx)
+      case 'Lorem':
+        return this.renderLoremSync(node as LoremNode, ctx)
+      case 'CsrfToken':
+        return this.renderCsrfTokenSync()
+      case 'Debug':
+        return this.renderDebugSync(ctx)
+      case 'Templatetag':
+        return this.renderTemplatetagSync(node as TemplatetagNode)
       default:
         return null
     }
@@ -391,6 +420,212 @@ export class Runtime {
       return ''
     }
     return result
+  }
+
+  // Django: {% cycle %} - cycles through values on each iteration
+  private cycleState: Map<string, number> = new Map()
+
+  private renderCycleSync(node: CycleNode, ctx: Context): string {
+    // Generate unique key for this cycle based on values
+    const key = node.values.map(v => JSON.stringify(v)).join(',')
+
+    // Get current index and increment
+    const currentIndex = this.cycleState.get(key) ?? 0
+    const values = node.values.map(v => this.eval(v, ctx))
+    const value = values[currentIndex % values.length]
+    this.cycleState.set(key, currentIndex + 1)
+
+    if (node.asVar) {
+      ctx.set(node.asVar, value)
+      return node.silent ? '' : this.stringify(value)
+    }
+    return this.stringify(value)
+  }
+
+  // Django: {% firstof %} - outputs first truthy value
+  private renderFirstofSync(node: FirstofNode, ctx: Context): string {
+    for (const expr of node.values) {
+      const value = this.eval(expr, ctx)
+      if (this.isTruthy(value)) {
+        if (node.asVar) {
+          ctx.set(node.asVar, value)
+          return ''
+        }
+        return this.stringify(value)
+      }
+    }
+    // Return fallback or empty
+    const fallback = node.fallback ? this.eval(node.fallback, ctx) : ''
+    if (node.asVar) {
+      ctx.set(node.asVar, fallback)
+      return ''
+    }
+    return this.stringify(fallback)
+  }
+
+  // Django: {% ifchanged %} - outputs only if value changed
+  private ifchangedState: Map<string, any> = new Map()
+
+  private renderIfchangedSync(node: IfchangedNode, ctx: Context): string {
+    // Generate key for this ifchanged block
+    const key = `ifchanged_${node.line}_${node.column}`
+
+    let currentValue: any
+    if (node.values.length > 0) {
+      // Compare specific values
+      currentValue = node.values.map(v => this.eval(v, ctx))
+    } else {
+      // Compare rendered body content
+      currentValue = this.renderNodesSync(node.body, ctx)
+    }
+
+    const lastValue = this.ifchangedState.get(key)
+    const changed = JSON.stringify(currentValue) !== JSON.stringify(lastValue)
+    this.ifchangedState.set(key, currentValue)
+
+    if (changed) {
+      if (node.values.length > 0) {
+        return this.renderNodesSync(node.body, ctx)
+      }
+      return currentValue as string
+    } else {
+      return this.renderNodesSync(node.else_, ctx)
+    }
+  }
+
+  // Django: {% regroup %} - regroups list by attribute
+  private renderRegroupSync(node: RegroupNode, ctx: Context): string {
+    const list = this.toIterable(this.eval(node.target, ctx))
+    const groups: Array<{ grouper: any; list: any[] }> = []
+    let currentGrouper: any = Symbol('initial')
+    let currentList: any[] = []
+
+    for (const item of list) {
+      // Get the grouping key using attribute access
+      const grouper = item && typeof item === 'object' ? item[node.key] : undefined
+
+      if (grouper !== currentGrouper) {
+        if (currentList.length > 0) {
+          groups.push({ grouper: currentGrouper, list: currentList })
+        }
+        currentGrouper = grouper
+        currentList = [item]
+      } else {
+        currentList.push(item)
+      }
+    }
+
+    // Don't forget the last group
+    if (currentList.length > 0) {
+      groups.push({ grouper: currentGrouper, list: currentList })
+    }
+
+    ctx.set(node.asVar, groups)
+    return ''
+  }
+
+  // Django: {% widthratio %} - calculates width ratio
+  private renderWidthratioSync(node: WidthratioNode, ctx: Context): string {
+    const value = Number(this.eval(node.value, ctx))
+    const maxValue = Number(this.eval(node.maxValue, ctx))
+    const maxWidth = Number(this.eval(node.maxWidth, ctx))
+
+    const ratio = maxValue === 0 ? 0 : Math.round((value / maxValue) * maxWidth)
+
+    if (node.asVar) {
+      ctx.set(node.asVar, ratio)
+      return ''
+    }
+    return String(ratio)
+  }
+
+  // Django: {% lorem %} - generates lorem ipsum text
+  private renderLoremSync(node: LoremNode, ctx: Context): string {
+    const count = node.count ? Number(this.eval(node.count, ctx)) : 1
+    const method = node.method
+
+    const words = [
+      'lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit',
+      'sed', 'do', 'eiusmod', 'tempor', 'incididunt', 'ut', 'labore', 'et', 'dolore',
+      'magna', 'aliqua', 'enim', 'ad', 'minim', 'veniam', 'quis', 'nostrud',
+      'exercitation', 'ullamco', 'laboris', 'nisi', 'aliquip', 'ex', 'ea', 'commodo',
+      'consequat', 'duis', 'aute', 'irure', 'in', 'reprehenderit', 'voluptate',
+      'velit', 'esse', 'cillum', 'fugiat', 'nulla', 'pariatur', 'excepteur', 'sint',
+      'occaecat', 'cupidatat', 'non', 'proident', 'sunt', 'culpa', 'qui', 'officia',
+      'deserunt', 'mollit', 'anim', 'id', 'est', 'laborum'
+    ]
+
+    const getWord = (index: number) => {
+      if (node.random) {
+        return words[Math.floor(Math.random() * words.length)]
+      }
+      return words[index % words.length]
+    }
+
+    if (method === 'w') {
+      // Words
+      const result: string[] = []
+      for (let i = 0; i < count; i++) {
+        result.push(getWord(i))
+      }
+      return result.join(' ')
+    } else if (method === 'p' || method === 'b') {
+      // Paragraphs
+      const paragraphs: string[] = []
+      for (let p = 0; p < count; p++) {
+        const sentenceCount = 3 + (p % 3)
+        const sentences: string[] = []
+        for (let s = 0; s < sentenceCount; s++) {
+          const wordCount = 8 + (s % 7)
+          const sentenceWords: string[] = []
+          for (let w = 0; w < wordCount; w++) {
+            sentenceWords.push(getWord(p * 100 + s * 20 + w))
+          }
+          // Capitalize first word
+          sentenceWords[0] = sentenceWords[0].charAt(0).toUpperCase() + sentenceWords[0].slice(1)
+          sentences.push(sentenceWords.join(' ') + '.')
+        }
+        paragraphs.push(sentences.join(' '))
+      }
+
+      if (method === 'b') {
+        // Plain paragraphs separated by double newlines
+        return paragraphs.join('\n\n')
+      }
+      // HTML paragraphs
+      return paragraphs.map(p => `<p>${p}</p>`).join('\n')
+    }
+
+    return ''
+  }
+
+  // Django: {% csrf_token %} - outputs CSRF token hidden input
+  private renderCsrfTokenSync(): string {
+    // In a real Django app, this would use the actual CSRF token
+    // For compatibility, output a placeholder that can be replaced server-side
+    return '<input type="hidden" name="csrfmiddlewaretoken" value="CSRF_TOKEN_PLACEHOLDER">'
+  }
+
+  // Django: {% debug %} - outputs debug info
+  private renderDebugSync(ctx: Context): string {
+    // Output context info for debugging
+    const data = ctx.toObject?.() || {}
+    return `<pre>${JSON.stringify(data, null, 2)}</pre>`
+  }
+
+  // Django: {% templatetag %} - outputs template syntax characters
+  private renderTemplatetagSync(node: TemplatetagNode): string {
+    const tagMap: Record<string, string> = {
+      'openblock': '{%',
+      'closeblock': '%}',
+      'openvariable': '{{',
+      'closevariable': '}}',
+      'openbrace': '{',
+      'closebrace': '}',
+      'opencomment': '{#',
+      'closecomment': '#}'
+    }
+    return tagMap[node.tagType] || ''
   }
 
   // Get date components in the specified timezone
@@ -819,6 +1054,25 @@ export class Runtime {
         return this.renderStaticSync(node as StaticNode, ctx)
       case 'Now':
         return this.renderNowSync(node as NowNode, ctx)
+      // Django additional tags
+      case 'Cycle':
+        return this.renderCycleSync(node as CycleNode, ctx)
+      case 'Firstof':
+        return this.renderFirstofSync(node as FirstofNode, ctx)
+      case 'Ifchanged':
+        return this.renderIfchangedSync(node as IfchangedNode, ctx)
+      case 'Regroup':
+        return this.renderRegroupSync(node as RegroupNode, ctx)
+      case 'Widthratio':
+        return this.renderWidthratioSync(node as WidthratioNode, ctx)
+      case 'Lorem':
+        return this.renderLoremSync(node as LoremNode, ctx)
+      case 'CsrfToken':
+        return this.renderCsrfTokenSync()
+      case 'Debug':
+        return this.renderDebugSync(ctx)
+      case 'Templatetag':
+        return this.renderTemplatetagSync(node as TemplatetagNode)
       default:
         return null
     }
