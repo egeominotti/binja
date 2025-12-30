@@ -423,15 +423,20 @@ export class Runtime {
   }
 
   // Django: {% cycle %} - cycles through values on each iteration
+  // Optimized: use node position as key instead of JSON.stringify on values
   private cycleState: Map<string, number> = new Map()
 
   private renderCycleSync(node: CycleNode, ctx: Context): string {
-    // Generate unique key for this cycle based on values
-    const key = node.values.map(v => JSON.stringify(v)).join(',')
+    // Use source position as unique key - avoids expensive JSON.stringify
+    const key = `cycle_${node.line}_${node.column}`
 
     // Get current index and increment
     const currentIndex = this.cycleState.get(key) ?? 0
-    const values = node.values.map(v => this.eval(v, ctx))
+    // Optimized: for loop instead of .map()
+    const values: any[] = []
+    for (let i = 0; i < node.values.length; i++) {
+      values.push(this.eval(node.values[i], ctx))
+    }
     const value = values[currentIndex % values.length]
     this.cycleState.set(key, currentIndex + 1)
 
@@ -464,6 +469,7 @@ export class Runtime {
   }
 
   // Django: {% ifchanged %} - outputs only if value changed
+  // Optimized: smart comparison - uses === for primitives, JSON.stringify only for objects
   private ifchangedState: Map<string, any> = new Map()
 
   private renderIfchangedSync(node: IfchangedNode, ctx: Context): string {
@@ -472,15 +478,19 @@ export class Runtime {
 
     let currentValue: any
     if (node.values.length > 0) {
-      // Compare specific values
-      currentValue = node.values.map(v => this.eval(v, ctx))
+      // Compare specific values - use for loop instead of .map()
+      const values: any[] = []
+      for (let i = 0; i < node.values.length; i++) {
+        values.push(this.eval(node.values[i], ctx))
+      }
+      currentValue = values
     } else {
-      // Compare rendered body content
+      // Compare rendered body content (string)
       currentValue = this.renderNodesSync(node.body, ctx)
     }
 
     const lastValue = this.ifchangedState.get(key)
-    const changed = JSON.stringify(currentValue) !== JSON.stringify(lastValue)
+    const changed = !this.deepEqual(currentValue, lastValue)
     this.ifchangedState.set(key, currentValue)
 
     if (changed) {
@@ -1237,6 +1247,30 @@ export class Runtime {
       return false
     }
     return true
+  }
+
+  // Optimized deep equality check - avoids JSON.stringify for primitives and simple arrays
+  private deepEqual(a: any, b: any): boolean {
+    // Fast path: identical references or primitives
+    if (a === b) return true
+    // Null/undefined check
+    if (a == null || b == null) return a === b
+    // Type mismatch
+    const typeA = typeof a
+    const typeB = typeof b
+    if (typeA !== typeB) return false
+    // Primitives already checked with ===
+    if (typeA !== 'object') return false
+    // Array comparison
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false
+      for (let i = 0; i < a.length; i++) {
+        if (!this.deepEqual(a[i], b[i])) return false
+      }
+      return true
+    }
+    // Object comparison - fallback to JSON for complex objects
+    return JSON.stringify(a) === JSON.stringify(b)
   }
 
   private isIn(needle: any, haystack: any): boolean {
