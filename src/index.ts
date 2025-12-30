@@ -59,7 +59,7 @@ export interface EnvironmentOptions {
 }
 
 export class Environment {
-  private options: Required<EnvironmentOptions>
+  private options: Omit<Required<EnvironmentOptions>, 'timezone'> & { timezone?: string }
   private runtime: Runtime
   private templateCache: Map<string, TemplateNode> = new Map()
   private routes: Map<string, string> = new Map()

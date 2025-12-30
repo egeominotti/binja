@@ -53,7 +53,7 @@ export interface RuntimeOptions {
 }
 
 export class Runtime {
-  private options: Required<RuntimeOptions>
+  private options: Omit<Required<RuntimeOptions>, 'timezone'> & { timezone?: string }
   private filters: Record<string, FilterFunction>
   private tests: Record<string, TestFunction>
   private blocks: Map<string, BlockNode> = new Map()
