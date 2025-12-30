@@ -308,8 +308,67 @@ zig build -Doptimize=ReleaseFast -Dtarget=x86_64-linux
 zig build -Doptimize=ReleaseFast -Dtarget=aarch64-linux
 ```
 
+## Publishing to npm
+
+### Release Process
+
+1. **Bump version** in `package.json`:
+   ```bash
+   bun run version:patch   # 0.4.1 -> 0.4.2
+   bun run version:minor   # 0.4.1 -> 0.5.0
+   bun run version:major   # 0.4.1 -> 1.0.0
+   ```
+
+2. **Build everything** (native + JS):
+   ```bash
+   bun run build:all
+   ```
+
+3. **Run tests**:
+   ```bash
+   bun test
+   ```
+
+4. **Commit and push**:
+   ```bash
+   git add -A
+   git commit -m "release: v0.x.x"
+   git push origin main
+   ```
+
+5. **Publish to npm**:
+   ```bash
+   npm publish
+   ```
+   Note: `prepublishOnly` script runs `build:all` automatically.
+
+### Build Scripts
+
+| Script | Description |
+|--------|-------------|
+| `build` | Build JS (index, cli, native, debug modules) + types |
+| `build:native` | Build Zig native libraries for all platforms |
+| `build:all` | Build native + JS |
+| `build:types` | Generate TypeScript declarations |
+
+### Package Structure
+
+The published package includes:
+- `dist/` - Compiled JavaScript and TypeScript declarations
+- `dist/native/index.js` - Native FFI bindings (subpath export)
+- `dist/debug/index.js` - Debug panel (subpath export)
+- `native/` - Prebuilt Zig binaries for all platforms
+
+### Subpath Exports
+
+```typescript
+import { render } from 'binja'           // Main API
+import { isNativeAvailable } from 'binja/native'  // Native status
+import { DebugCollector } from 'binja/debug'      // Debug tools
+```
+
 ## GitHub
 
-- **Repository**: jinja-bun
+- **Repository**: binja
 - **Description**: High-performance Jinja2/Django Template Language engine for Bun. 100% DTL compatible. Native Zig acceleration.
 - **Topics**: `jinja2`, `django`, `template-engine`, `bun`, `typescript`, `dtl`, `django-templates`, `zig`
