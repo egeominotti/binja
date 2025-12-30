@@ -5,7 +5,7 @@
  * falls back to pure TypeScript implementation otherwise.
  */
 import { dlopen, FFIType, ptr, CString } from 'bun:ffi'
-import { join, dirname } from 'path'
+import { join, dirname, basename } from 'path'
 import { existsSync } from 'fs'
 
 // ============================================================================
@@ -116,8 +116,12 @@ function getLibraryPath(): string | null {
 
   const libName = `libbinja.${libExt}`
 
-  // Project root (2 levels up from src/native)
-  const projectRoot = join(import.meta.dir, '..', '..')
+  // Detect depth: when bundled into dist/index.js, we're 1 level deep
+  // When in dist/native/index.js, we're 2 levels deep
+  const dirName = basename(import.meta.dir)
+  const projectRoot = dirName === 'native'
+    ? join(import.meta.dir, '..', '..')  // dist/native/ → package root
+    : join(import.meta.dir, '..')         // dist/ → package root
 
   // Search paths in order of priority
   const searchPaths = [
