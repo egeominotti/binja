@@ -21,6 +21,7 @@ export type NodeType =
   | 'Url'
   | 'Static'
   | 'Cache'
+  | 'Now'
   // Expressions
   | 'Name'
   | 'Literal'
@@ -141,6 +142,12 @@ export interface CacheNode extends BaseNode {
   fragment: ExpressionNode
   varyOn: ExpressionNode[]
   body: ASTNode[]
+}
+
+export interface NowNode extends BaseNode {
+  type: 'Now'
+  format: ExpressionNode
+  asVar: string | null
 }
 
 // ==================== Expressions ====================
@@ -284,6 +291,7 @@ export type StatementNode =
   | UrlNode
   | StaticNode
   | CacheNode
+  | NowNode
   | CommentNode
   | MacroNode
   | CallNode

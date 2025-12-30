@@ -170,6 +170,7 @@ export const builtinTests: Record<string, TestFunction> = {
   defined,
   undefined,
   none,
+  None: none, // Alias for Django compatibility
   boolean,
   string,
   mapping,

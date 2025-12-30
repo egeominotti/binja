@@ -19,6 +19,7 @@ import type {
   LoadNode,
   UrlNode,
   StaticNode,
+  NowNode,
   ExpressionNode,
   NameNode,
   LiteralNode,
@@ -129,6 +130,8 @@ export class Parser {
         return this.parseUrl(start)
       case 'static':
         return this.parseStatic(start)
+      case 'now':
+        return this.parseNow(start)
       case 'comment':
         return this.parseComment(start)
       case 'spaceless':
@@ -483,6 +486,26 @@ export class Parser {
     return {
       type: 'Static',
       path,
+      asVar,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseNow(start: Token): NowNode {
+    const format = this.parseExpression()
+    let asVar: string | null = null
+
+    if (this.check(TokenType.NAME) && this.peek().value === 'as') {
+      this.advance()
+      asVar = this.expect(TokenType.NAME).value
+    }
+
+    this.expect(TokenType.BLOCK_END)
+
+    return {
+      type: 'Now',
+      format,
       asVar,
       line: start.line,
       column: start.column,

@@ -64,8 +64,7 @@
   "license": "BSD-3-Clause",
   "devDependencies": {
     "@types/bun": "latest",
-    "hono": "^4.11.3",
-    "typescript": "^5.0.0"
+    "typescript": "latest"
   },
   "engines": {
     "bun": ">=1.0.0"

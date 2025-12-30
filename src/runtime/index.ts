@@ -23,6 +23,7 @@ import type {
   LoadNode,
   UrlNode,
   StaticNode,
+  NowNode,
   ExpressionNode,
   NameNode,
   LiteralNode,
@@ -191,6 +192,8 @@ export class Runtime {
         return this.renderUrlSync(node as UrlNode, ctx)
       case 'Static':
         return this.renderStaticSync(node as StaticNode, ctx)
+      case 'Now':
+        return this.renderNowSync(node as NowNode, ctx)
       case 'Load':
       case 'Extends':
         return null
@@ -259,9 +262,12 @@ export class Runtime {
   private renderBlockSync(node: BlockNode, ctx: Context): string {
     const blockToRender = this.blocks.get(node.name) || node
     ctx.push()
-    ctx.set('block', {
-      super: () => this.renderNodesSync(node.body, ctx),
-    })
+    // Pre-render parent content for {{ block.super }} - must be a value, not function
+    const parentContent = this.renderNodesSync(node.body, ctx)
+    // Mark as safe to prevent double-escaping
+    const safeContent = new String(parentContent) as any
+    safeContent.__safe__ = true
+    ctx.set('block', { super: safeContent })
     const result = this.renderNodesSync(blockToRender.body, ctx)
     ctx.pop()
     return result
@@ -297,6 +303,57 @@ export class Runtime {
       return ''
     }
     return url
+  }
+
+  private renderNowSync(node: NowNode, ctx: Context): string {
+    const format = String(this.eval(node.format, ctx))
+    const result = this.formatDate(new Date(), format)
+    if (node.asVar) {
+      ctx.set(node.asVar, result)
+      return ''
+    }
+    return result
+  }
+
+  // Django date format helper for {% now %} tag
+  private formatDate(d: Date, format: string): string {
+    const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+    let result = ''
+    for (let i = 0; i < format.length; i++) {
+      const char = format[i]
+      switch (char) {
+        // Day
+        case 'd': result += String(d.getDate()).padStart(2, '0'); break
+        case 'j': result += String(d.getDate()); break
+        case 'D': result += DAY_NAMES_SHORT[d.getDay()]; break
+        case 'l': result += DAY_NAMES_LONG[d.getDay()]; break
+        // Month
+        case 'm': result += String(d.getMonth() + 1).padStart(2, '0'); break
+        case 'n': result += String(d.getMonth() + 1); break
+        case 'M': result += MONTH_NAMES_SHORT[d.getMonth()]; break
+        case 'F': result += MONTH_NAMES_LONG[d.getMonth()]; break
+        // Year
+        case 'y': result += String(d.getFullYear()).slice(-2); break
+        case 'Y': result += String(d.getFullYear()); break
+        // Time
+        case 'H': result += String(d.getHours()).padStart(2, '0'); break
+        case 'G': result += String(d.getHours()); break
+        case 'i': result += String(d.getMinutes()).padStart(2, '0'); break
+        case 's': result += String(d.getSeconds()).padStart(2, '0'); break
+        // AM/PM
+        case 'a': result += d.getHours() < 12 ? 'a.m.' : 'p.m.'; break
+        case 'A': result += d.getHours() < 12 ? 'AM' : 'PM'; break
+        // 12-hour
+        case 'g': result += String(d.getHours() % 12 || 12); break
+        case 'h': result += String(d.getHours() % 12 || 12).padStart(2, '0'); break
+        default: result += char
+      }
+    }
+    return result
   }
 
   private renderNodesSync(nodes: ASTNode[], ctx: Context): string {
@@ -524,6 +581,8 @@ export class Runtime {
         return this.renderUrlSync(node as UrlNode, ctx)
       case 'Static':
         return this.renderStaticSync(node as StaticNode, ctx)
+      case 'Now':
+        return this.renderNowSync(node as NowNode, ctx)
       default:
         return null
     }
@@ -589,11 +648,12 @@ export class Runtime {
   private async renderBlockAsync(node: BlockNode, ctx: Context): Promise<string> {
     const blockToRender = this.blocks.get(node.name) || node
     ctx.push()
-    // Pre-render parent content for block.super (must be sync accessible)
+    // Pre-render parent content for {{ block.super }} - must be a value, not function
     const parentContent = await this.renderNodesAsync(node.body, ctx)
-    ctx.set('block', {
-      super: () => parentContent,
-    })
+    // Mark as safe to prevent double-escaping
+    const safeContent = new String(parentContent) as any
+    safeContent.__safe__ = true
+    ctx.set('block', { super: safeContent })
     const result = await this.renderNodesAsync(blockToRender.body, ctx)
     ctx.pop()
     return result
