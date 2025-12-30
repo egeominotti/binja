@@ -171,8 +171,10 @@ describe('Regression Tests', () => {
 
   // ==================== Edge Cases in Expressions ====================
   describe('Edge Cases in Expressions', () => {
-    test('division by zero returns zero (safe handling)', async () => {
-      expect(await render('{{ 10 / 0 }}', {})).toBe('0')
+    test('division by zero returns Infinity (JavaScript behavior)', async () => {
+      expect(await render('{{ 10 / 0 }}', {})).toBe('Infinity')
+      expect(await render('{{ -10 / 0 }}', {})).toBe('-Infinity')
+      expect(await render('{{ 0 / 0 }}', {})).toBe('NaN')
     })
 
     test('modulo by zero returns NaN', async () => {

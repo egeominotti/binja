@@ -25,6 +25,7 @@
 
 | Feature | binja | Other JS engines |
 |---------|-----------|------------------|
+| **AOT Compilation** | ✅ 160x faster | ❌ |
 | Django DTL Compatible | ✅ 100% | ❌ Partial |
 | Jinja2 Compatible | ✅ Full | ⚠️ Limited |
 | Template Inheritance | ✅ | ⚠️ |
@@ -37,106 +38,31 @@
 
 ## Benchmarks
 
-Tested on MacBook Pro M2, Bun 1.1.x, rendering 1000 iterations.
+Tested on Mac Studio M1 Max, Bun 1.3.5, 10,000 iterations.
 
-### Simple Template
-```
-{{ name }} - {{ title|upper }}
-```
+### Two Rendering Modes
 
-| Engine | Ops/sec | Relative |
-|--------|---------|----------|
-| **binja** | **142,857** | **1.0x** |
-| Nunjucks | 45,662 | 3.1x slower |
-| EJS | 38,461 | 3.7x slower |
-| Handlebars | 52,631 | 2.7x slower |
+| Mode | Function | Best For | vs Nunjucks |
+|------|----------|----------|-------------|
+| **Runtime** | `render()` | Development | **3.7x faster** |
+| **AOT** | `compile()` | Production | **160x faster** |
 
-### Complex Template (loops, conditions, filters)
-```django
-{% for item in items %}
-  {% if item.active %}
-    {{ item.name|title }} - ${{ item.price|floatformat:2 }}
-  {% endif %}
-{% endfor %}
-```
+### Performance Comparison
 
-| Engine | Ops/sec | Relative |
-|--------|---------|----------|
-| **binja** | **28,571** | **1.0x** |
-| Nunjucks | 8,928 | 3.2x slower |
-| EJS | 12,500 | 2.3x slower |
-| Handlebars | 15,384 | 1.9x slower |
-
-### Template Inheritance
-```django
-{% extends "base.html" %}
-{% block content %}...{% endblock %}
-```
-
-| Engine | Ops/sec | Relative |
-|--------|---------|----------|
-| **binja** | **18,518** | **1.0x** |
-| Nunjucks | 6,250 | 3.0x slower |
-| EJS | N/A | Not supported |
-| Handlebars | N/A | Not supported |
-
-### Memory Usage
-
-| Engine | Heap (MB) | RSS (MB) |
-|--------|-----------|----------|
-| **binja** | **12.4** | **45.2** |
-| Nunjucks | 28.6 | 89.4 |
-| EJS | 18.2 | 62.1 |
+| Benchmark | Nunjucks | binja Runtime | binja AOT |
+|-----------|----------|---------------|-----------|
+| Simple Template | 95K ops/s | 290K ops/s | **14.3M ops/s** |
+| Complex Template | 28K ops/s | 103K ops/s | **1.07M ops/s** |
+| Nested Loops | 27K ops/s | 130K ops/s | **1.75M ops/s** |
+| HTML Escaping | 65K ops/s | 241K ops/s | **2.23M ops/s** |
+| Conditionals | 27K ops/s | 126K ops/s | **22.8M ops/s** |
+| Large Dataset (100 items) | 21K ops/s | 36K ops/s | **202K ops/s** |
 
 ### Run Benchmarks
 
 ```bash
-bun run benchmark
+bun run full-benchmark.ts
 ```
-
-<details>
-<summary>📊 Full Benchmark Code</summary>
-
-```typescript
-import { Environment } from 'binja'
-
-const env = new Environment()
-const iterations = 1000
-
-// Simple benchmark
-const simpleTemplate = '{{ name }} - {{ title|upper }}'
-const simpleContext = { name: 'John', title: 'hello world' }
-
-console.time('Simple Template')
-for (let i = 0; i < iterations; i++) {
-  await env.renderString(simpleTemplate, simpleContext)
-}
-console.timeEnd('Simple Template')
-
-// Complex benchmark
-const complexTemplate = `
-{% for item in items %}
-  {% if item.active %}
-    {{ item.name|title }} - ${{ item.price|floatformat:2 }}
-  {% endif %}
-{% endfor %}
-`
-const complexContext = {
-  items: Array.from({ length: 50 }, (_, i) => ({
-    name: `product ${i}`,
-    price: Math.random() * 100,
-    active: Math.random() > 0.3
-  }))
-}
-
-console.time('Complex Template')
-for (let i = 0; i < iterations; i++) {
-  await env.renderString(complexTemplate, complexContext)
-}
-console.timeEnd('Complex Template')
-```
-
-</details>
 
 ---
 
@@ -179,6 +105,37 @@ const html = await env.render('pages/home.html', {
   user: { name: 'John', email: 'john@example.com' },
   items: ['Apple', 'Banana', 'Cherry']
 })
+```
+
+### AOT Compilation (Maximum Performance)
+
+For production, use `compile()` for **160x faster** rendering:
+
+```typescript
+import { compile } from 'binja'
+
+// Compile once at startup
+const renderUser = compile('<h1>{{ name|upper }}</h1>')
+
+// Use many times (sync, extremely fast!)
+const html = renderUser({ name: 'john' })
+// Output: <h1>JOHN</h1>
+```
+
+Production example:
+
+```typescript
+import { compile } from 'binja'
+
+// Pre-compile all templates at server startup
+const templates = {
+  home: compile(await Bun.file('./views/home.html').text()),
+  user: compile(await Bun.file('./views/user.html').text()),
+}
+
+// Rendering is now synchronous and extremely fast
+app.get('/', () => templates.home({ title: 'Welcome' }))
+app.get('/user/:id', ({ params }) => templates.user({ id: params.id }))
 ```
 
 ---
@@ -351,6 +308,43 @@ const html = await env.render('pages/home.html', {
 
 ---
 
+## Tests (is operator)
+
+Tests check values using the `is` operator (Jinja2 syntax):
+
+```django
+{% if value is defined %}...{% endif %}
+{% if num is even %}...{% endif %}
+{% if num is divisibleby(3) %}...{% endif %}
+{% if items is empty %}...{% endif %}
+```
+
+### Built-in Tests
+
+| Test | Description |
+|------|-------------|
+| `divisibleby(n)` | Divisible by n |
+| `even` / `odd` | Even/odd integer |
+| `number` / `integer` / `float` | Type checks |
+| `defined` / `undefined` | Variable exists |
+| `none` | Is null |
+| `empty` | Empty array/string/object |
+| `truthy` / `falsy` | Truthiness checks |
+| `string` / `mapping` / `iterable` | Type checks |
+| `gt(n)` / `lt(n)` / `ge(n)` / `le(n)` | Comparisons |
+| `eq(v)` / `ne(v)` / `sameas(v)` | Equality |
+| `upper` / `lower` | String case checks |
+
+```typescript
+import { builtinTests } from 'binja'
+
+// All 30+ built-in tests
+console.log(Object.keys(builtinTests))
+// ['divisibleby', 'even', 'odd', 'number', 'integer', ...]
+```
+
+---
+
 ## Django Compatibility
 
 binja is designed to be a drop-in replacement for Django templates:
@@ -459,29 +453,82 @@ await render('{{ script }}', {
 
 ## Performance Tips
 
-1. **Reuse Environment** - Create once, render many times
-2. **Enable caching** - Templates are cached automatically
-3. **Use Bun** - Native Bun optimizations
+1. **Use AOT in Production** - `compile()` is 160x faster than Nunjucks
+2. **Pre-compile at Startup** - Compile templates once, use many times
+3. **Reuse Environment** - For templates with `{% extends %}`, create once
+4. **Enable caching** - Templates are cached automatically
 
 ```typescript
-// Good: Create once
-const env = new Environment({ templates: './templates' })
+import { compile } from 'binja'
 
-// Render multiple times
-app.get('/', () => env.render('home.html', data))
-app.get('/about', () => env.render('about.html', data))
+// Best: AOT compilation for static templates
+const templates = {
+  home: compile(await Bun.file('./views/home.html').text()),
+  user: compile(await Bun.file('./views/user.html').text()),
+}
+
+// Sync rendering, extremely fast
+app.get('/', () => templates.home({ title: 'Home' }))
+app.get('/user/:id', () => templates.user({ id: params.id }))
+```
+
+For templates with inheritance (`{% extends %}`):
+
+```typescript
+import { Environment } from 'binja'
+
+// Environment with cache for inherited templates
+const env = new Environment({ templates: './views', cache: true })
+
+// Pre-warm cache at startup
+await env.loadTemplate('base.html')
+await env.loadTemplate('home.html')
 ```
 
 ---
 
 ## API Reference
 
-### `render(template, context)`
+### `render(template, context)` - Runtime Mode
 
-Render a template string with context.
+Render a template string with context (async, easy development).
 
 ```typescript
+import { render } from 'binja'
+
 const html = await render('Hello {{ name }}', { name: 'World' })
+```
+
+### `compile(template, options?)` - AOT Mode
+
+Compile a template to an optimized function (sync, **160x faster**).
+
+```typescript
+import { compile } from 'binja'
+
+// Compile once
+const renderGreeting = compile('<h1>{{ name|upper }}</h1>')
+
+// Use many times (sync!)
+const html = renderGreeting({ name: 'world' }) // <h1>WORLD</h1>
+```
+
+**Supported:** Variables, filters, conditions, loops, set/with, comments.
+**Not supported:** `{% extends %}`, `{% include %}` (use Environment for these).
+
+### `compileToCode(template, options?)`
+
+Generate JavaScript code string for build tools.
+
+```typescript
+import { compileToCode } from 'binja'
+
+const code = compileToCode('<h1>{{ title }}</h1>', {
+  functionName: 'renderHeader'
+})
+
+// Save to file for bundling
+await Bun.write('./compiled/header.js', code)
 ```
 
 ### `Environment`
@@ -496,6 +543,7 @@ env.render(name, context)      // Render template file
 env.renderString(str, context) // Render template string
 env.addFilter(name, fn)        // Add custom filter
 env.addGlobal(name, value)     // Add global variable
+env.loadTemplate(name)         // Pre-load template (for cache warming)
 ```
 
 ---
@@ -725,4 +773,3 @@ See [LICENSE](./LICENSE) for details.
 <p align="center">
   Made with ❤️ for the Bun ecosystem
 </p>
-# binja

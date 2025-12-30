@@ -105,7 +105,11 @@ export const upper: TestFunction = (value) => {
 export const empty: TestFunction = (value) => {
   if (value == null) return true
   if (typeof value === 'string' || Array.isArray(value)) return value.length === 0
-  if (typeof value === 'object') return Object.keys(value).length === 0
+  if (typeof value === 'object') {
+    // Avoid Object.keys() allocation - return early on first key found
+    for (const _ in value) return false
+    return true
+  }
   return false
 }
 
@@ -131,7 +135,11 @@ export const truthy: TestFunction = (value) => {
   if (typeof value === 'number') return value !== 0
   if (typeof value === 'string') return value.length > 0
   if (Array.isArray(value)) return value.length > 0
-  if (typeof value === 'object') return Object.keys(value).length > 0
+  if (typeof value === 'object') {
+    // Avoid Object.keys() allocation - return early on first key found
+    for (const _ in value) return true
+    return false
+  }
   return true
 }
 

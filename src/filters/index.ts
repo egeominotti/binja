@@ -5,6 +5,25 @@
 
 export type FilterFunction = (value: any, ...args: any[]) => any
 
+// Pre-compiled regex patterns for performance (avoid recreation on each filter call)
+const TITLE_REGEX = /\b\w/g
+const STRIPTAGS_REGEX = /<[^>]*>/g
+const SLUGIFY_NON_WORD_REGEX = /[^\w\s-]/g
+const SLUGIFY_SPACES_REGEX = /[\s_-]+/g
+const SLUGIFY_TRIM_REGEX = /^-+|-+$/g
+const URLIZE_REGEX = /(https?:\/\/[^\s]+)/g
+const DATE_CHAR_REGEX = /[a-zA-Z]/g
+const DOUBLE_NEWLINE_REGEX = /\n\n+/
+const NEWLINE_REGEX = /\n/g
+const WHITESPACE_REGEX = /\s+/
+
+// Pre-defined date format arrays (avoid recreation on each date filter call)
+const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const MONTH_NAMES_AP = ['Jan.', 'Feb.', 'March', 'April', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.']
+
 // ==================== String Filters ====================
 
 export const upper: FilterFunction = (value) => String(value).toUpperCase()
@@ -22,23 +41,19 @@ export const capfirst: FilterFunction = (value) => {
 }
 
 export const title: FilterFunction = (value) =>
-  String(value).replace(/\b\w/g, (c) => c.toUpperCase())
+  String(value).replace(TITLE_REGEX, (c) => c.toUpperCase())
 
 export const trim: FilterFunction = (value) => String(value).trim()
 
 export const striptags: FilterFunction = (value) =>
-  String(value).replace(/<[^>]*>/g, '')
+  String(value).replace(STRIPTAGS_REGEX, '')
 
 export const escape: FilterFunction = (value) => {
   // If already safe, don't double-escape
   if ((value as any)?.__safe__) return value
 
-  const escaped = String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
+  // Use Bun's native escapeHTML for maximum performance (480 MB/s - 20 GB/s)
+  const escaped = Bun.escapeHTML(String(value))
 
   // Mark as safe to prevent double-escaping by autoescape
   const safeString = new String(escaped) as any
@@ -58,8 +73,8 @@ export const escapejs: FilterFunction = (value) =>
 
 export const linebreaks: FilterFunction = (value) => {
   const str = String(value)
-  const paragraphs = str.split(/\n\n+/)
-  const html = paragraphs.map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('\n')
+  const paragraphs = str.split(DOUBLE_NEWLINE_REGEX)
+  const html = paragraphs.map((p) => `<p>${p.replace(NEWLINE_REGEX, '<br>')}</p>`).join('\n')
   // Mark as safe - this produces HTML that should not be escaped
   const safeString = new String(html) as any
   safeString.__safe__ = true
@@ -67,7 +82,7 @@ export const linebreaks: FilterFunction = (value) => {
 }
 
 export const linebreaksbr: FilterFunction = (value) => {
-  const html = String(value).replace(/\n/g, '<br>')
+  const html = String(value).replace(NEWLINE_REGEX, '<br>')
   // Mark as safe - this produces HTML that should not be escaped
   const safeString = new String(html) as any
   safeString.__safe__ = true
@@ -81,13 +96,13 @@ export const truncatechars: FilterFunction = (value, length = 30) => {
 }
 
 export const truncatewords: FilterFunction = (value, count = 15) => {
-  const words = String(value).split(/\s+/)
+  const words = String(value).split(WHITESPACE_REGEX)
   if (words.length <= count) return value
   return words.slice(0, count).join(' ') + '...'
 }
 
 export const wordcount: FilterFunction = (value) =>
-  String(value).split(/\s+/).filter(Boolean).length
+  String(value).split(WHITESPACE_REGEX).filter(Boolean).length
 
 export const center: FilterFunction = (value, width = 80) => {
   const str = String(value)
@@ -109,9 +124,9 @@ export const cut: FilterFunction = (value, arg = '') =>
 export const slugify: FilterFunction = (value) =>
   String(value)
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(SLUGIFY_NON_WORD_REGEX, '')
+    .replace(SLUGIFY_SPACES_REGEX, '-')
+    .replace(SLUGIFY_TRIM_REGEX, '')
 
 // ==================== Number Filters ====================
 
@@ -173,7 +188,12 @@ export const filesizeformat: FilterFunction = (value) => {
 export const length: FilterFunction = (value) => {
   if (value == null) return 0
   if (typeof value === 'string' || Array.isArray(value)) return value.length
-  if (typeof value === 'object') return Object.keys(value).length
+  if (typeof value === 'object') {
+    // Avoid Object.keys() allocation - count with for...in
+    let count = 0
+    for (const _ in value) count++
+    return count
+  }
   return 0
 }
 
@@ -266,72 +286,43 @@ export const columns: FilterFunction = (value, cols) => {
 
 // ==================== Date/Time Filters ====================
 
+// Date format helper - uses pre-defined arrays for performance
+const formatDateChar = (d: Date, char: string): string => {
+  switch (char) {
+    // Day
+    case 'd': return String(d.getDate()).padStart(2, '0')
+    case 'j': return String(d.getDate())
+    case 'D': return DAY_NAMES_SHORT[d.getDay()]
+    case 'l': return DAY_NAMES_LONG[d.getDay()]
+    // Month
+    case 'm': return String(d.getMonth() + 1).padStart(2, '0')
+    case 'n': return String(d.getMonth() + 1)
+    case 'M': return MONTH_NAMES_SHORT[d.getMonth()]
+    case 'F': return MONTH_NAMES_LONG[d.getMonth()]
+    case 'N': return MONTH_NAMES_AP[d.getMonth()]
+    // Year
+    case 'y': return String(d.getFullYear()).slice(-2)
+    case 'Y': return String(d.getFullYear())
+    // Time
+    case 'H': return String(d.getHours()).padStart(2, '0')
+    case 'G': return String(d.getHours())
+    case 'i': return String(d.getMinutes()).padStart(2, '0')
+    case 's': return String(d.getSeconds()).padStart(2, '0')
+    // AM/PM
+    case 'a': return d.getHours() < 12 ? 'a.m.' : 'p.m.'
+    case 'A': return d.getHours() < 12 ? 'AM' : 'PM'
+    // 12-hour
+    case 'g': return String(d.getHours() % 12 || 12)
+    case 'h': return String(d.getHours() % 12 || 12).padStart(2, '0')
+    default: return char
+  }
+}
+
 export const date: FilterFunction = (value, format = 'N j, Y') => {
   const d = value instanceof Date ? value : new Date(value)
   if (isNaN(d.getTime())) return ''
 
-  // Django date format codes
-  const formatMap: Record<string, () => string> = {
-    // Day
-    d: () => String(d.getDate()).padStart(2, '0'),
-    j: () => String(d.getDate()),
-    D: () => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()],
-    l: () =>
-      ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()],
-    // Month
-    m: () => String(d.getMonth() + 1).padStart(2, '0'),
-    n: () => String(d.getMonth() + 1),
-    M: () =>
-      ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][
-        d.getMonth()
-      ],
-    F: () =>
-      [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ][d.getMonth()],
-    N: () =>
-      [
-        'Jan.',
-        'Feb.',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'Aug.',
-        'Sept.',
-        'Oct.',
-        'Nov.',
-        'Dec.',
-      ][d.getMonth()],
-    // Year
-    y: () => String(d.getFullYear()).slice(-2),
-    Y: () => String(d.getFullYear()),
-    // Time
-    H: () => String(d.getHours()).padStart(2, '0'),
-    G: () => String(d.getHours()),
-    i: () => String(d.getMinutes()).padStart(2, '0'),
-    s: () => String(d.getSeconds()).padStart(2, '0'),
-    // AM/PM
-    a: () => (d.getHours() < 12 ? 'a.m.' : 'p.m.'),
-    A: () => (d.getHours() < 12 ? 'AM' : 'PM'),
-    // 12-hour
-    g: () => String(d.getHours() % 12 || 12),
-    h: () => String(d.getHours() % 12 || 12).padStart(2, '0'),
-  }
-
-  return format.replace(/[a-zA-Z]/g, (char: string) => formatMap[char]?.() ?? char)
+  return format.replace(DATE_CHAR_REGEX, (char: string) => formatDateChar(d, char))
 }
 
 export const time: FilterFunction = (value, format = 'H:i') => date(value, format)
@@ -417,8 +408,7 @@ export const pluralize: FilterFunction = (value, arg = 's') => {
 export const urlencode: FilterFunction = (value) => encodeURIComponent(String(value))
 
 export const urlize: FilterFunction = (value) => {
-  const urlRegex = /(https?:\/\/[^\s]+)/g
-  const html = String(value).replace(urlRegex, '<a href="$1">$1</a>')
+  const html = String(value).replace(URLIZE_REGEX, '<a href="$1">$1</a>')
   // Mark as safe - this produces HTML that should not be escaped
   const safeString = new String(html) as any
   safeString.__safe__ = true
