@@ -195,7 +195,7 @@ export class Environment {
   compile(source: string): TemplateNode {
     const lexer = new Lexer(source)
     const tokens = lexer.tokenize()
-    const parser = new Parser(tokens)
+    const parser = new Parser(tokens, source)
     return parser.parse()
   }
 
@@ -406,7 +406,7 @@ export function compile(
 ): (ctx: Record<string, any>) => string {
   const lexer = new Lexer(source)
   const tokens = lexer.tokenize()
-  const parser = new Parser(tokens)
+  const parser = new Parser(tokens, source)
   const ast = parser.parse()
   return compileToFunction(ast, options)
 }
@@ -460,7 +460,7 @@ export async function compileWithInheritance(
     parse(source: string): TemplateNode {
       const lexer = new Lexer(source)
       const tokens = lexer.tokenize()
-      const parser = new Parser(tokens)
+      const parser = new Parser(tokens, source)
       return parser.parse()
     }
   }
@@ -511,7 +511,7 @@ export async function compileWithInheritanceToCode(
     parse(source: string): TemplateNode {
       const lexer = new Lexer(source)
       const tokens = lexer.tokenize()
-      const parser = new Parser(tokens)
+      const parser = new Parser(tokens, source)
       return parser.parse()
     }
   }
@@ -544,7 +544,7 @@ export function compileToCode(
 ): string {
   const lexer = new Lexer(source)
   const tokens = lexer.tokenize()
-  const parser = new Parser(tokens)
+  const parser = new Parser(tokens, source)
   const ast = parser.parse()
   return compileToString(ast, options)
 }
@@ -557,6 +557,7 @@ export type { TemplateNode, ASTNode, ExpressionNode } from './parser/nodes'
 export { Runtime, Context } from './runtime'
 export { builtinFilters } from './filters'
 export type { FilterFunction } from './filters'
+export { TemplateError, TemplateSyntaxError, TemplateRuntimeError } from './errors'
 export type { CompileOptions } from './compiler'
 export { builtinTests } from './tests'
 export type { TestFunction } from './tests'

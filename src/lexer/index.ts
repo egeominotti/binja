@@ -6,6 +6,7 @@
  */
 import { Token, TokenType, KEYWORDS, LexerState } from './tokens'
 import { tokenizeNative, isNativeAccelerated } from './hybrid'
+import { TemplateSyntaxError } from '../errors'
 
 export class Lexer {
   private state: LexerState
@@ -137,7 +138,11 @@ export class Lexer {
 
     // Expect block end
     if (!this.match(this.blockEnd)) {
-      throw new Error(`Expected ${this.blockEnd} after ${tagName} at line ${this.state.line}`)
+      throw new TemplateSyntaxError(`Expected '${this.blockEnd}' after '${tagName}'`, {
+        line: this.state.line,
+        column: this.state.column,
+        source: this.state.source,
+      })
     }
 
     // Now capture everything until {% endraw %} or {% endverbatim %}
@@ -175,7 +180,11 @@ export class Lexer {
           if (this.peek() === '-') this.advance()
 
           if (!this.match(this.blockEnd)) {
-            throw new Error(`Expected ${this.blockEnd} after ${endTag} at line ${this.state.line}`)
+            throw new TemplateSyntaxError(`Expected '${this.blockEnd}' after '${endTag}'`, {
+              line: this.state.line,
+              column: this.state.column,
+              source: this.state.source,
+            })
           }
           return
         }
@@ -193,7 +202,12 @@ export class Lexer {
       this.advance()
     }
 
-    throw new Error(`Unclosed ${tagName} block starting at line ${startLine}`)
+    throw new TemplateSyntaxError(`Unclosed '${tagName}' block`, {
+      line: startLine,
+      column: startColumn,
+      source: this.state.source,
+      suggestion: `Add {% end${tagName} %} to close the block`,
+    })
   }
 
   private scanText(): void {
@@ -252,7 +266,12 @@ export class Lexer {
       this.scanExpressionToken()
     }
 
-    throw new Error(`Unclosed template tag at line ${this.state.line}`)
+    throw new TemplateSyntaxError(`Unclosed template tag`, {
+      line: this.state.line,
+      column: this.state.column,
+      source: this.state.source,
+      suggestion: `Add closing delimiter '${endDelimiter}'`,
+    })
   }
 
   private scanExpressionToken(): void {
@@ -300,7 +319,12 @@ export class Lexer {
     }
 
     if (this.isAtEnd()) {
-      throw new Error(`Unterminated string at line ${this.state.line}`)
+      throw new TemplateSyntaxError(`Unterminated string literal`, {
+        line: this.state.line,
+        column: this.state.column,
+        source: this.state.source,
+        suggestion: `Add closing quote '${quote}'`,
+      })
     }
 
     const value = this.state.source.slice(start, this.state.pos)
@@ -372,7 +396,12 @@ export class Lexer {
         if (this.match('=')) {
           this.addToken(TokenType.NE, '!=')
         } else {
-          throw new Error(`Unexpected character '!' at line ${this.state.line}`)
+          throw new TemplateSyntaxError(`Unexpected character '!'`, {
+            line: this.state.line,
+            column: this.state.column - 1,
+            source: this.state.source,
+            suggestion: `Use '!=' for not-equal comparison or 'not' for negation`,
+          })
         }
         break
       case '<':
@@ -391,7 +420,11 @@ export class Lexer {
         break
       default:
         if (!this.isWhitespace(c)) {
-          throw new Error(`Unexpected character '${c}' at line ${this.state.line}`)
+          throw new TemplateSyntaxError(`Unexpected character '${c}'`, {
+            line: this.state.line,
+            column: this.state.column - 1,
+            source: this.state.source,
+          })
         }
     }
   }

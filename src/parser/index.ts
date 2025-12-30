@@ -4,6 +4,7 @@
  */
 import { TokenType } from '../lexer'
 import type { Token } from '../lexer'
+import { TemplateSyntaxError } from '../errors'
 import type {
   ASTNode,
   TemplateNode,
@@ -49,9 +50,11 @@ import type {
 export class Parser {
   private tokens: Token[]
   private current: number = 0
+  private source?: string
 
-  constructor(tokens: Token[]) {
+  constructor(tokens: Token[], source?: string) {
     this.tokens = tokens
+    this.source = source
   }
 
   parse(): TemplateNode {
@@ -1362,9 +1365,13 @@ export class Parser {
     throw this.error(`Expected ${type}, got ${token.type} (${token.value})`)
   }
 
-  private error(message: string): Error {
+  private error(message: string): TemplateSyntaxError {
     const token = this.peek()
-    return new Error(`Parse error at line ${token.line}, column ${token.column}: ${message}`)
+    return new TemplateSyntaxError(message, {
+      line: token.line,
+      column: token.column,
+      source: this.source,
+    })
   }
 }
 

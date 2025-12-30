@@ -8,6 +8,7 @@
 import { Context } from './context'
 import { builtinFilters, FilterFunction } from '../filters'
 import { builtinTests, TestFunction } from '../tests'
+import { TemplateRuntimeError, findSimilar } from '../errors'
 import type {
   ASTNode,
   TemplateNode,
@@ -68,6 +69,7 @@ export class Runtime {
   private tests: Record<string, TestFunction>
   private blocks: Map<string, BlockNode> = new Map()
   private parentTemplate: TemplateNode | null = null
+  private source?: string // Template source for error messages
 
   constructor(options: RuntimeOptions = {}) {
     this.options = {
@@ -851,7 +853,17 @@ export class Runtime {
     }
     const kwargs = this.evalObjectSync(node.kwargs, ctx)
     const filter = this.filters[node.filter]
-    if (!filter) throw new Error(`Unknown filter: ${node.filter}`)
+    if (!filter) {
+      const available = Object.keys(this.filters)
+      const suggestion = findSimilar(node.filter, available)
+      throw new TemplateRuntimeError(`Unknown filter '${node.filter}'`, {
+        line: node.line,
+        column: node.column,
+        source: this.source,
+        suggestion: suggestion || undefined,
+        availableOptions: available.slice(0, 15),
+      })
+    }
     return filter(value, ...args, ...Object.values(kwargs))
   }
 
@@ -1318,6 +1330,11 @@ export class Runtime {
   // Add global variable
   addGlobal(name: string, value: any): void {
     this.options.globals[name] = value
+  }
+
+  // Set template source for error messages
+  setSource(source: string): void {
+    this.source = source
   }
 }
 
