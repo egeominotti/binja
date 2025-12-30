@@ -1,6 +1,6 @@
 {
   "name": "binja",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "High-performance Jinja2/Django template engine for Bun",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -35,7 +35,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/cli.ts --outdir ./dist --target bun && bun run build:types",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/cli.ts --outdir ./dist --target bun && bun build ./src/native/index.ts --outdir ./dist/native --target bun && bun build ./src/debug/index.ts --outdir ./dist/debug --target bun && bun run build:types",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist",
     "build:native": "./scripts/build-native.sh",
     "build:all": "bun run build:native && bun run build",
