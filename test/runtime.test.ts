@@ -298,6 +298,99 @@ describe('Runtime', () => {
     })
   })
 
+  describe('Now Tag', () => {
+    test('renders current year', async () => {
+      const result = await render('{% now "Y" %}', {})
+      const currentYear = new Date().getFullYear().toString()
+      expect(result).toBe(currentYear)
+    })
+
+    test('renders current month', async () => {
+      const result = await render('{% now "m" %}', {})
+      const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0')
+      expect(result).toBe(currentMonth)
+    })
+
+    test('renders current day', async () => {
+      const result = await render('{% now "d" %}', {})
+      const currentDay = String(new Date().getDate()).padStart(2, '0')
+      expect(result).toBe(currentDay)
+    })
+
+    test('renders full date format', async () => {
+      const result = await render('{% now "Y-m-d" %}', {})
+      const d = new Date()
+      const expected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      expect(result).toBe(expected)
+    })
+
+    test('renders day name short', async () => {
+      const result = await render('{% now "D" %}', {})
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      expect(dayNames).toContain(result)
+    })
+
+    test('renders day name long', async () => {
+      const result = await render('{% now "l" %}', {})
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      expect(dayNames).toContain(result)
+    })
+
+    test('renders month name short', async () => {
+      const result = await render('{% now "M" %}', {})
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      expect(monthNames).toContain(result)
+    })
+
+    test('renders month name long', async () => {
+      const result = await render('{% now "F" %}', {})
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      expect(monthNames).toContain(result)
+    })
+
+    test('stores result in variable with as', async () => {
+      const result = await render('{% now "Y" as year %}Year: {{ year }}', {})
+      const currentYear = new Date().getFullYear().toString()
+      expect(result).toBe(`Year: ${currentYear}`)
+    })
+
+    test('as variable does not output directly', async () => {
+      const result = await render('{% now "Y" as year %}', {})
+      expect(result).toBe('')
+    })
+
+    test('renders time format', async () => {
+      const result = await render('{% now "H:i" %}', {})
+      // Just check it matches time format HH:MM
+      expect(result).toMatch(/^\d{1,2}:\d{2}$/)
+    })
+
+    test('renders AM/PM format', async () => {
+      const result = await render('{% now "A" %}', {})
+      expect(['AM', 'PM']).toContain(result)
+    })
+
+    test('renders 12-hour format', async () => {
+      const result = await render('{% now "g" %}', {})
+      const hour = parseInt(result, 10)
+      expect(hour).toBeGreaterThanOrEqual(1)
+      expect(hour).toBeLessThanOrEqual(12)
+    })
+
+    test('handles combined format string', async () => {
+      const result = await render('{% now "D, F j, Y" %}', {})
+      // Should contain day name, month name, day number, and year
+      expect(result).toMatch(/^\w{3}, \w+ \d{1,2}, \d{4}$/)
+    })
+
+    test('works with timezone option', async () => {
+      const env = new Environment({ timezone: 'UTC' })
+      const result = await env.renderString('{% now "Y" %}', {})
+      // Should be a valid year
+      expect(result).toMatch(/^\d{4}$/)
+    })
+  })
+
   describe('Environment', () => {
     test('allows custom filters', async () => {
       const env = new Environment({

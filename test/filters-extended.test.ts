@@ -291,4 +291,102 @@ describe('Extended Filters', () => {
       expect(result).toContain('<li>b</li>')
     })
   })
+
+  describe('groupby', () => {
+    test('groups array by attribute', async () => {
+      const result = await render(
+        '{% for group in items|groupby("category") %}{{ group.grouper }}:{% for item in group.list %}{{ item.name }}{% endfor %};{% endfor %}',
+        {
+          items: [
+            { name: 'apple', category: 'fruit' },
+            { name: 'banana', category: 'fruit' },
+            { name: 'carrot', category: 'vegetable' },
+            { name: 'broccoli', category: 'vegetable' }
+          ]
+        }
+      )
+      expect(result).toBe('fruit:applebanana;vegetable:carrotbroccoli;')
+    })
+
+    test('groups by value when no attribute specified', async () => {
+      const result = await render(
+        '{% for group in items|groupby %}{{ group.grouper }}({{ group.list|length }}){% endfor %}',
+        { items: ['a', 'a', 'b', 'b', 'b', 'c'] }
+      )
+      expect(result).toBe('a(2)b(3)c(1)')
+    })
+
+    test('returns empty array for non-array input', async () => {
+      const result = await render('{{ items|groupby("x")|length }}', { items: 'string' })
+      expect(result).toBe('0')
+    })
+
+    test('handles empty array', async () => {
+      const result = await render('{{ items|groupby("x")|length }}', { items: [] })
+      expect(result).toBe('0')
+    })
+
+    test('handles items with missing attribute', async () => {
+      const result = await render(
+        '{% for g in items|groupby("cat") %}{{ g.grouper }}:{{ g.list|length }};{% endfor %}',
+        {
+          items: [
+            { name: 'a', cat: 'x' },
+            { name: 'b' }, // missing cat
+            { name: 'c', cat: 'x' }
+          ]
+        }
+      )
+      expect(result).toContain('x:2')
+      expect(result).toContain('undefined:1')
+    })
+  })
+
+  describe('dictsortreversed', () => {
+    test('sorts array of objects by key in reverse order', async () => {
+      const result = await render(
+        '{% for item in items|dictsortreversed("name") %}{{ item.name }}{% endfor %}',
+        {
+          items: [
+            { name: 'cherry' },
+            { name: 'apple' },
+            { name: 'banana' }
+          ]
+        }
+      )
+      expect(result).toBe('cherrybananaapple')
+    })
+
+    test('sorts by value when no key specified', async () => {
+      const result = await render(
+        '{{ items|dictsortreversed|join(",") }}',
+        { items: [1, 3, 2, 5, 4] }
+      )
+      expect(result).toBe('5,4,3,2,1')
+    })
+
+    test('returns non-array as-is', async () => {
+      const result = await render('{{ value|dictsortreversed }}', { value: 'string' })
+      expect(result).toBe('string')
+    })
+
+    test('handles empty array', async () => {
+      const result = await render('{{ items|dictsortreversed|join }}', { items: [] })
+      expect(result).toBe('')
+    })
+
+    test('handles numeric keys', async () => {
+      const result = await render(
+        '{% for item in items|dictsortreversed("score") %}{{ item.score }}{% endfor %}',
+        {
+          items: [
+            { name: 'a', score: 50 },
+            { name: 'b', score: 100 },
+            { name: 'c', score: 25 }
+          ]
+        }
+      )
+      expect(result).toBe('1005025')
+    })
+  })
 })
