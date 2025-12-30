@@ -54,6 +54,8 @@ export interface EnvironmentOptions {
   debug?: boolean
   /** Debug panel options */
   debugOptions?: PanelOptions
+  /** Timezone for date/time operations (e.g., 'Europe/Rome', 'UTC', 'America/New_York') */
+  timezone?: string
 }
 
 export class Environment {
@@ -74,6 +76,7 @@ export class Environment {
       extensions: options.extensions ?? ['.html', '.jinja', '.jinja2', ''],
       debug: options.debug ?? false,
       debugOptions: options.debugOptions ?? {},
+      timezone: options.timezone ?? undefined,
     }
 
     this.runtime = new Runtime({
@@ -83,6 +86,7 @@ export class Environment {
       urlResolver: this.options.urlResolver,
       staticResolver: this.options.staticResolver,
       templateLoader: this.loadTemplate.bind(this),
+      timezone: this.options.timezone,
     })
   }
 

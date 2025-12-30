@@ -48,6 +48,8 @@ export interface RuntimeOptions {
   urlResolver?: (name: string, args: any[], kwargs: Record<string, any>) => string
   staticResolver?: (path: string) => string
   templateLoader?: (name: string) => Promise<TemplateNode>
+  /** Timezone for date/time operations (e.g., 'Europe/Rome', 'UTC') */
+  timezone?: string
 }
 
 export class Runtime {
@@ -68,10 +70,24 @@ export class Runtime {
       templateLoader: options.templateLoader ?? (async () => {
         throw new Error('Template loader not configured')
       }),
+      timezone: options.timezone ?? undefined,
     }
 
     // Merge builtin and custom filters
     this.filters = { ...builtinFilters, ...this.options.filters }
+
+    // Override date filter with timezone support if timezone is configured
+    if (this.options.timezone) {
+      const tz = this.options.timezone
+      this.filters.date = (value: any, format: string = 'N j, Y') => {
+        const d = value instanceof Date ? value : new Date(value)
+        if (isNaN(d.getTime())) return ''
+        return this.formatDate(d, format)
+      }
+      this.filters.time = (value: any, format: string = 'H:i') => {
+        return this.filters.date(value, format)
+      }
+    }
 
     // Merge builtin and custom tests
     this.tests = { ...builtinTests, ...this.options.tests }
@@ -315,6 +331,53 @@ export class Runtime {
     return result
   }
 
+  // Get date components in the specified timezone
+  private getDateInTimezone(d: Date, tz?: string): {
+    year: number, month: number, day: number, weekday: number,
+    hours: number, minutes: number, seconds: number
+  } {
+    if (!tz) {
+      // Use local timezone
+      return {
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        day: d.getDate(),
+        weekday: d.getDay(),
+        hours: d.getHours(),
+        minutes: d.getMinutes(),
+        seconds: d.getSeconds(),
+      }
+    }
+
+    // Use Intl.DateTimeFormat to get components in the specified timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+
+    const parts = formatter.formatToParts(d)
+    const get = (type: string) => parts.find(p => p.type === type)?.value || ''
+
+    const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+
+    return {
+      year: parseInt(get('year'), 10),
+      month: parseInt(get('month'), 10) - 1, // 0-indexed like JS Date
+      day: parseInt(get('day'), 10),
+      weekday: weekdayMap[get('weekday')] ?? 0,
+      hours: parseInt(get('hour'), 10),
+      minutes: parseInt(get('minute'), 10),
+      seconds: parseInt(get('second'), 10),
+    }
+  }
+
   // Django date format helper for {% now %} tag
   private formatDate(d: Date, format: string): string {
     const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -322,34 +385,38 @@ export class Runtime {
     const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
+    // Get date components in the configured timezone
+    const tz = this.options.timezone
+    const { year, month, day, weekday, hours, minutes, seconds } = this.getDateInTimezone(d, tz)
+
     let result = ''
     for (let i = 0; i < format.length; i++) {
       const char = format[i]
       switch (char) {
         // Day
-        case 'd': result += String(d.getDate()).padStart(2, '0'); break
-        case 'j': result += String(d.getDate()); break
-        case 'D': result += DAY_NAMES_SHORT[d.getDay()]; break
-        case 'l': result += DAY_NAMES_LONG[d.getDay()]; break
+        case 'd': result += String(day).padStart(2, '0'); break
+        case 'j': result += String(day); break
+        case 'D': result += DAY_NAMES_SHORT[weekday]; break
+        case 'l': result += DAY_NAMES_LONG[weekday]; break
         // Month
-        case 'm': result += String(d.getMonth() + 1).padStart(2, '0'); break
-        case 'n': result += String(d.getMonth() + 1); break
-        case 'M': result += MONTH_NAMES_SHORT[d.getMonth()]; break
-        case 'F': result += MONTH_NAMES_LONG[d.getMonth()]; break
+        case 'm': result += String(month + 1).padStart(2, '0'); break
+        case 'n': result += String(month + 1); break
+        case 'M': result += MONTH_NAMES_SHORT[month]; break
+        case 'F': result += MONTH_NAMES_LONG[month]; break
         // Year
-        case 'y': result += String(d.getFullYear()).slice(-2); break
-        case 'Y': result += String(d.getFullYear()); break
+        case 'y': result += String(year).slice(-2); break
+        case 'Y': result += String(year); break
         // Time
-        case 'H': result += String(d.getHours()).padStart(2, '0'); break
-        case 'G': result += String(d.getHours()); break
-        case 'i': result += String(d.getMinutes()).padStart(2, '0'); break
-        case 's': result += String(d.getSeconds()).padStart(2, '0'); break
+        case 'H': result += String(hours).padStart(2, '0'); break
+        case 'G': result += String(hours); break
+        case 'i': result += String(minutes).padStart(2, '0'); break
+        case 's': result += String(seconds).padStart(2, '0'); break
         // AM/PM
-        case 'a': result += d.getHours() < 12 ? 'a.m.' : 'p.m.'; break
-        case 'A': result += d.getHours() < 12 ? 'AM' : 'PM'; break
+        case 'a': result += hours < 12 ? 'a.m.' : 'p.m.'; break
+        case 'A': result += hours < 12 ? 'AM' : 'PM'; break
         // 12-hour
-        case 'g': result += String(d.getHours() % 12 || 12); break
-        case 'h': result += String(d.getHours() % 12 || 12).padStart(2, '0'); break
+        case 'g': result += String(hours % 12 || 12); break
+        case 'h': result += String(hours % 12 || 12).padStart(2, '0'); break
         default: result += char
       }
     }

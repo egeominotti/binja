@@ -290,6 +290,28 @@ app.get('/user/:id', ({ params }) => templates.user({ id: params.id }))
 | `timesince` | `{{ past\|timesince }}` | `2 days ago` |
 | `timeuntil` | `{{ future\|timeuntil }}` | `in 3 hours` |
 
+#### Timezone Support
+
+All date/time operations respect the `timezone` option in Environment:
+
+```typescript
+const env = new Environment({
+  timezone: 'Europe/Rome'  // All dates will be displayed in Rome timezone
+})
+
+// 2024-06-15 12:00 UTC = 2024-06-15 14:00 Rome (UTC+2)
+await env.renderString('{{ date|date:"Y-m-d H:i" }}', {
+  date: new Date('2024-06-15T12:00:00Z')
+})
+// Output: 2024-06-15 14:00
+
+// {% now %} tag also uses the configured timezone
+await env.renderString('{% now "Y-m-d H:i" %}')
+// Output: current date/time in Rome timezone
+```
+
+Common timezone values: `UTC`, `Europe/London`, `Europe/Rome`, `Europe/Paris`, `America/New_York`, `America/Los_Angeles`, `Asia/Tokyo`, `Asia/Shanghai`, `Australia/Sydney`
+
 ### Safety & Encoding
 
 | Filter | Example | Description |
@@ -377,6 +399,10 @@ const env = new Environment({
 
   // Auto-escape HTML (default: true)
   autoescape: true,
+
+  // Timezone for date/time operations
+  // All date filters and {% now %} tag will use this timezone
+  timezone: 'Europe/Rome',  // or 'UTC', 'America/New_York', etc.
 
   // Custom filters
   filters: {
