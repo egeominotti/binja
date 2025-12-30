@@ -32,7 +32,7 @@ interface ForLoopInternal extends ForLoop {
   _idx: number
 }
 
-// Optimized ForLoop object with lazy getters for rarely-used properties
+// Optimized ForLoop object with lazy getters and dynamic cycle function
 function createForLoop(
   items: any[],
   index: number,
@@ -41,6 +41,7 @@ function createForLoop(
   parentloop?: ForLoop
 ): ForLoopInternal {
   const length = items.length
+  const revCount = length - index
   const forloop = {
     // Internal state for lazy getters
     _items: items,
@@ -56,15 +57,15 @@ function createForLoop(
     depth,
     depth0: depth - 1,
     // Reverse counters (less common)
-    revcounter: length - index,
-    revcounter0: length - index - 1,
-    revindex: length - index,
-    revindex0: length - index - 1,
+    revcounter: revCount,
+    revcounter0: revCount - 1,
+    revindex: revCount,
+    revindex0: revCount - 1,
     // Item references (lazy via getter - reads from internal state)
     get previtem() { return this._idx > 0 ? this._items[this._idx - 1] : undefined },
     get nextitem() { return this._idx < this._items.length - 1 ? this._items[this._idx + 1] : undefined },
-    // Functions
-    cycle: (...args: any[]) => args[index % args.length],
+    // Optimized: cycle uses dynamic _idx, avoiding function recreation per iteration
+    cycle(...args: any[]) { return args[this._idx % args.length] },
     changed: (value: any) => {
       const changed = value !== lastCycleValue.value
       lastCycleValue.value = value
@@ -164,6 +165,7 @@ export class Context {
       : null
   }
 
+  // Optimized: minimal property updates, reuse cycle function closure
   updateForLoop(index: number, items: any[]): void {
     const forloop = this._currentForloop as ForLoopInternal | null
     if (!forloop) return
@@ -171,20 +173,29 @@ export class Context {
     const length = items.length
     // Update internal state for lazy getters
     forloop._idx = index
-    forloop._items = items
-    // Update only the properties that change per iteration
+    // Note: items array doesn't change, skip reassignment if same reference
+    if (forloop._items !== items) forloop._items = items
+
+    // Only update the commonly-accessed properties
+    // counter/index are by far the most used
     forloop.counter = index + 1
     forloop.counter0 = index
-    forloop.first = index === 0
-    forloop.last = index === length - 1
     forloop.index = index + 1
     forloop.index0 = index
-    forloop.revcounter = length - index
-    forloop.revcounter0 = length - index - 1
-    forloop.revindex = length - index
-    forloop.revindex0 = length - index - 1
-    // Update cycle function with new index
-    forloop.cycle = (...args: any[]) => args[index % args.length]
+
+    // first/last: compute directly instead of always storing
+    forloop.first = index === 0
+    forloop.last = index === length - 1
+
+    // Reverse counters (less common, but cheap to compute)
+    const revCount = length - index
+    forloop.revcounter = revCount
+    forloop.revcounter0 = revCount - 1
+    forloop.revindex = revCount
+    forloop.revindex0 = revCount - 1
+
+    // Note: cycle function is NOT updated here - it captures _idx via closure
+    // See createForLoop() where cycle uses forloop._idx dynamically
   }
 
   // Get all data as plain object
