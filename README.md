@@ -400,6 +400,10 @@ const env = new Environment({
   // Auto-escape HTML (default: true)
   autoescape: true,
 
+  // Cache settings
+  cache: true,          // Enable template caching (default: true)
+  cacheMaxSize: 100,    // LRU cache limit (default: 100)
+
   // Timezone for date/time operations
   // All date filters and {% now %} tag will use this timezone
   timezone: 'Europe/Rome',  // or 'UTC', 'America/New_York', etc.
@@ -426,6 +430,11 @@ const env = new Environment({
   // Static file resolver for {% static %} tag
   staticResolver: (path: string) => `/static/${path}`
 })
+
+// Cache monitoring
+env.cacheSize()    // Number of cached templates
+env.cacheStats()   // { size, maxSize, hits, misses, hitRate }
+env.clearCache()   // Clear cache and reset stats
 ```
 
 ---
@@ -568,7 +577,8 @@ await render('{{ script }}', {
 1. **Use AOT in Production** - `compile()` is 160x faster than Nunjucks
 2. **Pre-compile at Startup** - Compile templates once, use many times
 3. **Reuse Environment** - For templates with `{% extends %}`, create once
-4. **Enable caching** - Templates are cached automatically
+4. **LRU Cache** - Templates cached with LRU eviction (default: 100, prevents memory leaks)
+5. **Monitor Cache** - Use `env.cacheStats()` to optimize `cacheMaxSize`
 
 ```typescript
 import { compile } from 'binja'
@@ -650,12 +660,19 @@ Create a configured template environment.
 ```typescript
 const env = new Environment(options)
 
-// Methods
+// Rendering
 env.render(name, context)      // Render template file
 env.renderString(str, context) // Render template string
+
+// Configuration
 env.addFilter(name, fn)        // Add custom filter
 env.addGlobal(name, value)     // Add global variable
-env.loadTemplate(name)         // Pre-load template (for cache warming)
+
+// Cache Management (LRU with configurable max size)
+env.loadTemplate(name)         // Pre-load template (cache warming)
+env.cacheSize()                // Get number of cached templates
+env.cacheStats()               // Get { size, maxSize, hits, misses, hitRate }
+env.clearCache()               // Clear all cached templates and reset stats
 ```
 
 ---
