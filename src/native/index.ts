@@ -193,7 +193,7 @@ export function nativeVersion(): string | null {
  * Native Lexer - uses Zig FFI for maximum performance
  */
 export class NativeLexer {
-  private lexerPtr: number = 0
+  private lexerPtr: any = 0  // Pointer from FFI
   private source: string
   private sourceBuffer: Uint8Array
   private lib: LibType
@@ -228,7 +228,7 @@ export class NativeLexer {
       throw new Error('Failed to create native lexer')
     }
 
-    this.lexerPtr = Number(result)
+    this.lexerPtr = result
     this._tokenCount = Number(this.lib.symbols.binja_lexer_token_count(this.lexerPtr))
   }
 
@@ -292,9 +292,9 @@ export class NativeLexer {
   }
 
   free(): void {
-    if (this.lexerPtr !== 0) {
+    if (this.lexerPtr) {
       this.lib.symbols.binja_lexer_free(this.lexerPtr)
-      this.lexerPtr = 0
+      this.lexerPtr = null
     }
   }
 

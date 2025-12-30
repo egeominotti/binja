@@ -1,6 +1,6 @@
 {
   "name": "binja",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "High-performance Jinja2/Django template engine for Bun",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -67,7 +67,10 @@
     "ssr",
     "template-engine",
     "django-templates",
-    "typescript"
+    "typescript",
+    "zig",
+    "native",
+    "ffi"
   ],
   "author": "egeominotti",
   "license": "BSD-3-Clause",
