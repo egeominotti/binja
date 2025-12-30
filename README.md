@@ -240,109 +240,141 @@ app.get('/user/:id', ({ params }) => templates.user({ id: params.id }))
 
 ---
 
-## Filters
+## Filters (84 Built-in)
 
-### String Filters
+binja includes **84 built-in filters** covering both Jinja2 and Django Template Language.
 
-| Filter | Example | Output |
-|--------|---------|--------|
-| `upper` | `{{ "hello"\|upper }}` | `HELLO` |
-| `lower` | `{{ "HELLO"\|lower }}` | `hello` |
-| `capitalize` | `{{ "hello"\|capitalize }}` | `Hello` |
-| `title` | `{{ "hello world"\|title }}` | `Hello World` |
-| `trim` | `{{ "  hello  "\|trim }}` | `hello` |
-| `truncatechars` | `{{ "hello world"\|truncatechars:5 }}` | `he...` |
-| `truncatewords` | `{{ "hello world foo"\|truncatewords:2 }}` | `hello world...` |
-| `slugify` | `{{ "Hello World!"\|slugify }}` | `hello-world` |
-| `striptags` | `{{ "<p>Hello</p>"\|striptags }}` | `Hello` |
-| `wordcount` | `{{ "hello world"\|wordcount }}` | `2` |
-| `center` | `{{ "hi"\|center:10 }}` | `    hi    ` |
-| `ljust` | `{{ "hi"\|ljust:10 }}` | `hi        ` |
-| `rjust` | `{{ "hi"\|rjust:10 }}` | `        hi` |
-| `cut` | `{{ "hello"\|cut:"l" }}` | `heo` |
-| `addslashes` | `{{ "it's"\|addslashes }}` | `it\'s` |
-| `stringformat` | `{{ 5\|stringformat:"03d" }}` | `005` |
+### String Filters (26)
 
-### Number Filters
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `upper` | Uppercase | `{{ "hello"\|upper }}` → `HELLO` |
+| `lower` | Lowercase | `{{ "HELLO"\|lower }}` → `hello` |
+| `capitalize` | First letter uppercase | `{{ "hello"\|capitalize }}` → `Hello` |
+| `capfirst` | First char uppercase | `{{ "hello"\|capfirst }}` → `Hello` |
+| `title` | Title case | `{{ "hello world"\|title }}` → `Hello World` |
+| `trim` | Strip whitespace | `{{ "  hi  "\|trim }}` → `hi` |
+| `striptags` | Remove HTML tags | `{{ "<p>Hi</p>"\|striptags }}` → `Hi` |
+| `slugify` | URL-friendly slug | `{{ "Hello World!"\|slugify }}` → `hello-world` |
+| `truncatechars` | Truncate to N chars | `{{ "hello"\|truncatechars:3 }}` → `hel...` |
+| `truncatewords` | Truncate to N words | `{{ "a b c d"\|truncatewords:2 }}` → `a b...` |
+| `truncatechars_html` | Truncate preserving HTML | `{{ "<b>hi</b> world"\|truncatechars_html:5 }}` |
+| `truncatewords_html` | Truncate words in HTML | `{{ "<p>a b c</p>"\|truncatewords_html:2 }}` |
+| `wordcount` | Count words | `{{ "hello world"\|wordcount }}` → `2` |
+| `wordwrap` | Wrap at N chars | `{{ text\|wordwrap:40 }}` |
+| `center` | Center in N chars | `{{ "hi"\|center:10 }}` → `    hi    ` |
+| `ljust` | Left justify | `{{ "hi"\|ljust:10 }}` → `hi        ` |
+| `rjust` | Right justify | `{{ "hi"\|rjust:10 }}` → `        hi` |
+| `cut` | Remove substring | `{{ "hello"\|cut:"l" }}` → `heo` |
+| `replace` | Replace substring | `{{ "hello"\|replace:"l","x" }}` → `hexxo` |
+| `indent` | Indent lines | `{{ text\|indent:4 }}` |
+| `linebreaks` | Newlines to `<p>/<br>` | `{{ text\|linebreaks }}` |
+| `linebreaksbr` | Newlines to `<br>` | `{{ text\|linebreaksbr }}` |
+| `linenumbers` | Add line numbers | `{{ code\|linenumbers }}` |
+| `addslashes` | Escape quotes | `{{ "it's"\|addslashes }}` → `it\'s` |
+| `format` | sprintf-style format | `{{ "Hi %s"\|format:name }}` |
+| `stringformat` | Python % format | `{{ 5\|stringformat:"03d" }}` → `005` |
 
-| Filter | Example | Output |
-|--------|---------|--------|
-| `abs` | `{{ -5\|abs }}` | `5` |
-| `add` | `{{ 5\|add:3 }}` | `8` |
-| `floatformat` | `{{ 3.14159\|floatformat:2 }}` | `3.14` |
-| `filesizeformat` | `{{ 1048576\|filesizeformat }}` | `1.0 MB` |
-| `divisibleby` | `{{ 10\|divisibleby:2 }}` | `true` |
-| `get_digit` | `{{ 12345\|get_digit:2 }}` | `4` |
-| `widthratio` | `{% widthratio value max 100 %}` | Calculated ratio |
+### Number Filters (9)
 
-### List Filters
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `abs` | Absolute value | `{{ -5\|abs }}` → `5` |
+| `int` | Convert to integer | `{{ "42"\|int }}` → `42` |
+| `float` | Convert to float | `{{ "3.14"\|float }}` → `3.14` |
+| `round` | Round number | `{{ 3.7\|round }}` → `4` |
+| `add` | Add number | `{{ 5\|add:3 }}` → `8` |
+| `divisibleby` | Check divisibility | `{{ 10\|divisibleby:2 }}` → `true` |
+| `floatformat` | Format decimal places | `{{ 3.14159\|floatformat:2 }}` → `3.14` |
+| `filesizeformat` | Human file size | `{{ 1048576\|filesizeformat }}` → `1.0 MB` |
+| `get_digit` | Get Nth digit | `{{ 12345\|get_digit:2 }}` → `4` |
 
-| Filter | Example | Output |
-|--------|---------|--------|
-| `length` | `{{ items\|length }}` | `3` |
-| `first` | `{{ items\|first }}` | First item |
-| `last` | `{{ items\|last }}` | Last item |
-| `join` | `{{ items\|join:", " }}` | `a, b, c` |
-| `reverse` | `{{ items\|reverse }}` | Reversed list |
-| `sort` | `{{ items\|sort }}` | Sorted list |
-| `unique` | `{{ items\|unique }}` | Unique items |
-| `slice` | `{{ items\|slice:":2" }}` | First 2 items |
-| `batch` | `{{ items\|batch:2 }}` | Grouped by 2 |
-| `random` | `{{ items\|random }}` | Random item |
+### List/Array Filters (22)
 
-### Date Filters
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `length` | List length | `{{ items\|length }}` → `3` |
+| `length_is` | Check length | `{{ items\|length_is:3 }}` → `true` |
+| `first` | First item | `{{ items\|first }}` |
+| `last` | Last item | `{{ items\|last }}` |
+| `join` | Join with separator | `{{ items\|join:", " }}` → `a, b, c` |
+| `slice` | Slice list | `{{ items\|slice:":2" }}` |
+| `reverse` | Reverse list | `{{ items\|reverse }}` |
+| `sort` | Sort list | `{{ items\|sort }}` |
+| `unique` | Remove duplicates | `{{ items\|unique }}` |
+| `batch` | Group into batches | `{{ items\|batch:2 }}` |
+| `columns` | Split into columns | `{{ items\|columns:3 }}` |
+| `dictsort` | Sort dict by key | `{{ dict\|dictsort }}` |
+| `dictsortreversed` | Sort dict reversed | `{{ dict\|dictsortreversed }}` |
+| `groupby` | Group by attribute | `{{ items\|groupby:"category" }}` |
+| `random` | Random item | `{{ items\|random }}` |
+| `list` | Convert to list | `{{ value\|list }}` |
+| `make_list` | String to char list | `{{ "abc"\|make_list }}` → `['a','b','c']` |
+| `map` | Map attribute | `{{ items\|map:"name" }}` |
+| `select` | Filter by test | `{{ items\|select:"even" }}` |
+| `reject` | Reject by test | `{{ items\|reject:"none" }}` |
+| `selectattr` | Filter by attr test | `{{ items\|selectattr:"active" }}` |
+| `rejectattr` | Reject by attr test | `{{ items\|rejectattr:"hidden" }}` |
 
-| Filter | Example | Output |
-|--------|---------|--------|
-| `date` | `{{ now\|date:"Y-m-d" }}` | `2024-01-15` |
-| `time` | `{{ now\|time:"H:i" }}` | `14:30` |
-| `timesince` | `{{ past\|timesince }}` | `2 days ago` |
-| `timeuntil` | `{{ future\|timeuntil }}` | `in 3 hours` |
+### Math Filters (4)
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `max` | Maximum value | `{{ items\|max }}` |
+| `min` | Minimum value | `{{ items\|min }}` |
+| `sum` | Sum of values | `{{ items\|sum }}` |
+| `attr` | Get attribute | `{{ item\|attr:"name" }}` |
+
+### Date/Time Filters (4)
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `date` | Format date | `{{ now\|date:"Y-m-d" }}` → `2024-01-15` |
+| `time` | Format time | `{{ now\|time:"H:i" }}` → `14:30` |
+| `timesince` | Time since date | `{{ past\|timesince }}` → `2 days ago` |
+| `timeuntil` | Time until date | `{{ future\|timeuntil }}` → `in 3 hours` |
 
 #### Timezone Support
 
-All date/time operations respect the `timezone` option in Environment:
-
 ```typescript
 const env = new Environment({
-  timezone: 'Europe/Rome'  // All dates will be displayed in Rome timezone
+  timezone: 'Europe/Rome'  // All dates in Rome timezone
 })
-
-// 2024-06-15 12:00 UTC = 2024-06-15 14:00 Rome (UTC+2)
-await env.renderString('{{ date|date:"Y-m-d H:i" }}', {
-  date: new Date('2024-06-15T12:00:00Z')
-})
-// Output: 2024-06-15 14:00
-
-// {% now %} tag also uses the configured timezone
-await env.renderString('{% now "Y-m-d H:i" %}')
-// Output: current date/time in Rome timezone
 ```
 
-Common timezone values: `UTC`, `Europe/London`, `Europe/Rome`, `Europe/Paris`, `America/New_York`, `America/Los_Angeles`, `Asia/Tokyo`, `Asia/Shanghai`, `Australia/Sydney`
+### Safety & Encoding Filters (13)
 
-### Safety & Encoding
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `escape` / `e` | HTML escape | `{{ html\|escape }}` |
+| `forceescape` | Force HTML escape | `{{ html\|forceescape }}` |
+| `safe` | Mark as safe | `{{ html\|safe }}` |
+| `safeseq` | Mark sequence safe | `{{ items\|safeseq }}` |
+| `escapejs` | JS string escape | `{{ text\|escapejs }}` |
+| `urlencode` | URL encode | `{{ url\|urlencode }}` |
+| `iriencode` | IRI encode | `{{ url\|iriencode }}` |
+| `urlize` | URLs to links | `{{ text\|urlize }}` |
+| `urlizetrunc` | URLs to links (truncated) | `{{ text\|urlizetrunc:15 }}` |
+| `json` / `tojson` | JSON stringify | `{{ data\|json }}` |
+| `json_script` | Safe JSON in script | `{{ data\|json_script:"id" }}` |
+| `pprint` | Pretty print | `{{ data\|pprint }}` |
+| `xmlattr` | Dict to XML attrs | `{{ attrs\|xmlattr }}` |
 
-| Filter | Example | Description |
-|--------|---------|-------------|
-| `escape` | `{{ html\|escape }}` | HTML escape |
-| `safe` | `{{ html\|safe }}` | Mark as safe (no escape) |
-| `urlencode` | `{{ url\|urlencode }}` | URL encode |
-| `iriencode` | `{{ url\|iriencode }}` | IRI encode (unicode-safe) |
-| `json` | `{{ data\|json }}` | JSON stringify |
-| `json_script` | `{{ data\|json_script:"id" }}` | Safe JSON in script tag |
-| `truncatechars_html` | `{{ html\|truncatechars_html:10 }}` | Truncate preserving HTML |
-| `truncatewords_html` | `{{ html\|truncatewords_html:5 }}` | Truncate words in HTML |
-| `urlizetrunc` | `{{ text\|urlizetrunc:15 }}` | URLs with truncated display |
+### Default/Conditional Filters (4)
 
-### Default Values
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `default` / `d` | Default value | `{{ missing\|default:"N/A" }}` |
+| `default_if_none` | Default if null | `{{ val\|default_if_none:"None" }}` |
+| `yesno` | Boolean to text | `{{ true\|yesno:"Yes,No" }}` → `Yes` |
+| `pluralize` | Pluralize suffix | `{{ count\|pluralize }}` → `s` |
 
-| Filter | Example | Output |
-|--------|---------|--------|
-| `default` | `{{ missing\|default:"N/A" }}` | `N/A` |
-| `default_if_none` | `{{ null\|default_if_none:"None" }}` | `None` |
-| `yesno` | `{{ true\|yesno:"Yes,No" }}` | `Yes` |
-| `pluralize` | `{{ count\|pluralize }}` | `s` or `` |
+### Misc Filters (2)
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `items` | Dict to pairs | `{% for k,v in dict\|items %}` |
+| `unordered_list` | Nested list to HTML | `{{ items\|unordered_list }}` |
 
 ---
 
