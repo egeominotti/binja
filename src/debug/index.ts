@@ -17,9 +17,21 @@ import { generateDebugPanel, PanelOptions } from './panel'
 import type { DebugData } from './collector'
 
 export { DebugCollector, startDebugCollection, endDebugCollection, getDebugCollector } from './collector'
-export type { DebugData, ContextValue } from './collector'
+export type { DebugData, ContextValue, QueryInfo, QueryStats } from './collector'
 export { generateDebugPanel } from './panel'
 export type { PanelOptions } from './panel'
+
+// ORM Integrations
+export {
+  recordQuery,
+  createPrismaMiddleware,
+  setupPrismaLogging,
+  createDrizzleLogger,
+  wrapDrizzleQuery,
+  wrapBunSQL,
+  wrapQuery,
+  createQueryWrapper,
+} from './integrations'
 
 export interface DebugRenderOptions {
   /** Panel options */

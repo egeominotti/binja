@@ -152,6 +152,25 @@ function generateStyles(id: string, c: typeof darkTheme, opts: Required<PanelOpt
 #${id} .dbg-warning { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; background: rgba(234,179,8,0.1); border-radius: 6px; border-left: 3px solid ${c.warning}; }
 #${id} .dbg-warning-icon { color: ${c.warning}; flex-shrink: 0; margin-top: 1px; }
 #${id} .dbg-warning-text { color: ${c.text}; font-size: 12px; }
+#${id} .dbg-queries { display: flex; flex-direction: column; gap: 8px; }
+#${id} .dbg-query { background: ${c.bg}; border-radius: 6px; overflow: hidden; }
+#${id} .dbg-query.n1 { border-left: 3px solid ${c.error}; }
+#${id} .dbg-query.slow { border-left: 3px solid ${c.warning}; }
+#${id} .dbg-query-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; gap: 8px; }
+#${id} .dbg-query-sql { flex: 1; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; color: ${c.text}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#${id} .dbg-query-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+#${id} .dbg-query-time { font-family: 'SF Mono', Monaco, monospace; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: ${c.bgTertiary}; }
+#${id} .dbg-query-time.slow { background: rgba(234,179,8,0.15); color: ${c.warning}; }
+#${id} .dbg-query-rows { font-size: 10px; color: ${c.textMuted}; }
+#${id} .dbg-query-source { font-size: 9px; padding: 2px 5px; border-radius: 3px; background: rgba(59,130,246,0.1); color: ${c.accent}; text-transform: uppercase; }
+#${id} .dbg-query-badge { font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: 600; }
+#${id} .dbg-query-badge.n1 { background: rgba(239,68,68,0.15); color: ${c.error}; }
+#${id} .dbg-query-stats { display: flex; gap: 12px; margin-bottom: 12px; padding: 10px; background: ${c.bg}; border-radius: 6px; }
+#${id} .dbg-query-stat { flex: 1; text-align: center; }
+#${id} .dbg-query-stat-num { font-size: 18px; font-weight: 600; font-family: 'SF Mono', Monaco, monospace; color: ${c.text}; }
+#${id} .dbg-query-stat-num.warning { color: ${c.warning}; }
+#${id} .dbg-query-stat-num.error { color: ${c.error}; }
+#${id} .dbg-query-stat-label { font-size: 10px; color: ${c.textMuted}; margin-top: 2px; }
 `
 }
 
@@ -175,6 +194,7 @@ const icons = {
   cache: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10H12V2z"/><path d="M12 2a10 10 0 00-8.66 15"/></svg>`,
   warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
   file: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/></svg>`,
+  database: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
 }
 
 function generateToggle(id: string, data: DebugData, c: typeof darkTheme): string {
@@ -206,6 +226,7 @@ function generatePanel(id: string, data: DebugData, c: typeof darkTheme, opts: R
     ${generateTemplatesSection(data)}
     ${generateContextSection(data)}
     ${generateFiltersSection(data)}
+    ${generateQueriesSection(data)}
     ${generateCacheSection(data)}
     ${generateWarningsSection(data)}
   </div>
@@ -387,6 +408,80 @@ function generateWarningsSection(data: DebugData): string {
   </div>
   <div class="dbg-section-content">
     <div class="dbg-warnings">${items}</div>
+  </div>
+</div>`
+}
+
+function generateQueriesSection(data: DebugData): string {
+  if (data.queries.length === 0) return ''
+
+  const stats = data.queryStats
+  const hasIssues = stats.slowCount > 0 || stats.n1Count > 0
+
+  // Generate stats row
+  const statsHtml = `
+    <div class="dbg-query-stats">
+      <div class="dbg-query-stat">
+        <div class="dbg-query-stat-num">${stats.count}</div>
+        <div class="dbg-query-stat-label">Queries</div>
+      </div>
+      <div class="dbg-query-stat">
+        <div class="dbg-query-stat-num">${stats.totalDuration.toFixed(1)}ms</div>
+        <div class="dbg-query-stat-label">Total Time</div>
+      </div>
+      <div class="dbg-query-stat">
+        <div class="dbg-query-stat-num ${stats.slowCount > 0 ? 'warning' : ''}">${stats.slowCount}</div>
+        <div class="dbg-query-stat-label">Slow (&gt;100ms)</div>
+      </div>
+      <div class="dbg-query-stat">
+        <div class="dbg-query-stat-num ${stats.n1Count > 0 ? 'error' : ''}">${stats.n1Count}</div>
+        <div class="dbg-query-stat-label">N+1</div>
+      </div>
+    </div>`
+
+  // Generate query list
+  const queries = data.queries.map(q => {
+    const isSlow = q.duration > 100
+    const classes = [
+      'dbg-query',
+      q.isN1 ? 'n1' : '',
+      isSlow ? 'slow' : ''
+    ].filter(Boolean).join(' ')
+
+    const badges = []
+    if (q.isN1) {
+      badges.push('<span class="dbg-query-badge n1">N+1</span>')
+    }
+
+    const rowsText = q.rows !== undefined ? `<span class="dbg-query-rows">${q.rows} rows</span>` : ''
+    const sourceText = q.source ? `<span class="dbg-query-source">${escapeHtml(q.source)}</span>` : ''
+
+    return `
+    <div class="${classes}">
+      <div class="dbg-query-header">
+        <span class="dbg-query-sql" title="${escapeHtml(q.sql)}">${escapeHtml(q.sql)}</span>
+        <div class="dbg-query-meta">
+          ${badges.join('')}
+          ${sourceText}
+          ${rowsText}
+          <span class="dbg-query-time ${isSlow ? 'slow' : ''}">${q.duration.toFixed(1)}ms</span>
+        </div>
+      </div>
+    </div>`
+  }).join('')
+
+  const metaColor = hasIssues ? 'style="color:#ef4444"' : ''
+
+  return `
+<div class="dbg-section ${hasIssues ? 'open' : ''}">
+  <div class="dbg-section-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="dbg-section-title">${icons.database} Queries</span>
+    <span class="dbg-section-meta" ${metaColor}>${stats.count} (${stats.totalDuration.toFixed(1)}ms)</span>
+    <span class="dbg-chevron">${icons.chevron}</span>
+  </div>
+  <div class="dbg-section-content">
+    ${statsHtml}
+    <div class="dbg-queries">${queries}</div>
   </div>
 </div>`
 }

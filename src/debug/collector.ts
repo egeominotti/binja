@@ -22,6 +22,36 @@ export interface ContextValue {
   children?: Record<string, ContextValue>
 }
 
+export interface QueryInfo {
+  /** SQL query or operation name */
+  sql: string
+  /** Query parameters */
+  params?: any[]
+  /** Duration in milliseconds */
+  duration: number
+  /** Number of rows returned */
+  rows?: number
+  /** Source ORM (drizzle, prisma, etc.) */
+  source?: string
+  /** Timestamp when query was executed */
+  timestamp: number
+  /** Whether this query was detected as part of N+1 */
+  isN1?: boolean
+}
+
+export interface QueryStats {
+  /** Total number of queries */
+  count: number
+  /** Total duration of all queries */
+  totalDuration: number
+  /** Number of slow queries (> 100ms) */
+  slowCount: number
+  /** Number of N+1 queries detected */
+  n1Count: number
+  /** Queries grouped by similar SQL for N+1 detection */
+  queryCounts: Map<string, number>
+}
+
 export interface DebugData {
   // Timing
   startTime: number
@@ -51,6 +81,10 @@ export interface DebugData {
   cacheHits: number
   cacheMisses: number
 
+  // Database Queries
+  queries: QueryInfo[]
+  queryStats: QueryStats
+
   // Warnings
   warnings: string[]
 }
@@ -70,6 +104,14 @@ export class DebugCollector {
       testsUsed: new Map(),
       cacheHits: 0,
       cacheMisses: 0,
+      queries: [],
+      queryStats: {
+        count: 0,
+        totalDuration: 0,
+        slowCount: 0,
+        n1Count: 0,
+        queryCounts: new Map(),
+      },
       warnings: [],
     }
   }
@@ -227,6 +269,63 @@ export class DebugCollector {
   // Warnings
   addWarning(message: string): void {
     this.data.warnings.push(message)
+  }
+
+  // Database Queries
+  /**
+   * Record a database query for telemetry
+   * @param query Query information
+   */
+  recordQuery(query: Omit<QueryInfo, 'timestamp' | 'isN1'>): void {
+    const normalizedSql = this.normalizeQuery(query.sql)
+    const currentCount = this.data.queryStats.queryCounts.get(normalizedSql) || 0
+    this.data.queryStats.queryCounts.set(normalizedSql, currentCount + 1)
+
+    // Detect N+1: same query pattern executed > 2 times
+    const isN1 = currentCount >= 2
+
+    const queryInfo: QueryInfo = {
+      ...query,
+      timestamp: performance.now(),
+      isN1,
+    }
+
+    this.data.queries.push(queryInfo)
+
+    // Update stats
+    this.data.queryStats.count++
+    this.data.queryStats.totalDuration += query.duration
+
+    if (query.duration > 100) {
+      this.data.queryStats.slowCount++
+    }
+
+    if (isN1 && currentCount === 2) {
+      // Only count N+1 once per pattern
+      this.data.queryStats.n1Count++
+      this.addWarning(`N+1 query detected: ${normalizedSql.slice(0, 50)}...`)
+    }
+  }
+
+  /**
+   * Normalize SQL query for comparison (removes specific values)
+   */
+  private normalizeQuery(sql: string): string {
+    return sql
+      .replace(/\s+/g, ' ')           // Normalize whitespace
+      .replace(/= \?/g, '= ?')        // Normalize params
+      .replace(/= \$\d+/g, '= ?')     // Normalize Postgres params
+      .replace(/= '\w+'/g, "= '?'")   // Normalize string literals
+      .replace(/= \d+/g, '= ?')       // Normalize numbers
+      .replace(/IN \([^)]+\)/gi, 'IN (?)') // Normalize IN clauses
+      .trim()
+  }
+
+  /**
+   * Get query statistics
+   */
+  getQueryStats(): QueryStats {
+    return this.data.queryStats
   }
 
   // Get collected data
