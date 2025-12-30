@@ -48,6 +48,8 @@ export interface EnvironmentOptions {
   staticResolver?: (path: string) => string
   /** Cache compiled templates (default: true) */
   cache?: boolean
+  /** Maximum number of templates to cache (LRU eviction, default: 100) */
+  cacheMaxSize?: number
   /** Template file extensions to try (default: ['.html', '.jinja', '.jinja2']) */
   extensions?: string[]
   /** Enable debug panel injection (default: false) */
@@ -58,11 +60,26 @@ export interface EnvironmentOptions {
   timezone?: string
 }
 
+export interface CacheStats {
+  /** Number of templates currently in cache */
+  size: number
+  /** Maximum cache size */
+  maxSize: number
+  /** Number of cache hits */
+  hits: number
+  /** Number of cache misses */
+  misses: number
+  /** Hit rate percentage */
+  hitRate: number
+}
+
 export class Environment {
-  private options: Omit<Required<EnvironmentOptions>, 'timezone'> & { timezone?: string }
+  private options: Omit<Required<EnvironmentOptions>, 'timezone' | 'cacheMaxSize'> & { timezone?: string; cacheMaxSize: number }
   private runtime: Runtime
   private templateCache: Map<string, TemplateNode> = new Map()
   private routes: Map<string, string> = new Map()
+  private cacheHits: number = 0
+  private cacheMisses: number = 0
 
   constructor(options: EnvironmentOptions = {}) {
     this.options = {
@@ -73,6 +90,7 @@ export class Environment {
       urlResolver: options.urlResolver ?? this.defaultUrlResolver.bind(this),
       staticResolver: options.staticResolver ?? this.defaultStaticResolver.bind(this),
       cache: options.cache ?? true,
+      cacheMaxSize: options.cacheMaxSize ?? 100,
       extensions: options.extensions ?? ['.html', '.jinja', '.jinja2', ''],
       debug: options.debug ?? false,
       debugOptions: options.debugOptions ?? {},
@@ -182,13 +200,20 @@ export class Environment {
   }
 
   /**
-   * Load and compile a template file
+   * Load and compile a template file (with LRU cache)
    */
   async loadTemplate(templateName: string): Promise<TemplateNode> {
-    // Check cache first
+    // Check cache first (LRU: move to end on access)
     if (this.options.cache && this.templateCache.has(templateName)) {
-      return this.templateCache.get(templateName)!
+      this.cacheHits++
+      // LRU: delete and re-add to move to end (most recently used)
+      const ast = this.templateCache.get(templateName)!
+      this.templateCache.delete(templateName)
+      this.templateCache.set(templateName, ast)
+      return ast
     }
+
+    this.cacheMisses++
 
     // Resolve template path
     const templatePath = await this.resolveTemplatePath(templateName)
@@ -200,8 +225,13 @@ export class Environment {
     const source = await Bun.file(templatePath).text()
     const ast = this.compile(source)
 
-    // Cache if enabled
+    // Cache if enabled (with LRU eviction)
     if (this.options.cache) {
+      // LRU eviction: remove oldest (first) entries if cache is full
+      while (this.templateCache.size >= this.options.cacheMaxSize) {
+        const oldestKey = this.templateCache.keys().next().value
+        if (oldestKey) this.templateCache.delete(oldestKey)
+      }
       this.templateCache.set(templateName, ast)
     }
 
@@ -209,10 +239,33 @@ export class Environment {
   }
 
   /**
-   * Clear the template cache
+   * Clear the template cache and reset stats
    */
   clearCache(): void {
     this.templateCache.clear()
+    this.cacheHits = 0
+    this.cacheMisses = 0
+  }
+
+  /**
+   * Get current cache size
+   */
+  cacheSize(): number {
+    return this.templateCache.size
+  }
+
+  /**
+   * Get cache statistics
+   */
+  cacheStats(): CacheStats {
+    const total = this.cacheHits + this.cacheMisses
+    return {
+      size: this.templateCache.size,
+      maxSize: this.options.cacheMaxSize,
+      hits: this.cacheHits,
+      misses: this.cacheMisses,
+      hitRate: total > 0 ? (this.cacheHits / total) * 100 : 0,
+    }
   }
 
   /**
