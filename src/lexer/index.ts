@@ -63,6 +63,17 @@ export class Lexer {
       const wsControl = this.peek() === '-'
       if (wsControl) this.advance()
 
+      // Check for raw/verbatim block - capture content as-is until endraw/endverbatim
+      const savedPos = this.state.pos
+      this.skipWhitespace()
+      if (this.checkWord('raw') || this.checkWord('verbatim')) {
+        const tagName = this.checkWord('raw') ? 'raw' : 'verbatim'
+        this.scanRawBlock(tagName, wsControl)
+        return
+      }
+      // Reset position if not raw/verbatim
+      this.state.pos = savedPos
+
       this.addToken(TokenType.BLOCK_START, this.blockStart + (wsControl ? '-' : ''))
       this.scanExpression(this.blockEnd, TokenType.BLOCK_END)
       return
@@ -75,6 +86,92 @@ export class Lexer {
 
     // Regular text
     this.scanText()
+  }
+
+  private checkWord(word: string): boolean {
+    const start = this.state.pos
+    for (let i = 0; i < word.length; i++) {
+      if (this.state.source[start + i]?.toLowerCase() !== word[i]) {
+        return false
+      }
+    }
+    // Check that word ends (not part of larger identifier)
+    const nextChar = this.state.source[start + word.length]
+    return !nextChar || !this.isAlphaNumeric(nextChar)
+  }
+
+  private scanRawBlock(tagName: string, wsControl: boolean): void {
+    const startLine = this.state.line
+    const startColumn = this.state.column
+
+    // Skip the tag name
+    for (let i = 0; i < tagName.length; i++) {
+      this.advance()
+    }
+    this.skipWhitespace()
+
+    // Skip optional whitespace control before closing
+    if (this.peek() === '-') this.advance()
+
+    // Expect block end
+    if (!this.match(this.blockEnd)) {
+      throw new Error(`Expected ${this.blockEnd} after ${tagName} at line ${this.state.line}`)
+    }
+
+    // Now capture everything until {% endraw %} or {% endverbatim %}
+    const endTag = `end${tagName}`
+    const contentStart = this.state.pos
+
+    while (!this.isAtEnd()) {
+      // Look for {% endraw %} or {% endverbatim %}
+      if (this.check(this.blockStart)) {
+        const savedPos = this.state.pos
+        const savedLine = this.state.line
+        const savedColumn = this.state.column
+
+        this.match(this.blockStart)
+        if (this.peek() === '-') this.advance()
+        this.skipWhitespace()
+
+        if (this.checkWord(endTag)) {
+          // Found end tag - emit content as TEXT
+          const content = this.state.source.slice(contentStart, savedPos)
+          if (content.length > 0) {
+            this.state.tokens.push({
+              type: TokenType.TEXT,
+              value: content,
+              line: startLine,
+              column: startColumn,
+            })
+          }
+
+          // Skip the end tag
+          for (let i = 0; i < endTag.length; i++) {
+            this.advance()
+          }
+          this.skipWhitespace()
+          if (this.peek() === '-') this.advance()
+
+          if (!this.match(this.blockEnd)) {
+            throw new Error(`Expected ${this.blockEnd} after ${endTag} at line ${this.state.line}`)
+          }
+          return
+        }
+
+        // Not the end tag, restore position and continue
+        this.state.pos = savedPos
+        this.state.line = savedLine
+        this.state.column = savedColumn
+      }
+
+      if (this.peek() === '\n') {
+        this.state.line++
+        this.state.column = 0
+      }
+      this.advance()
+    }
+
+    throw new Error(`Unclosed ${tagName} block starting at line ${startLine}`)
   }
 
   private scanText(): void {

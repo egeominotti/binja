@@ -23,13 +23,15 @@
 
 ## Why binja?
 
-| Feature | binja | Other JS engines |
+| Feature | Binja | Other JS engines |
 |---------|-----------|------------------|
 | **AOT Compilation** | ✅ 160x faster | ❌ |
 | Django DTL Compatible | ✅ 100% | ❌ Partial |
 | Jinja2 Compatible | ✅ Full | ⚠️ Limited |
 | Template Inheritance | ✅ | ⚠️ |
 | 50+ Built-in Filters | ✅ | ❌ |
+| Debug Panel | ✅ | ❌ |
+| CLI Tool | ✅ | ⚠️ |
 | Autoescape by Default | ✅ | ❌ |
 | TypeScript | ✅ Native | ⚠️ |
 | Bun Optimized | ✅ | ❌ |
@@ -402,6 +404,90 @@ const env = new Environment({
 
 ---
 
+## Debug Panel
+
+Binja includes a professional debug panel for development, similar to Django Debug Toolbar:
+
+```typescript
+const env = new Environment({
+  templates: './templates',
+  debug: true,  // Enable debug panel
+  debugOptions: {
+    dark: true,
+    position: 'bottom-right',
+  },
+})
+
+// Debug panel is automatically injected into HTML responses
+const html = await env.render('page.html', context)
+```
+
+### Features
+
+- **Performance Metrics** - Lexer, Parser, Render timing with visual bars
+- **Template Chain** - See extends/include hierarchy
+- **Context Inspector** - Expandable tree view of all context variables
+- **Filter Usage** - Which filters were used and how many times
+- **Cache Stats** - Hit/miss rates
+- **Warnings** - Optimization suggestions
+
+### Options
+
+```typescript
+debugOptions: {
+  dark: true,                    // Dark/light theme
+  collapsed: true,               // Start collapsed
+  position: 'bottom-right',      // Panel position
+  width: 420,                    // Panel width
+}
+```
+
+---
+
+## CLI Tool
+
+Binja includes a CLI for template pre-compilation:
+
+```bash
+# Compile all templates to JavaScript
+binja compile ./templates -o ./dist
+
+# Check templates for errors
+binja check ./templates
+
+# Watch mode for development
+binja watch ./templates -o ./dist
+```
+
+### Pre-compiled Templates
+
+```typescript
+// Generated: dist/home.js
+import { render } from './dist/home.js'
+
+const html = render({ title: 'Home', items: [...] })
+```
+
+---
+
+## Raw/Verbatim Tag
+
+Output template syntax without processing:
+
+```django
+{% raw %}
+  {{ this will not be processed }}
+  {% neither will this %}
+{% endraw %}
+
+{# Or Django-style #}
+{% verbatim %}
+  {{ raw output }}
+{% endverbatim %}
+```
+
+---
+
 ## Custom Filters
 
 ```typescript
@@ -556,8 +642,11 @@ env.loadTemplate(name)         // Pre-load template (for cache warming)
 import { Elysia } from 'elysia'
 import { Environment } from 'binja'
 
+// Development with debug panel
 const templates = new Environment({
   templates: './views',
+  debug: Bun.env.NODE_ENV !== 'production',
+  debugOptions: { dark: true },
   globals: {
     site_name: 'My App',
     current_year: new Date().getFullYear()
@@ -669,7 +758,13 @@ import { Hono } from 'hono'
 import { Environment } from 'binja'
 
 const app = new Hono()
-const templates = new Environment({ templates: './views' })
+
+// Development with debug panel
+const templates = new Environment({
+  templates: './views',
+  debug: process.env.NODE_ENV !== 'production',
+  debugOptions: { dark: true, position: 'bottom-right' }
+})
 
 app.get('/', async (c) => {
   const html = await templates.render('index.html', {

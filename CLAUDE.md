@@ -28,9 +28,10 @@ bun run typecheck
 ## Project Structure
 
 ```
-packages/jinja-bun/
+binja/
 ├── src/
 │   ├── index.ts          # Main entry point, Environment class
+│   ├── cli.ts            # CLI tool (binja compile/check/watch)
 │   ├── lexer/
 │   │   ├── index.ts      # Lexer - tokenizes template strings
 │   │   └── tokens.ts     # Token types and interfaces
@@ -40,19 +41,31 @@ packages/jinja-bun/
 │   ├── runtime/
 │   │   ├── index.ts      # Runtime - executes AST
 │   │   └── context.ts    # Context class with forloop/loop support
-│   └── filters/
-│       └── index.ts      # 50+ built-in filters
+│   ├── compiler/
+│   │   ├── index.ts      # AOT compiler - generates JS functions
+│   │   └── flattener.ts  # Template flattener for AOT inheritance
+│   ├── filters/
+│   │   └── index.ts      # 70+ built-in filters
+│   ├── tests/
+│   │   └── index.ts      # 30+ built-in tests (is operator)
+│   └── debug/
+│       ├── index.ts      # Debug panel exports
+│       ├── collector.ts  # DebugCollector for timing/context
+│       └── panel.ts      # HTML panel generator
 ├── test/
 │   ├── lexer.test.ts     # Lexer tests
 │   ├── parser.test.ts    # Parser tests
 │   ├── filters.test.ts   # Filter tests
+│   ├── filters-extended.test.ts # Extended filters tests
 │   ├── runtime.test.ts   # Runtime/core tags tests
 │   ├── inheritance.test.ts # Template inheritance tests
-│   ├── api.test.ts       # API tests
-│   ├── security.test.ts  # Security/XSS tests
-│   ├── autoescape.test.ts # Autoescape tests
-│   ├── whitespace.test.ts # Whitespace control tests
-│   └── regression.test.ts # Edge cases
+│   ├── aot-inheritance.test.ts # AOT with extends/include tests
+│   ├── raw.test.ts       # Raw/verbatim tag tests
+│   ├── debug.test.ts     # Debug panel tests
+│   └── ...
+├── website/              # Demo website with debug panel
+│   ├── server.ts         # Hono server
+│   └── templates/        # Demo templates
 ├── package.json
 ├── tsconfig.json
 └── CLAUDE.md
@@ -74,11 +87,14 @@ Template String → Lexer → Tokens → Parser → AST → Runtime → Output S
 
 | Class | File | Purpose |
 |-------|------|---------|
-| `Environment` | `src/index.ts` | Main API, template loading, configuration |
+| `Environment` | `src/index.ts` | Main API, template loading, configuration, debug |
 | `Lexer` | `src/lexer/index.ts` | Tokenizes template strings |
 | `Parser` | `src/parser/index.ts` | Generates AST from tokens |
 | `Runtime` | `src/runtime/index.ts` | Executes AST |
 | `Context` | `src/runtime/context.ts` | Variable scope management |
+| `Compiler` | `src/compiler/index.ts` | AOT compilation to JS functions |
+| `TemplateFlattener` | `src/compiler/flattener.ts` | Resolves extends/include at compile-time |
+| `DebugCollector` | `src/debug/collector.ts` | Collects timing and context data |
 
 ## Supported Features
 
@@ -91,24 +107,39 @@ Template String → Lexer → Tokens → Parser → AST → Runtime → Output S
 - `{% with %}`, `{% endwith %}`
 - `{% load %}` (no-op for compatibility)
 - `{% url %}`, `{% static %}`
+- `{% verbatim %}` (raw output)
 - `{{ variable|filter:arg }}`
 - `forloop.counter`, `forloop.counter0`, `forloop.first`, `forloop.last`, `forloop.parentloop`
 
 ### Jinja2 Compatibility
 
 - `{% set x = value %}`
+- `{% raw %}` (raw output)
 - `{{ value if condition else default }}`
 - `{{ "a" ~ "b" }}` (string concatenation)
 - `loop.index`, `loop.index0`, `loop.first`, `loop.last`
 - Filter with parentheses: `{{ name|truncate(30) }}`
 
-### Built-in Filters (50+)
+### AOT Compilation
 
-**String**: `upper`, `lower`, `capitalize`, `title`, `trim`, `striptags`, `escape`, `safe`, `slugify`, `truncatechars`, `truncatewords`, `wordcount`, `center`, `ljust`, `rjust`, `cut`, `linebreaks`, `linebreaksbr`
+- `compile()` - 160x faster than Nunjucks
+- `compileWithInheritance()` - AOT with extends/include support
+- `compileToCode()` - Generate JS code strings for build tools
 
-**Number**: `abs`, `round`, `int`, `float`, `floatformat`, `add`, `divisibleby`, `filesizeformat`
+### Debug Panel
 
-**List/Array**: `length`, `first`, `last`, `join`, `slice`, `reverse`, `sort`, `unique`, `batch`, `dictsort`, `random`
+- `debug: true` in Environment options enables automatic panel injection
+- Shows timing (lexer, parser, render), context variables, filters used
+- Expandable tree view for context objects
+- Dark/light mode, draggable, collapsible sections
+
+### Built-in Filters (70+)
+
+**String**: `upper`, `lower`, `capitalize`, `title`, `trim`, `striptags`, `escape`, `safe`, `slugify`, `truncatechars`, `truncatewords`, `wordcount`, `center`, `ljust`, `rjust`, `cut`, `linebreaks`, `linebreaksbr`, `wordwrap`, `indent`, `replace`, `format`, `string`
+
+**Number**: `abs`, `round`, `int`, `float`, `floatformat`, `add`, `divisibleby`, `filesizeformat`, `phone2numeric`
+
+**List/Array**: `length`, `first`, `last`, `join`, `slice`, `reverse`, `sort`, `unique`, `batch`, `dictsort`, `random`, `list`, `map`, `select`, `reject`, `selectattr`, `rejectattr`, `attr`, `max`, `min`, `sum`
 
 **Date/Time**: `date`, `time`, `timesince`, `timeuntil`
 
@@ -116,7 +147,9 @@ Template String → Lexer → Tokens → Parser → AST → Runtime → Output S
 
 **URL**: `urlencode`, `urlize`
 
-**JSON**: `json`
+**JSON/Debug**: `json`, `pprint`, `linenumbers`, `unordered_list`
+
+**Safety**: `escape`, `forceescape`, `safe`
 
 ## Code Patterns
 

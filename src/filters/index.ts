@@ -476,6 +476,272 @@ export const groupby: FilterFunction = (value, attribute) => {
   }))
 }
 
+// ==================== Additional Jinja2/Django Filters ====================
+
+// Jinja2: wordwrap - Wrap text at N characters
+export const wordwrap: FilterFunction = (value, width = 79, breakLongWords = true, wrapString = '\n') => {
+  const str = String(value)
+  if (str.length <= width) return str
+
+  const words = str.split(' ')
+  const lines: string[] = []
+  let currentLine = ''
+
+  for (const word of words) {
+    if (currentLine.length + word.length + 1 <= width) {
+      currentLine += (currentLine ? ' ' : '') + word
+    } else {
+      if (currentLine) lines.push(currentLine)
+      if (breakLongWords && word.length > width) {
+        // Break long word into chunks
+        let remaining = word
+        while (remaining.length > width) {
+          lines.push(remaining.slice(0, width))
+          remaining = remaining.slice(width)
+        }
+        currentLine = remaining
+      } else {
+        currentLine = word
+      }
+    }
+  }
+  if (currentLine) lines.push(currentLine)
+
+  return lines.join(wrapString)
+}
+
+// Jinja2: indent - Indent each line
+export const indent: FilterFunction = (value, width = 4, first = false, blank = false) => {
+  const str = String(value)
+  const indentStr = typeof width === 'string' ? width : ' '.repeat(Number(width))
+  const lines = str.split('\n')
+
+  return lines.map((line, i) => {
+    // Skip first line if first=false
+    if (i === 0 && !first) return line
+    // Skip blank lines if blank=false
+    if (!blank && line.trim() === '') return line
+    return indentStr + line
+  }).join('\n')
+}
+
+// Jinja2: replace - Replace substring
+export const replace: FilterFunction = (value, old, newStr, count) => {
+  const str = String(value)
+  if (count === undefined) {
+    return str.replaceAll(String(old), String(newStr))
+  }
+  // Replace only N occurrences
+  let result = str
+  let remaining = Number(count)
+  while (remaining > 0 && result.includes(String(old))) {
+    result = result.replace(String(old), String(newStr))
+    remaining--
+  }
+  return result
+}
+
+// Jinja2: format - Python-style string formatting
+export const format: FilterFunction = (value, ...args) => {
+  let str = String(value)
+  // Support positional: "Hello %s" | format("World")
+  // Support named: "Hello %(name)s" | format(name="World") - simplified
+  args.forEach((arg, i) => {
+    str = str.replace(/%s/, String(arg))
+    str = str.replace(new RegExp(`%${i + 1}`, 'g'), String(arg))
+  })
+  return str
+}
+
+// Jinja2: string - Convert to string
+export const string: FilterFunction = (value) => String(value)
+
+// Jinja2: list - Convert to list/array
+export const list: FilterFunction = (value) => {
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') return value.split('')
+  if (value && typeof value[Symbol.iterator] === 'function') return [...value]
+  if (typeof value === 'object' && value !== null) return Object.values(value)
+  return [value]
+}
+
+// Jinja2: map - Apply filter/attribute to each element
+export const map: FilterFunction = (value, attribute) => {
+  if (!Array.isArray(value)) return []
+  if (typeof attribute === 'string') {
+    // Map by attribute name
+    return value.map(item => item?.[attribute])
+  }
+  return value
+}
+
+// Jinja2: select - Filter elements that are truthy (or pass test)
+export const select: FilterFunction = (value, attribute) => {
+  if (!Array.isArray(value)) return []
+  if (attribute === undefined) {
+    return value.filter(item => !!item)
+  }
+  // Filter by attribute being truthy
+  return value.filter(item => !!item?.[attribute])
+}
+
+// Jinja2: reject - Filter elements that are falsy (or fail test)
+export const reject: FilterFunction = (value, attribute) => {
+  if (!Array.isArray(value)) return []
+  if (attribute === undefined) {
+    return value.filter(item => !item)
+  }
+  return value.filter(item => !item?.[attribute])
+}
+
+// Jinja2: selectattr - Filter by attribute value
+export const selectattr: FilterFunction = (value, attribute, test, testValue) => {
+  if (!Array.isArray(value)) return []
+  return value.filter(item => {
+    const attrValue = item?.[attribute]
+    if (test === undefined) return !!attrValue
+    if (test === 'eq' || test === 'equalto') return attrValue === testValue
+    if (test === 'ne') return attrValue !== testValue
+    if (test === 'gt') return attrValue > testValue
+    if (test === 'lt') return attrValue < testValue
+    if (test === 'ge' || test === 'gte') return attrValue >= testValue
+    if (test === 'le' || test === 'lte') return attrValue <= testValue
+    if (test === 'in') return testValue?.includes?.(attrValue)
+    if (test === 'defined') return attrValue !== undefined
+    if (test === 'undefined') return attrValue === undefined
+    if (test === 'none') return attrValue === null
+    if (test === 'true') return attrValue === true
+    if (test === 'false') return attrValue === false
+    return !!attrValue
+  })
+}
+
+// Jinja2: rejectattr - Reject by attribute value
+export const rejectattr: FilterFunction = (value, attribute, test, testValue) => {
+  if (!Array.isArray(value)) return []
+  const selected = selectattr(value, attribute, test, testValue)
+  return value.filter(item => !selected.includes(item))
+}
+
+// Jinja2: attr - Get attribute from object
+export const attr: FilterFunction = (value, name) => {
+  if (value == null) return undefined
+  return value[name]
+}
+
+// Jinja2: max - Maximum value
+export const max: FilterFunction = (value, attribute, defaultValue) => {
+  if (!Array.isArray(value) || value.length === 0) return defaultValue
+  if (attribute) {
+    return value.reduce((max, item) =>
+      item[attribute] > max[attribute] ? item : max
+    )
+  }
+  return Math.max(...value)
+}
+
+// Jinja2: min - Minimum value
+export const min: FilterFunction = (value, attribute, defaultValue) => {
+  if (!Array.isArray(value) || value.length === 0) return defaultValue
+  if (attribute) {
+    return value.reduce((min, item) =>
+      item[attribute] < min[attribute] ? item : min
+    )
+  }
+  return Math.min(...value)
+}
+
+// Jinja2: sum - Sum of elements
+export const sum: FilterFunction = (value, attribute, start = 0) => {
+  if (!Array.isArray(value)) return start
+  return value.reduce((total, item) => {
+    const val = attribute ? item[attribute] : item
+    return total + (Number(val) || 0)
+  }, Number(start))
+}
+
+// Jinja2: pprint - Pretty print for debugging
+export const pprint: FilterFunction = (value) => {
+  try {
+    const result = JSON.stringify(value, null, 2)
+    // Mark as safe to prevent escaping of quotes
+    const safeString = new String(result) as any
+    safeString.__safe__ = true
+    return safeString
+  } catch {
+    return String(value)
+  }
+}
+
+// Django: forceescape - Force HTML escape even if already safe
+export const forceescape: FilterFunction = (value) => {
+  // Use Bun's native escapeHTML, ignoring __safe__ flag
+  const escaped = Bun.escapeHTML(String(value))
+  // Mark as safe to prevent double-escaping by autoescape
+  const safeString = new String(escaped) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
+// Django: phone2numeric - Convert phone letters to numbers
+const PHONE_MAP: Record<string, string> = {
+  a: '2', b: '2', c: '2',
+  d: '3', e: '3', f: '3',
+  g: '4', h: '4', i: '4',
+  j: '5', k: '5', l: '5',
+  m: '6', n: '6', o: '6',
+  p: '7', q: '7', r: '7', s: '7',
+  t: '8', u: '8', v: '8',
+  w: '9', x: '9', y: '9', z: '9',
+}
+export const phone2numeric: FilterFunction = (value) => {
+  return String(value).toLowerCase().split('').map(char =>
+    PHONE_MAP[char] ?? char
+  ).join('')
+}
+
+// Django: linenumbers - Add line numbers
+export const linenumbers: FilterFunction = (value) => {
+  const lines = String(value).split('\n')
+  const width = String(lines.length).length
+  return lines.map((line, i) =>
+    `${String(i + 1).padStart(width, ' ')}. ${line}`
+  ).join('\n')
+}
+
+// Django: unordered_list - Recursive HTML list
+export const unordered_list: FilterFunction = (value): any => {
+  if (!Array.isArray(value)) return String(value)
+
+  const renderList = (items: any[], depth = 0): string => {
+    const indent = '  '.repeat(depth)
+    let html = ''
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (Array.isArray(item)) {
+        // Nested list
+        html += `\n${indent}<ul>\n${renderList(item, depth + 1)}${indent}</ul>\n`
+      } else {
+        html += `${indent}<li>${item}`
+        // Check if next item is a nested array
+        if (i + 1 < items.length && Array.isArray(items[i + 1])) {
+          html += `\n${indent}<ul>\n${renderList(items[i + 1], depth + 1)}${indent}</ul>\n${indent}`
+          i++ // Skip the nested array
+        }
+        html += `</li>\n`
+      }
+    }
+
+    return html
+  }
+
+  const html = renderList(value)
+  const safeString = new String(html) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
 // ==================== Built-in Filters Registry ====================
 
 export const builtinFilters: Record<string, FilterFunction> = {
@@ -552,4 +818,28 @@ export const builtinFilters: Record<string, FilterFunction> = {
   random,
   batch,
   groupby,
+
+  // Additional Jinja2 filters
+  wordwrap,
+  indent,
+  replace,
+  format,
+  string,
+  list,
+  map,
+  select,
+  reject,
+  selectattr,
+  rejectattr,
+  attr,
+  max,
+  min,
+  sum,
+  pprint,
+
+  // Additional Django filters
+  forceescape,
+  phone2numeric,
+  linenumbers,
+  unordered_list,
 }

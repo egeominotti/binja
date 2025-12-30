@@ -116,6 +116,7 @@ class Compiler {
   private indent = 0
   private varCounter = 0
   private loopStack: string[] = [] // Track nested loop variable names for parentloop
+  private localVars: Set<string>[] = [] // Stack of local variable scopes
 
   constructor(options: CompileOptions = {}) {
     this.options = {
@@ -124,6 +125,27 @@ class Compiler {
       minify: options.minify ?? false,
       autoescape: options.autoescape ?? true,
     }
+  }
+
+  private pushScope(): void {
+    this.localVars.push(new Set())
+  }
+
+  private popScope(): void {
+    this.localVars.pop()
+  }
+
+  private addLocalVar(name: string): void {
+    if (this.localVars.length > 0) {
+      this.localVars[this.localVars.length - 1].add(name)
+    }
+  }
+
+  private isLocalVar(name: string): boolean {
+    for (let i = this.localVars.length - 1; i >= 0; i--) {
+      if (this.localVars[i].has(name)) return true
+    }
+    return false
   }
 
   compile(ast: TemplateNode): string {
@@ -297,13 +319,16 @@ class Compiler {
   private compileWith(node: WithNode): string {
     let code = `  {${this.nl()}`
 
+    this.pushScope()
     for (const { target, value } of node.assignments) {
       const valueExpr = this.compileExpr(value)
       code += `    const ${target} = ${valueExpr};${this.nl()}`
+      this.addLocalVar(target)
     }
 
     code += this.compileNodes(node.body)
     code += `  }${this.nl()}`
+    this.popScope()
 
     return code
   }
@@ -345,6 +370,11 @@ class Compiler {
     if (node.name === 'false' || node.name === 'False') return 'false'
     if (node.name === 'none' || node.name === 'None' || node.name === 'null') return 'null'
     if (node.name === 'forloop' || node.name === 'loop') return node.name
+
+    // Check if it's a local variable (from with/set)
+    if (this.isLocalVar(node.name)) {
+      return node.name
+    }
 
     return `__ctx.${node.name}`
   }

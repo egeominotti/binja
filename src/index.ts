@@ -25,6 +25,9 @@ import { Parser, TemplateNode } from './parser'
 import { Runtime, RuntimeOptions, Context } from './runtime'
 import { builtinFilters, FilterFunction } from './filters'
 import { compileToString, compileToFunction, CompileOptions } from './compiler'
+import { flattenTemplate, canFlatten, TemplateLoader } from './compiler/flattener'
+import { startDebugCollection, endDebugCollection, generateDebugPanel } from './debug'
+import type { PanelOptions } from './debug'
 import * as path from 'path'
 
 // Pre-compiled regex for URL parameter replacement (avoid per-call compilation)
@@ -47,6 +50,10 @@ export interface EnvironmentOptions {
   cache?: boolean
   /** Template file extensions to try (default: ['.html', '.jinja', '.jinja2']) */
   extensions?: string[]
+  /** Enable debug panel injection (default: false) */
+  debug?: boolean
+  /** Debug panel options */
+  debugOptions?: PanelOptions
 }
 
 export class Environment {
@@ -65,6 +72,8 @@ export class Environment {
       staticResolver: options.staticResolver ?? this.defaultStaticResolver.bind(this),
       cache: options.cache ?? true,
       extensions: options.extensions ?? ['.html', '.jinja', '.jinja2', ''],
+      debug: options.debug ?? false,
+      debugOptions: options.debugOptions ?? {},
     }
 
     this.runtime = new Runtime({
@@ -81,6 +90,9 @@ export class Environment {
    * Render a template file with the given context
    */
   async render(templateName: string, context: Record<string, any> = {}): Promise<string> {
+    if (this.options.debug) {
+      return this.renderWithDebug(templateName, context)
+    }
     const ast = await this.loadTemplate(templateName)
     return this.runtime.render(ast, context)
   }
@@ -89,8 +101,70 @@ export class Environment {
    * Render a template string directly
    */
   async renderString(source: string, context: Record<string, any> = {}): Promise<string> {
+    if (this.options.debug) {
+      return this.renderStringWithDebug(source, context)
+    }
     const ast = this.compile(source)
     return this.runtime.render(ast, context)
+  }
+
+  /**
+   * Internal: Render with debug panel
+   */
+  private async renderWithDebug(templateName: string, context: Record<string, any>): Promise<string> {
+    const collector = startDebugCollection()
+    collector.captureContext(context)
+    collector.addTemplate(templateName, 'root')
+    collector.setMode('runtime')
+
+    collector.startRender()
+    const ast = await this.loadTemplate(templateName)
+    let html = this.runtime.render(ast, context)
+    // Handle case where render might return a Promise
+    if (html && typeof (html as any).then === 'function') {
+      html = await (html as any)
+    }
+    collector.endRender()
+
+    const data = endDebugCollection()!
+    return this.injectDebugPanel(String(html || ''), data)
+  }
+
+  /**
+   * Internal: Render string with debug panel
+   */
+  private async renderStringWithDebug(source: string, context: Record<string, any>): Promise<string> {
+    const collector = startDebugCollection()
+    collector.captureContext(context)
+    collector.setMode('runtime')
+
+    collector.startRender()
+    const ast = this.compile(source)
+    let html = this.runtime.render(ast, context)
+    if (html && typeof (html as any).then === 'function') {
+      html = await (html as any)
+    }
+    collector.endRender()
+
+    const data = endDebugCollection()!
+    return this.injectDebugPanel(String(html || ''), data)
+  }
+
+  /**
+   * Internal: Inject debug panel into HTML
+   */
+  private injectDebugPanel(html: string, data: any): string {
+    if (!html || typeof html !== 'string') return html || ''
+
+    const isHtml = html.includes('<html') || html.includes('<body') || html.includes('<!DOCTYPE')
+    if (!isHtml) return html
+
+    const panel = generateDebugPanel(data, this.options.debugOptions)
+
+    if (html.includes('</body>')) {
+      return html.replace('</body>', `${panel}</body>`)
+    }
+    return html + panel
   }
 
   /**
@@ -260,6 +334,9 @@ export function Template(source: string, options: EnvironmentOptions = {}) {
  * Compile a template to an optimized JavaScript function (AOT mode)
  * Returns a sync function that is 10-50x faster than runtime rendering
  *
+ * Note: This function does NOT support {% extends %} or {% include %}.
+ * Use compileWithInheritance() for templates with inheritance.
+ *
  * @example
  * ```typescript
  * const renderUser = compile('<h1>{{ name|upper }}</h1>')
@@ -275,6 +352,123 @@ export function compile(
   const parser = new Parser(tokens)
   const ast = parser.parse()
   return compileToFunction(ast, options)
+}
+
+export interface CompileWithInheritanceOptions extends CompileOptions {
+  /** Base directory for resolving template paths */
+  templates: string
+  /** File extensions to try (default: ['.html', '.jinja', '.jinja2', '']) */
+  extensions?: string[]
+}
+
+/**
+ * Compile a template with full inheritance support (extends/include/block)
+ * Resolves all template inheritance at compile-time for maximum AOT performance.
+ *
+ * IMPORTANT: All {% extends %} and {% include %} must use static string literals.
+ * Dynamic template names (variables) are not supported in AOT mode.
+ *
+ * @example
+ * ```typescript
+ * // page.html: {% extends "base.html" %}{% block content %}Hello{% endblock %}
+ * const renderPage = await compileWithInheritance('page.html', {
+ *   templates: './templates'
+ * })
+ * const html = renderPage({ title: 'Home' }) // Full page with base template
+ * ```
+ */
+export async function compileWithInheritance(
+  templateName: string,
+  options: CompileWithInheritanceOptions
+): Promise<(ctx: Record<string, any>) => string> {
+  const extensions = options.extensions ?? ['.html', '.jinja', '.jinja2', '']
+  const templatesDir = path.resolve(options.templates)
+
+  // Create template loader
+  const loader: TemplateLoader = {
+    load(name: string): string {
+      const basePath = path.resolve(templatesDir, name)
+      for (const ext of extensions) {
+        const fullPath = basePath + ext
+        const file = Bun.file(fullPath)
+        // Sync check - Bun.file().text() is async but we need sync for flattening
+        // Use require('fs') for sync file reading during compilation
+        const fs = require('fs')
+        if (fs.existsSync(fullPath)) {
+          return fs.readFileSync(fullPath, 'utf-8')
+        }
+      }
+      throw new Error(`Template not found: ${name}`)
+    },
+    parse(source: string): TemplateNode {
+      const lexer = new Lexer(source)
+      const tokens = lexer.tokenize()
+      const parser = new Parser(tokens)
+      return parser.parse()
+    }
+  }
+
+  // Load and parse the main template
+  const source = loader.load(templateName)
+  const ast = loader.parse(source)
+
+  // Check if we can flatten
+  const check = canFlatten(ast)
+  if (!check.canFlatten) {
+    throw new Error(
+      `Cannot compile template with AOT: ${check.reason}\n` +
+      `Use Environment.render() for dynamic template names.`
+    )
+  }
+
+  // Flatten the template (resolve all inheritance)
+  const flattenedAst = flattenTemplate(ast, { loader })
+
+  // Compile the flattened AST
+  return compileToFunction(flattenedAst, options)
+}
+
+/**
+ * Compile a template with inheritance to JavaScript code string
+ * For build tools and CLI usage.
+ */
+export async function compileWithInheritanceToCode(
+  templateName: string,
+  options: CompileWithInheritanceOptions
+): Promise<string> {
+  const extensions = options.extensions ?? ['.html', '.jinja', '.jinja2', '']
+  const templatesDir = path.resolve(options.templates)
+  const fs = require('fs')
+
+  const loader: TemplateLoader = {
+    load(name: string): string {
+      const basePath = path.resolve(templatesDir, name)
+      for (const ext of extensions) {
+        const fullPath = basePath + ext
+        if (fs.existsSync(fullPath)) {
+          return fs.readFileSync(fullPath, 'utf-8')
+        }
+      }
+      throw new Error(`Template not found: ${name}`)
+    },
+    parse(source: string): TemplateNode {
+      const lexer = new Lexer(source)
+      const tokens = lexer.tokenize()
+      const parser = new Parser(tokens)
+      return parser.parse()
+    }
+  }
+
+  const source = loader.load(templateName)
+  const ast = loader.parse(source)
+
+  const check = canFlatten(ast)
+  if (!check.canFlatten) {
+    throw new Error(`Cannot compile template with AOT: ${check.reason}`)
+  }
+
+  const flattenedAst = flattenTemplate(ast, { loader })
+  return compileToString(flattenedAst, options)
 }
 
 /**
@@ -309,3 +503,15 @@ export type { FilterFunction } from './filters'
 export type { CompileOptions } from './compiler'
 export { builtinTests } from './tests'
 export type { TestFunction } from './tests'
+export { flattenTemplate, canFlatten } from './compiler/flattener'
+export type { TemplateLoader } from './compiler/flattener'
+
+// Debug Panel (development only)
+export {
+  renderWithDebug,
+  renderStringWithDebug,
+  createDebugRenderer,
+  debugMiddleware,
+  generateDebugPanel,
+} from './debug'
+export type { DebugData, PanelOptions, DebugRenderOptions } from './debug'
