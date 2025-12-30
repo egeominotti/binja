@@ -1027,6 +1027,41 @@ export const urlizetrunc: FilterFunction = (value, limit = 15) => {
   return safeString
 }
 
+// ==================== Jinja2 Additional Filters ====================
+
+// Jinja2: items - Convert dict/object to list of [key, value] pairs
+export const items: FilterFunction = (value) => {
+  if (value == null || typeof value !== 'object') return []
+  return Object.entries(value)
+}
+
+// Jinja2: xmlattr - Generate XML/HTML attributes from dict
+export const xmlattr: FilterFunction = (value, autospace = true) => {
+  if (value == null || typeof value !== 'object') return ''
+
+  const attrs: string[] = []
+  for (const [key, val] of Object.entries(value)) {
+    if (val === true) {
+      attrs.push(key)
+    } else if (val !== false && val != null) {
+      // Escape attribute value
+      const escaped = String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+      attrs.push(`${key}="${escaped}"`)
+    }
+  }
+
+  const result = attrs.join(' ')
+  const output = autospace && result ? ' ' + result : result
+
+  const safeString = new String(output) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
 // ==================== Built-in Filters Registry ====================
 
 export const builtinFilters: Record<string, FilterFunction> = {
@@ -1138,4 +1173,8 @@ export const builtinFilters: Record<string, FilterFunction> = {
   truncatechars_html,
   truncatewords_html,
   urlizetrunc,
+
+  // Jinja2 additional
+  items,
+  xmlattr,
 }

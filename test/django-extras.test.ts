@@ -159,6 +159,44 @@ describe('Django Extra Filters', () => {
   })
 })
 
+// ==================== Jinja2 Additional Filters ====================
+
+describe('Jinja2 Additional Filters', () => {
+  describe('items', () => {
+    test('converts object to array of pairs', async () => {
+      const result = await render("{% for key, val in data|items %}{{ key }}={{ val }},{% endfor %}", { data: { a: 1, b: 2 } })
+      expect(result).toBe('a=1,b=2,')
+    })
+
+    test('handles empty object', async () => {
+      const result = await render("{% for k, v in data|items %}x{% endfor %}", { data: {} })
+      expect(result).toBe('')
+    })
+  })
+
+  describe('xmlattr', () => {
+    test('generates HTML attributes', async () => {
+      const env = new Environment({ autoescape: false })
+      const result = await env.renderString("<div{{ attrs|xmlattr }}>", { attrs: { class: 'box', id: 'main' } })
+      expect(result).toContain('class="box"')
+      expect(result).toContain('id="main"')
+    })
+
+    test('handles boolean attributes', async () => {
+      const env = new Environment({ autoescape: false })
+      const result = await env.renderString("<input{{ attrs|xmlattr }}>", { attrs: { disabled: true, readonly: false } })
+      expect(result).toContain('disabled')
+      expect(result).not.toContain('readonly')
+    })
+
+    test('escapes attribute values', async () => {
+      const env = new Environment({ autoescape: false })
+      const result = await env.renderString("<div{{ attrs|xmlattr }}>", { attrs: { title: 'say "hello"' } })
+      expect(result).toContain('title="say &quot;hello&quot;"')
+    })
+  })
+})
+
 // ==================== Django Tags ====================
 
 describe('Django Extra Tags', () => {
