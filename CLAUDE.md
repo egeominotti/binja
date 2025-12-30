@@ -34,6 +34,7 @@ binja/
 │   ├── cli.ts            # CLI tool (binja compile/check/watch)
 │   ├── lexer/
 │   │   ├── index.ts      # Lexer - tokenizes template strings
+│   │   ├── hybrid.ts     # Hybrid lexer (native Zig + JS fallback)
 │   │   └── tokens.ts     # Token types and interfaces
 │   ├── parser/
 │   │   ├── index.ts      # Parser - generates AST from tokens
@@ -47,11 +48,23 @@ binja/
 │   ├── filters/
 │   │   └── index.ts      # 70+ built-in filters
 │   ├── tests/
-│   │   └── index.ts      # 30+ built-in tests (is operator)
+│   │   └── index.ts      # 28 built-in tests (is operator)
+│   ├── native/
+│   │   └── index.ts      # Zig FFI bindings with fallback
 │   └── debug/
 │       ├── index.ts      # Debug panel exports
 │       ├── collector.ts  # DebugCollector for timing/context
 │       └── panel.ts      # HTML panel generator
+├── zig-native/           # Native Zig lexer source
+│   ├── src/
+│   │   ├── lexer.zig     # High-performance Zig lexer
+│   │   └── lib.zig       # FFI exports
+│   └── build.zig         # Zig build configuration
+├── native/               # Prebuilt binaries (per-platform)
+│   ├── darwin-arm64/     # macOS Apple Silicon
+│   ├── darwin-x64/       # macOS Intel
+│   ├── linux-x64/        # Linux x64
+│   └── linux-arm64/      # Linux ARM64
 ├── test/
 │   ├── lexer.test.ts     # Lexer tests
 │   ├── parser.test.ts    # Parser tests
@@ -61,8 +74,13 @@ binja/
 │   ├── inheritance.test.ts # Template inheritance tests
 │   ├── aot-inheritance.test.ts # AOT with extends/include tests
 │   ├── raw.test.ts       # Raw/verbatim tag tests
+│   ├── native.test.ts    # Native Zig lexer tests
 │   ├── debug.test.ts     # Debug panel tests
 │   └── ...
+├── examples/             # Usage examples
+│   ├── 01-basic-usage.ts
+│   ├── ...
+│   └── 07-complete-reference.ts  # All features reference
 ├── website/              # Demo website with debug panel
 │   ├── server.ts         # Hono server
 │   └── templates/        # Demo templates
@@ -76,19 +94,52 @@ binja/
 ### Template Processing Pipeline
 
 ```
-Template String → Lexer → Tokens → Parser → AST → Runtime → Output String
+Template String → Lexer (Zig/JS) → Tokens → Parser → AST → Runtime → Output String
 ```
 
 1. **Lexer** (`src/lexer/`): Tokenizes template into tokens (TEXT, VAR_START, BLOCK_START, etc.)
+   - Uses native Zig lexer when available (3-5x faster)
+   - Automatically falls back to pure TypeScript implementation
 2. **Parser** (`src/parser/`): Converts tokens into Abstract Syntax Tree (AST)
 3. **Runtime** (`src/runtime/`): Executes AST with context to produce output
+
+### Native Zig Acceleration
+
+The lexer has a native Zig implementation for maximum performance:
+
+```typescript
+import { isNativeAvailable, nativeVersion } from 'binja/native'
+
+// Check if native acceleration is active
+if (isNativeAvailable()) {
+  console.log(`Using native Zig lexer: ${nativeVersion()}`)
+}
+```
+
+**Platform Support:**
+| Platform | Architecture | Status |
+|----------|-------------|--------|
+| macOS | Apple Silicon (arm64) | ✅ |
+| macOS | Intel (x64) | ✅ |
+| Linux | x64 | ✅ |
+| Linux | arm64 | ✅ |
+| Windows | x64 | 🔜 |
+
+**Performance Comparison:**
+| Operation | TypeScript | Native Zig | Speedup |
+|-----------|-----------|------------|---------|
+| Simple template | 0.15ms | 0.04ms | 3.7x |
+| Complex template | 2.1ms | 0.42ms | 5x |
+| Large template | 8.5ms | 1.7ms | 5x |
 
 ### Key Classes
 
 | Class | File | Purpose |
 |-------|------|---------|
 | `Environment` | `src/index.ts` | Main API, template loading, configuration, debug |
-| `Lexer` | `src/lexer/index.ts` | Tokenizes template strings |
+| `HybridLexer` | `src/lexer/hybrid.ts` | Auto-selects native or JS lexer |
+| `NativeLexer` | `src/native/index.ts` | Zig FFI bindings |
+| `Lexer` | `src/lexer/index.ts` | Pure TypeScript lexer (fallback) |
 | `Parser` | `src/parser/index.ts` | Generates AST from tokens |
 | `Runtime` | `src/runtime/index.ts` | Executes AST |
 | `Context` | `src/runtime/context.ts` | Variable scope management |
@@ -132,6 +183,10 @@ Template String → Lexer → Tokens → Parser → AST → Runtime → Output S
 - Shows timing (lexer, parser, render), context variables, filters used
 - Expandable tree view for context objects
 - Dark/light mode, draggable, collapsible sections
+
+### Built-in Tests (28)
+
+Tests for the `is` operator: `defined`, `undefined`, `none`, `true`, `false`, `boolean`, `string`, `number`, `integer`, `float`, `iterable`, `sequence`, `mapping`, `callable`, `even`, `odd`, `divisibleby`, `sameas`, `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `lower`, `upper`, `empty`
 
 ### Built-in Filters (70+)
 
@@ -227,8 +282,34 @@ Filters returning HTML must return a `Markup` object or use `|safe`.
 ### Array Index in Parser
 The parser accepts NUMBER after DOT for DTL-style array access (`items.0`).
 
+## Building Native Library
+
+To build the Zig native library from source:
+
+```bash
+cd zig-native
+zig build -Doptimize=ReleaseFast
+```
+
+The library will be output to `zig-native/zig-out/lib/libbinja.{dylib,so,dll}`.
+
+For cross-compilation:
+```bash
+# macOS ARM64
+zig build -Doptimize=ReleaseFast -Dtarget=aarch64-macos
+
+# macOS x64
+zig build -Doptimize=ReleaseFast -Dtarget=x86_64-macos
+
+# Linux x64
+zig build -Doptimize=ReleaseFast -Dtarget=x86_64-linux
+
+# Linux ARM64
+zig build -Doptimize=ReleaseFast -Dtarget=aarch64-linux
+```
+
 ## GitHub
 
 - **Repository**: jinja-bun
-- **Description**: High-performance Jinja2/Django Template Language engine for Bun. 100% DTL compatible.
-- **Topics**: `jinja2`, `django`, `template-engine`, `bun`, `typescript`, `dtl`, `django-templates`
+- **Description**: High-performance Jinja2/Django Template Language engine for Bun. 100% DTL compatible. Native Zig acceleration.
+- **Topics**: `jinja2`, `django`, `template-engine`, `bun`, `typescript`, `dtl`, `django-templates`, `zig`

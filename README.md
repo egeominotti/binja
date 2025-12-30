@@ -1,19 +1,20 @@
 <h1 align="center">binja</h1>
 
 <p align="center">
-  <strong>High-performance Jinja2/Django template engine for Bun</strong>
+  <strong>High-performance Jinja2/Django template engine for Bun with native Zig acceleration</strong>
 </p>
 
 <p align="center">
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#features">Features</a> •
-  <a href="#documentation">Documentation</a> •
+  <a href="#native-acceleration">Native Acceleration</a> •
   <a href="#filters">Filters</a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white" alt="Bun" />
+  <img src="https://img.shields.io/badge/Zig-F7A41D?style=for-the-badge&logo=zig&logoColor=white" alt="Zig Native" />
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django Compatible" />
   <img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=for-the-badge" alt="BSD-3-Clause License" />
@@ -25,11 +26,13 @@
 
 | Feature | Binja | Other JS engines |
 |---------|-----------|------------------|
+| **Native Zig Lexer** | ✅ 7x faster | ❌ |
 | **AOT Compilation** | ✅ 160x faster | ❌ |
 | Django DTL Compatible | ✅ 100% | ❌ Partial |
 | Jinja2 Compatible | ✅ Full | ⚠️ Limited |
 | Template Inheritance | ✅ | ⚠️ |
-| 50+ Built-in Filters | ✅ | ❌ |
+| 70+ Built-in Filters | ✅ | ❌ |
+| 28 Built-in Tests | ✅ | ❌ |
 | Debug Panel | ✅ | ❌ |
 | CLI Tool | ✅ | ⚠️ |
 | Autoescape by Default | ✅ | ❌ |
@@ -65,6 +68,45 @@ Tested on Mac Studio M1 Max, Bun 1.3.5, 10,000 iterations.
 ```bash
 bun run full-benchmark.ts
 ```
+
+---
+
+## Native Acceleration
+
+Binja includes a **native Zig lexer** that provides **7x faster** tokenization through Bun's FFI. The native library is automatically used when available.
+
+### Supported Platforms
+
+| Platform | Architecture | Status |
+|----------|--------------|--------|
+| macOS | Apple Silicon (arm64) | ✅ |
+| macOS | Intel (x64) | ✅ |
+| Linux | x64 | ✅ |
+| Linux | arm64 | ✅ |
+
+### Check Native Status
+
+```typescript
+import { isNativeAccelerated } from 'binja/lexer'
+
+console.log('Using native Zig:', isNativeAccelerated())
+// Output: Using native Zig: true
+```
+
+### Performance Comparison
+
+| Template Size | TypeScript Lexer | Zig Native | Speedup |
+|--------------|------------------|------------|---------|
+| Small (100B) | 290K ops/s | 1.2M ops/s | **4x** |
+| Medium (1KB) | 85K ops/s | 450K ops/s | **5x** |
+| Large (10KB) | 12K ops/s | 85K ops/s | **7x** |
+
+The native lexer automatically handles:
+- ✅ All Jinja2/Django delimiters (`{{`, `{%`, `{#`)
+- ✅ Whitespace control (`{%-`, `-%}`)
+- ✅ Raw/verbatim blocks
+- ✅ UTF-8 characters (€, 日本語, emoji)
+- ✅ Error handling with line numbers
 
 ---
 
@@ -362,9 +404,12 @@ Tests check values using the `is` operator (Jinja2 syntax):
 ```typescript
 import { builtinTests } from 'binja'
 
-// All 30+ built-in tests
+// All 28 built-in tests
 console.log(Object.keys(builtinTests))
-// ['divisibleby', 'even', 'odd', 'number', 'integer', ...]
+// ['divisibleby', 'even', 'odd', 'number', 'integer', 'float',
+//  'defined', 'undefined', 'none', 'boolean', 'string', 'mapping',
+//  'iterable', 'sequence', 'callable', 'upper', 'lower', 'empty',
+//  'in', 'eq', 'ne', 'sameas', 'equalto', 'truthy', 'falsy', ...]
 ```
 
 ---

@@ -87,3 +87,16 @@ benchmark-results/
 .local/
 *.local.ts
 *.local.js
+
+# Zig build artifacts
+zig-native/.zig-cache/
+zig-native/zig-out/
+zig-native/*.dylib
+zig-native/*.so
+zig-native/*.dll
+
+# Zig dev/test files (not needed in package)
+zig-native/benchmark.ts
+zig-native/complex-benchmark.ts
+zig-native/test.ts
+zig-native/ffi.ts

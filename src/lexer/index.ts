@@ -1,8 +1,11 @@
 /**
  * Jinja2/DTL Lexer - Tokenizes template source into tokens
  * Compatible with both Jinja2 and Django Template Language
+ *
+ * Automatically uses Zig FFI acceleration when available and using default delimiters.
  */
 import { Token, TokenType, KEYWORDS, LexerState } from './tokens'
+import { tokenizeNative, isNativeAccelerated } from './hybrid'
 
 export class Lexer {
   private state: LexerState
@@ -12,6 +15,7 @@ export class Lexer {
   private blockEnd: string
   private commentStart: string
   private commentEnd: string
+  private useNative: boolean
 
   constructor(
     source: string,
@@ -39,9 +43,27 @@ export class Lexer {
     this.blockEnd = options.blockEnd ?? '%}'
     this.commentStart = options.commentStart ?? '{#'
     this.commentEnd = options.commentEnd ?? '#}'
+
+    // Use native only with default delimiters
+    const hasCustomDelimiters =
+      options.variableStart !== undefined ||
+      options.variableEnd !== undefined ||
+      options.blockStart !== undefined ||
+      options.blockEnd !== undefined ||
+      options.commentStart !== undefined ||
+      options.commentEnd !== undefined
+
+    this.useNative = !hasCustomDelimiters && isNativeAccelerated()
   }
 
   tokenize(): Token[] {
+    // Try native acceleration first
+    if (this.useNative) {
+      const nativeTokens = tokenizeNative(this.state.source)
+      if (nativeTokens) return nativeTokens
+    }
+
+    // Fallback to TypeScript implementation
     while (!this.isAtEnd()) {
       this.scanToken()
     }
@@ -480,3 +502,4 @@ export class Lexer {
 
 export { TokenType, KEYWORDS } from './tokens'
 export type { Token, LexerState } from './tokens'
+export { isNativeAccelerated } from './hybrid'
