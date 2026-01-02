@@ -1,6 +1,6 @@
 {
   "name": "binja",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "High-performance Jinja2/Django template engine for Bun",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -20,6 +20,18 @@
       "require": "./dist/debug/index.js",
       "types": "./dist/debug/index.d.ts",
       "bun": "./dist/debug/index.js"
+    },
+    "./hono": {
+      "import": "./dist/adapters/hono.js",
+      "require": "./dist/adapters/hono.js",
+      "types": "./dist/adapters/hono.d.ts",
+      "bun": "./dist/adapters/hono.js"
+    },
+    "./elysia": {
+      "import": "./dist/adapters/elysia.js",
+      "require": "./dist/adapters/elysia.js",
+      "types": "./dist/adapters/elysia.d.ts",
+      "bun": "./dist/adapters/elysia.js"
     }
   },
   "files": [
@@ -28,7 +40,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun --minify && bun build ./src/cli.ts --outdir ./dist --target bun --minify && bun build ./src/debug/index.ts --outdir ./dist/debug --target bun --minify && bun run build:types && bun run build:clean",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun --minify && bun build ./src/cli.ts --outdir ./dist --target bun --minify && bun build ./src/debug/index.ts --outdir ./dist/debug --target bun --minify && bun build ./src/adapters/hono.ts --outdir ./dist/adapters --target bun --minify && bun build ./src/adapters/elysia.ts --outdir ./dist/adapters --target bun --minify && bun run build:types && bun run build:clean",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist",
     "build:clean": "rm -rf dist/native dist/lexer/hybrid.* && find dist -name '*.d.ts.map' -delete",
     "test": "bun test",
@@ -65,6 +77,8 @@
   "license": "BSD-3-Clause",
   "devDependencies": {
     "@types/bun": "latest",
+    "elysia": "^1.4.19",
+    "hono": "^4.11.3",
     "typescript": "latest"
   },
   "engines": {
