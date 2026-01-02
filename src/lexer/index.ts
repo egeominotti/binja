@@ -396,6 +396,13 @@ export class Lexer {
           this.addToken(TokenType.GT, '>')
         }
         break
+      case '?':
+        if (this.match('?')) {
+          this.addToken(TokenType.NULLCOALESCE, '??')
+        } else {
+          this.addToken(TokenType.QUESTION, '?')
+        }
+        break
       default:
         if (!this.isWhitespace(c)) {
           throw new TemplateSyntaxError(`Unexpected character '${c}'`, {

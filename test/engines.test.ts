@@ -6,6 +6,7 @@
 import { describe, test, expect } from 'bun:test'
 import * as handlebars from '../src/engines/handlebars'
 import * as liquid from '../src/engines/liquid'
+import * as twig from '../src/engines/twig'
 import { MultiEngine, getEngine, detectEngine } from '../src/engines'
 
 describe('Handlebars Engine', () => {
@@ -342,6 +343,155 @@ describe('Liquid Engine', () => {
   })
 })
 
+describe('Twig Engine', () => {
+  describe('Basic Output', () => {
+    test('variable output', async () => {
+      const result = await twig.render('Hello {{ name }}!', { name: 'World' })
+      expect(result).toBe('Hello World!')
+    })
+
+    test('nested path', async () => {
+      const result = await twig.render('{{ user.name }}', { user: { name: 'John' } })
+      expect(result).toBe('John')
+    })
+
+    test('array index', async () => {
+      const result = await twig.render('{{ items[0] }}', { items: ['first', 'second'] })
+      expect(result).toBe('first')
+    })
+  })
+
+  describe('Filters', () => {
+    test('upper filter', async () => {
+      const result = await twig.render('{{ name | upper }}', { name: 'world' })
+      expect(result).toBe('WORLD')
+    })
+
+    test('default filter', async () => {
+      const result = await twig.render('{{ missing | default: "fallback" }}', {})
+      expect(result).toBe('fallback')
+    })
+
+    test('e filter (escape alias)', async () => {
+      const result = await twig.render('{{ html | e }}', { html: '<b>test</b>' })
+      expect(result).toBe('&lt;b&gt;test&lt;/b&gt;')
+    })
+  })
+
+  describe('If Tag', () => {
+    test('if true', async () => {
+      const result = await twig.render('{% if show %}Yes{% endif %}', { show: true })
+      expect(result).toBe('Yes')
+    })
+
+    test('if false', async () => {
+      const result = await twig.render('{% if show %}Yes{% endif %}', { show: false })
+      expect(result).toBe('')
+    })
+
+    test('if else', async () => {
+      const result = await twig.render('{% if show %}Yes{% else %}No{% endif %}', { show: false })
+      expect(result).toBe('No')
+    })
+
+    test('if elif', async () => {
+      const result = await twig.render('{% if a %}A{% elif b %}B{% else %}C{% endif %}', { a: false, b: true })
+      expect(result).toBe('B')
+    })
+  })
+
+  describe('For Tag', () => {
+    test('for loop', async () => {
+      const result = await twig.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      expect(result).toBe('abc')
+    })
+
+    test('for with loop.index', async () => {
+      const result = await twig.render('{% for i in items %}{{ loop.index }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      expect(result).toBe('123')
+    })
+
+    test('for with empty', async () => {
+      const result = await twig.render('{% for item in items %}{{ item }}{% empty %}Empty{% endfor %}', { items: [] })
+      expect(result).toBe('Empty')
+    })
+  })
+
+  describe('Set Tag', () => {
+    test('set variable', async () => {
+      const result = await twig.render('{% set name = "World" %}Hello {{ name }}!', {})
+      expect(result).toBe('Hello World!')
+    })
+  })
+
+  describe('Comments', () => {
+    test('comment', async () => {
+      const result = await twig.render('Hello {# ignored #}World', {})
+      expect(result).toBe('Hello World')
+    })
+  })
+
+  describe('Raw Tag', () => {
+    test('raw output', async () => {
+      const result = await twig.render('{% raw %}{{ not parsed }}{% endraw %}', {})
+      expect(result).toBe('{{ not parsed }}')
+    })
+  })
+
+  describe('Deep Paths', () => {
+    test('deeply nested', async () => {
+      const result = await twig.render('{{ a.b.c.d }}', { a: { b: { c: { d: 'deep' } } } })
+      expect(result).toBe('deep')
+    })
+
+    test('bracket and dot mixed', async () => {
+      const result = await twig.render('{{ users[0].name }}', { users: [{ name: 'John' }] })
+      expect(result).toBe('John')
+    })
+  })
+
+  describe('Comparison Operators', () => {
+    test('equals', async () => {
+      const result = await twig.render('{% if x == 5 %}Yes{% endif %}', { x: 5 })
+      expect(result).toBe('Yes')
+    })
+
+    test('not equals', async () => {
+      const result = await twig.render('{% if x != 5 %}Yes{% endif %}', { x: 3 })
+      expect(result).toBe('Yes')
+    })
+
+    test('greater than', async () => {
+      const result = await twig.render('{% if x > 5 %}Yes{% endif %}', { x: 10 })
+      expect(result).toBe('Yes')
+    })
+  })
+
+  describe('Boolean Operators', () => {
+    test('and operator', async () => {
+      const result = await twig.render('{% if a and b %}Both{% endif %}', { a: true, b: true })
+      expect(result).toBe('Both')
+    })
+
+    test('or operator', async () => {
+      const result = await twig.render('{% if a or b %}One{% endif %}', { a: false, b: true })
+      expect(result).toBe('One')
+    })
+
+    test('not operator', async () => {
+      const result = await twig.render('{% if not hidden %}Visible{% endif %}', { hidden: false })
+      expect(result).toBe('Visible')
+    })
+  })
+
+  describe('String Concatenation', () => {
+    test('tilde operator', async () => {
+      const result = await twig.render('{{ "Hello " ~ name }}', { name: 'World' })
+      expect(result).toBe('Hello World')
+    })
+  })
+})
+
 describe('MultiEngine', () => {
   test('getEngine by name', () => {
     const hbs = getEngine('handlebars')
@@ -351,6 +501,10 @@ describe('MultiEngine', () => {
     const liq = getEngine('liquid')
     expect(liq).toBeDefined()
     expect(liq?.name).toBe('liquid')
+
+    const tw = getEngine('twig')
+    expect(tw).toBeDefined()
+    expect(tw?.name).toBe('twig')
   })
 
   test('getEngine by extension', () => {
@@ -359,6 +513,9 @@ describe('MultiEngine', () => {
 
     const liq = getEngine('.liquid')
     expect(liq?.name).toBe('liquid')
+
+    const tw = getEngine('.twig')
+    expect(tw?.name).toBe('twig')
   })
 
   test('detectEngine from path', () => {
@@ -367,6 +524,9 @@ describe('MultiEngine', () => {
 
     const liq = detectEngine('/templates/page.liquid')
     expect(liq?.name).toBe('liquid')
+
+    const tw = detectEngine('/templates/page.twig')
+    expect(tw?.name).toBe('twig')
   })
 
   test('MultiEngine render', async () => {
@@ -380,6 +540,9 @@ describe('MultiEngine', () => {
 
     const liq = await engine.render('Hello {{ name }}!', { name: 'Liquid' }, 'liquid')
     expect(liq).toBe('Hello Liquid!')
+
+    const tw = await engine.render('Hello {{ name }}!', { name: 'Twig' }, 'twig')
+    expect(tw).toBe('Hello Twig!')
   })
 
   test('listEngines', () => {
@@ -388,5 +551,6 @@ describe('MultiEngine', () => {
     expect(list).toContain('jinja2')
     expect(list).toContain('handlebars')
     expect(list).toContain('liquid')
+    expect(list).toContain('twig')
   })
 })

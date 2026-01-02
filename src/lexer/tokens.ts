@@ -54,6 +54,8 @@ export enum TokenType {
   // Special
   ASSIGN = 'ASSIGN',                     // =
   TILDE = 'TILDE',                       // ~
+  QUESTION = 'QUESTION',                 // ?
+  NULLCOALESCE = 'NULLCOALESCE',         // ??
 }
 
 export interface Token {

@@ -5,11 +5,13 @@
  * - Jinja2/DTL (default)
  * - Handlebars
  * - Liquid (Shopify)
+ * - Twig (PHP/Symfony)
  */
 
 import { render } from '../src'
 import * as handlebars from '../src/engines/handlebars'
 import * as liquid from '../src/engines/liquid'
+import * as twig from '../src/engines/twig'
 import { MultiEngine } from '../src/engines'
 
 async function main() {
@@ -61,12 +63,25 @@ User: {{ user.name }} ({{ user.age }} years old)
   console.log(liquidResult)
   console.log()
 
-  // 4. Using MultiEngine class
+  // 4. Twig (PHP/Symfony)
+  console.log('--- Twig ---')
+  const twigTemplate = `
+Hello {{ name }}!
+{% if showGreeting %}Welcome to binja!{% endif %}
+Items: {% for item in items %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %}
+User: {{ user.name }} ({{ user.age }} years old)
+  `.trim()
+
+  const twigResult = await twig.render(twigTemplate, context)
+  console.log(twigResult)
+  console.log()
+
+  // 5. Using MultiEngine class
   console.log('--- MultiEngine API ---')
   const engine = new MultiEngine()
 
   // Render with different engines using the same API
-  const engines = ['jinja2', 'handlebars', 'liquid'] as const
+  const engines = ['jinja2', 'handlebars', 'liquid', 'twig'] as const
 
   for (const engineName of engines) {
     let template: string
@@ -78,6 +93,9 @@ User: {{ user.name }} ({{ user.age }} years old)
         template = 'Hello {{name}}!'
         break
       case 'liquid':
+        template = 'Hello {{ name }}!'
+        break
+      case 'twig':
         template = 'Hello {{ name }}!'
         break
     }

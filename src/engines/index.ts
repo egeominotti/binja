@@ -5,8 +5,9 @@
 
 import * as handlebars from './handlebars'
 import * as liquid from './liquid'
+import * as twig from './twig'
 
-export { handlebars, liquid }
+export { handlebars, liquid, twig }
 
 /**
  * Engine interface
@@ -26,6 +27,7 @@ export const engines: Record<string, TemplateEngine> = {
   handlebars: handlebars.engine,
   hbs: handlebars.engine,
   liquid: liquid.engine,
+  twig: twig.engine,
 }
 
 /**
