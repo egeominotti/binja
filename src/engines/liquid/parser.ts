@@ -168,7 +168,7 @@ export class LiquidParser {
     this.expect(LiquidTokenType.TAG_END)
 
     const body = this.parseNodes(['elsif', 'else', 'endif'])
-    const elifs: Array<{ condition: ExpressionNode; body: ASTNode[] }> = []
+    const elifs: Array<{ test: ExpressionNode; body: ASTNode[] }> = []
     let else_: ASTNode[] = []
 
     // Handle elsif chains
