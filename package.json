@@ -1,6 +1,6 @@
 {
   "name": "binja",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "High-performance Jinja2/Django template engine for Bun",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -15,12 +15,6 @@
       "types": "./dist/index.d.ts",
       "bun": "./dist/index.js"
     },
-    "./native": {
-      "import": "./dist/native/index.js",
-      "require": "./dist/native/index.js",
-      "types": "./dist/native/index.d.ts",
-      "bun": "./dist/native/index.js"
-    },
     "./debug": {
       "import": "./dist/debug/index.js",
       "require": "./dist/debug/index.js",
@@ -30,25 +24,22 @@
   },
   "files": [
     "dist",
-    "native",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/cli.ts --outdir ./dist --target bun && bun build ./src/native/index.ts --outdir ./dist/native --target bun && bun build ./src/debug/index.ts --outdir ./dist/debug --target bun && bun run build:types",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/cli.ts --outdir ./dist --target bun && bun build ./src/debug/index.ts --outdir ./dist/debug --target bun && bun run build:types",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist",
-    "build:native": "./scripts/build-native.sh",
-    "build:all": "bun run build:native && bun run build",
     "test": "bun test",
     "dev": "bun --watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run build:all",
+    "prepublishOnly": "bun run build",
     "version:patch": "npm version patch --no-git-tag-version",
     "version:minor": "npm version minor --no-git-tag-version",
     "version:major": "npm version major --no-git-tag-version",
-    "release:patch": "bun run version:patch && bun run build:all",
-    "release:minor": "bun run version:minor && bun run build:all",
-    "release:major": "bun run version:major && bun run build:all"
+    "release:patch": "bun run version:patch && bun run build",
+    "release:minor": "bun run version:minor && bun run build",
+    "release:major": "bun run version:major && bun run build"
   },
   "repository": {
     "type": "git",
@@ -67,10 +58,7 @@
     "ssr",
     "template-engine",
     "django-templates",
-    "typescript",
-    "zig",
-    "native",
-    "ffi"
+    "typescript"
   ],
   "author": "egeominotti",
   "license": "BSD-3-Clause",

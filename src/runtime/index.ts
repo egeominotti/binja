@@ -844,19 +844,527 @@ export class Runtime {
     return obj[index]
   }
 
+  // Pre-compiled regex for inline filters
+  private static readonly TITLE_REGEX = /\b\w/g
+  private static readonly STRIPTAGS_REGEX = /<[^>]*>/g
+  private static readonly SLUGIFY_REGEX1 = /[^\w\s-]/g
+  private static readonly SLUGIFY_REGEX2 = /[\s_-]+/g
+  private static readonly SLUGIFY_REGEX3 = /^-+|-+$/g
+  private static readonly WHITESPACE_REGEX = /\s+/
+  private static readonly URLIZE_REGEX = /(https?:\/\/[^\s]+)/g
+  private static readonly NEWLINE_REGEX = /\n/g
+  private static readonly DOUBLE_NEWLINE_REGEX = /\n\n+/
+
   private evalFilter(node: FilterExprNode, ctx: Context): any {
     const value = this.eval(node.node, ctx)
-    // Optimized: for loop instead of .map() - 28% faster
+    const filterName = node.filter
+    const argsLen = node.args.length
+
+    // ==================== FAST PATH: No arguments ====================
+    if (argsLen === 0) {
+      switch (filterName) {
+        // String filters
+        case 'upper':
+          return String(value ?? '').toUpperCase()
+        case 'lower':
+          return String(value ?? '').toLowerCase()
+        case 'trim':
+          return String(value ?? '').trim()
+        case 'capitalize': {
+          const s = String(value ?? '')
+          return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+        }
+        case 'capfirst': {
+          const s = String(value ?? '')
+          return s.charAt(0).toUpperCase() + s.slice(1)
+        }
+        case 'title':
+          return String(value ?? '').replace(Runtime.TITLE_REGEX, c => c.toUpperCase())
+        case 'striptags':
+          return String(value ?? '').replace(Runtime.STRIPTAGS_REGEX, '')
+        case 'slugify':
+          return String(value ?? '')
+            .toLowerCase()
+            .replace(Runtime.SLUGIFY_REGEX1, '')
+            .replace(Runtime.SLUGIFY_REGEX2, '-')
+            .replace(Runtime.SLUGIFY_REGEX3, '')
+        case 'wordcount': {
+          const str = String(value ?? '').trim()
+          return str ? str.split(Runtime.WHITESPACE_REGEX).length : 0
+        }
+        case 'escapejs':
+          return JSON.stringify(String(value ?? '')).slice(1, -1)
+        case 'linebreaksbr': {
+          const html = String(value ?? '').replace(Runtime.NEWLINE_REGEX, '<br>')
+          const safe = new String(html) as any
+          safe.__safe__ = true
+          return safe
+        }
+        case 'linebreaks': {
+          const paragraphs = String(value ?? '').split(Runtime.DOUBLE_NEWLINE_REGEX)
+          let html = ''
+          for (let i = 0; i < paragraphs.length; i++) {
+            if (i > 0) html += '\n'
+            html += `<p>${paragraphs[i].replace(Runtime.NEWLINE_REGEX, '<br>')}</p>`
+          }
+          const safe = new String(html) as any
+          safe.__safe__ = true
+          return safe
+        }
+        case 'urlencode':
+          return encodeURIComponent(String(value ?? ''))
+
+        // Safety filters
+        case 'safe': {
+          const safeVal = new String(value ?? '') as any
+          safeVal.__safe__ = true
+          return safeVal
+        }
+        case 'escape':
+        case 'e': {
+          if ((value as any)?.__safe__) return value
+          const escaped = new String(Bun.escapeHTML(String(value ?? ''))) as any
+          escaped.__safe__ = true
+          return escaped
+        }
+        case 'forceescape': {
+          const escaped = new String(Bun.escapeHTML(String(value ?? ''))) as any
+          escaped.__safe__ = true
+          return escaped
+        }
+
+        // Number filters
+        case 'int':
+          return parseInt(String(value), 10) || 0
+        case 'float':
+          return parseFloat(String(value)) || 0
+        case 'abs':
+          return Math.abs(Number(value) || 0)
+        case 'filesizeformat': {
+          const bytes = Number(value) || 0
+          const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB']
+          let i = 0, size = bytes
+          while (size >= 1024 && i < units.length - 1) { size /= 1024; i++ }
+          return `${size.toFixed(1)} ${units[i]}`
+        }
+
+        // Array filters
+        case 'length':
+          if (value == null) return 0
+          if (typeof value === 'string' || Array.isArray(value)) return value.length
+          if (typeof value === 'object') {
+            let count = 0
+            for (const _ in value) count++
+            return count
+          }
+          return 0
+        case 'first':
+          if (Array.isArray(value)) return value[0]
+          if (typeof value === 'string') return value[0]
+          return value
+        case 'last':
+          if (Array.isArray(value)) return value[value.length - 1]
+          if (typeof value === 'string') return value[value.length - 1]
+          return value
+        case 'reverse':
+          if (Array.isArray(value)) return [...value].reverse()
+          if (typeof value === 'string') return value.split('').reverse().join('')
+          return value
+        case 'sort':
+          if (Array.isArray(value)) return [...value].sort()
+          return value
+        case 'unique':
+          if (Array.isArray(value)) return [...new Set(value)]
+          return value
+        case 'list':
+        case 'make_list':
+          if (Array.isArray(value)) return value
+          if (typeof value === 'string') return value.split('')
+          if (value && typeof value[Symbol.iterator] === 'function') return [...value]
+          if (typeof value === 'object' && value !== null) return Object.values(value)
+          return [value]
+        case 'random':
+          if (Array.isArray(value)) return value[Math.floor(Math.random() * value.length)]
+          return value
+        case 'items':
+          if (value == null || typeof value !== 'object') return []
+          return Object.entries(value)
+
+        // Type conversion
+        case 'string':
+          return String(value ?? '')
+
+        // JSON/Debug
+        case 'json':
+        case 'tojson': {
+          try {
+            const jsonStr = new String(JSON.stringify(value)) as any
+            jsonStr.__safe__ = true
+            return jsonStr
+          } catch { return '' }
+        }
+        case 'pprint': {
+          try {
+            const result = new String(JSON.stringify(value, null, 2)) as any
+            result.__safe__ = true
+            return result
+          } catch { return String(value) }
+        }
+
+        // URL
+        case 'urlize': {
+          const html = String(value ?? '').replace(Runtime.URLIZE_REGEX, '<a href="$1">$1</a>')
+          const safe = new String(html) as any
+          safe.__safe__ = true
+          return safe
+        }
+      }
+    }
+
+    // ==================== FAST PATH: Single argument ====================
+    if (argsLen === 1) {
+      const arg = this.eval(node.args[0], ctx)
+
+      switch (filterName) {
+        // Default filters
+        case 'default':
+        case 'd':
+          if (value === undefined || value === null || value === '' || value === false) {
+            return arg
+          }
+          return value
+        case 'default_if_none':
+          return value === null || value === undefined ? arg : value
+
+        // String filters with args
+        case 'truncatechars': {
+          const str = String(value ?? '')
+          const len = Number(arg) || 30
+          if (str.length <= len) return str
+          return str.slice(0, len - 3) + '...'
+        }
+        case 'truncatewords': {
+          const words = String(value ?? '').split(Runtime.WHITESPACE_REGEX)
+          const count = Number(arg) || 15
+          if (words.length <= count) return value
+          return words.slice(0, count).join(' ') + '...'
+        }
+        case 'center': {
+          const str = String(value ?? '')
+          const width = Number(arg) || 80
+          const padding = Math.max(0, width - str.length)
+          const left = Math.floor(padding / 2)
+          return ' '.repeat(left) + str + ' '.repeat(padding - left)
+        }
+        case 'ljust':
+          return String(value ?? '').padEnd(Number(arg) || 80)
+        case 'rjust':
+          return String(value ?? '').padStart(Number(arg) || 80)
+        case 'cut':
+          return String(value ?? '').split(String(arg)).join('')
+
+        // Number filters with args
+        case 'add': {
+          const numVal = Number(value)
+          const numArg = Number(arg)
+          if (!isNaN(numVal) && !isNaN(numArg)) return numVal + numArg
+          return String(value) + String(arg)
+        }
+        case 'divisibleby':
+          return Number(value) % Number(arg) === 0
+        case 'round':
+          return Number(Number(value).toFixed(Number(arg) || 0))
+        case 'floatformat': {
+          const num = parseFloat(String(value))
+          if (isNaN(num)) return ''
+          const decimals = Number(arg)
+          if (decimals === -1) {
+            const formatted = num.toFixed(1)
+            return formatted.endsWith('.0') ? Math.round(num).toString() : formatted
+          }
+          return num.toFixed(Math.abs(decimals))
+        }
+        case 'get_digit': {
+          const num = parseInt(String(value), 10)
+          if (isNaN(num)) return value
+          const str = String(Math.abs(num))
+          const pos = Number(arg) || 1
+          if (pos < 1 || pos > str.length) return value
+          return parseInt(str[str.length - pos], 10)
+        }
+
+        // Array filters with args
+        case 'join':
+          if (Array.isArray(value)) return value.join(String(arg ?? ''))
+          return String(value)
+        case 'slice': {
+          if (!value) return value
+          const [startStr, endStr] = String(arg).split(':')
+          const start = startStr ? parseInt(startStr, 10) : 0
+          const end = endStr ? parseInt(endStr, 10) : undefined
+          if (Array.isArray(value) || typeof value === 'string') return value.slice(start, end)
+          return value
+        }
+        case 'batch': {
+          if (!Array.isArray(value)) return [[value]]
+          const size = Number(arg) || 1
+          const result: any[][] = []
+          for (let i = 0; i < value.length; i += size) {
+            result.push(value.slice(i, i + size))
+          }
+          return result
+        }
+        case 'columns': {
+          if (!Array.isArray(value)) return [[value]]
+          const cols = Number(arg) || 2
+          const result: any[][] = []
+          for (let i = 0; i < value.length; i += cols) {
+            result.push(value.slice(i, i + cols))
+          }
+          return result
+        }
+        case 'length_is':
+          return (value == null ? 0 : (value.length ?? Object.keys(value).length ?? 0)) === Number(arg)
+        case 'attr':
+          return value == null ? undefined : value[arg]
+        case 'dictsort':
+          if (!Array.isArray(value)) return value
+          return [...value].sort((a, b) => {
+            const aVal = arg ? a[arg] : a
+            const bVal = arg ? b[arg] : b
+            return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+          })
+        case 'dictsortreversed':
+          if (!Array.isArray(value)) return value
+          return [...value].sort((a, b) => {
+            const aVal = arg ? a[arg] : a
+            const bVal = arg ? b[arg] : b
+            return aVal > bVal ? -1 : aVal < bVal ? 1 : 0
+          })
+        case 'map':
+          if (!Array.isArray(value)) return []
+          if (typeof arg === 'string') return value.map(item => item?.[arg])
+          return value
+        case 'select':
+          if (!Array.isArray(value)) return []
+          if (arg === undefined) return value.filter(item => !!item)
+          return value.filter(item => !!item?.[arg])
+        case 'reject':
+          if (!Array.isArray(value)) return []
+          if (arg === undefined) return value.filter(item => !item)
+          return value.filter(item => !item?.[arg])
+        case 'groupby': {
+          if (!Array.isArray(value)) return []
+          const groups: Record<string, any[]> = {}
+          for (const item of value) {
+            const key = String(arg ? item[arg] : item)
+            if (!(key in groups)) groups[key] = []
+            groups[key].push(item)
+          }
+          const result: any[] = []
+          for (const key in groups) {
+            result.push({ grouper: key, list: groups[key] })
+          }
+          return result
+        }
+
+        // Date filters
+        case 'date':
+        case 'time': {
+          const d = value instanceof Date ? value : new Date(value)
+          if (isNaN(d.getTime())) return ''
+          return this.formatDate(d, String(arg || (filterName === 'time' ? 'H:i' : 'N j, Y')))
+        }
+
+        // Conditional filters
+        case 'pluralize': {
+          const argStr = String(arg ?? 's')
+          const [singular, plural] = argStr.includes(',') ? argStr.split(',') : ['', argStr]
+          return Number(value) === 1 ? singular : plural
+        }
+        case 'yesno': {
+          const [yes, no, maybe] = String(arg ?? 'yes,no,maybe').split(',')
+          if (value === true) return yes
+          if (value === false) return no
+          return maybe ?? no
+        }
+
+        // JSON with indent
+        case 'json':
+        case 'tojson': {
+          try {
+            const jsonStr = new String(JSON.stringify(value, null, arg)) as any
+            jsonStr.__safe__ = true
+            return jsonStr
+          } catch { return '' }
+        }
+
+        // URL
+        case 'urlizetrunc': {
+          const maxLen = Number(arg) || 15
+          const html = String(value ?? '').replace(Runtime.URLIZE_REGEX, (url) => {
+            const displayUrl = url.length > maxLen ? url.slice(0, maxLen) + '...' : url
+            return `<a href="${url}">${displayUrl}</a>`
+          })
+          const safe = new String(html) as any
+          safe.__safe__ = true
+          return safe
+        }
+
+        // Misc
+        case 'indent': {
+          const str = String(value ?? '')
+          const indentStr = typeof arg === 'string' ? arg : ' '.repeat(Number(arg) || 4)
+          const lines = str.split('\n')
+          let result = lines[0] // First line not indented by default
+          for (let i = 1; i < lines.length; i++) {
+            result += '\n' + (lines[i].trim() === '' ? lines[i] : indentStr + lines[i])
+          }
+          return result
+        }
+        case 'stringformat': {
+          const fmt = String(arg)
+          const val = value
+          // Simple format specifiers
+          if (fmt === 's') return String(val)
+          if (fmt === 'd' || fmt === 'i') return String(parseInt(String(val), 10) || 0)
+          if (fmt === 'f') return String(parseFloat(String(val)) || 0)
+          if (fmt === 'x') return (parseInt(String(val), 10) || 0).toString(16)
+          if (fmt === 'X') return (parseInt(String(val), 10) || 0).toString(16).toUpperCase()
+          if (fmt === 'o') return (parseInt(String(val), 10) || 0).toString(8)
+          if (fmt === 'b') return (parseInt(String(val), 10) || 0).toString(2)
+          if (fmt === 'e') return (parseFloat(String(val)) || 0).toExponential()
+          // Precision: .2f, .3f
+          const precMatch = fmt.match(/^\.?(\d+)f$/)
+          if (precMatch) return (parseFloat(String(val)) || 0).toFixed(parseInt(precMatch[1], 10))
+          // Width with padding: 05d, 10s
+          const widthMatch = fmt.match(/^(0?)(\d+)([sd])$/)
+          if (widthMatch) {
+            const [, zero, widthStr, type] = widthMatch
+            const width = parseInt(widthStr, 10)
+            const strVal = type === 'd' ? String(parseInt(String(val), 10) || 0) : String(val)
+            return strVal.padStart(width, zero ? '0' : ' ')
+          }
+          return String(val)
+        }
+        case 'json_script': {
+          const jsonStr = JSON.stringify(value)
+            .replace(/</g, '\\u003C')
+            .replace(/>/g, '\\u003E')
+            .replace(/&/g, '\\u0026')
+          const id = arg ? ` id="${String(arg)}"` : ''
+          const html = `<script${id} type="application/json">${jsonStr}</script>`
+          const safe = new String(html) as any
+          safe.__safe__ = true
+          return safe
+        }
+      }
+    }
+
+    // ==================== FAST PATH: Two arguments ====================
+    if (argsLen === 2) {
+      const arg1 = this.eval(node.args[0], ctx)
+      const arg2 = this.eval(node.args[1], ctx)
+
+      switch (filterName) {
+        case 'replace': {
+          const str = String(value ?? '')
+          return str.replaceAll(String(arg1), String(arg2))
+        }
+        case 'batch': {
+          if (!Array.isArray(value)) return [[value]]
+          const size = Number(arg1) || 1
+          const fillWith = arg2
+          const result: any[][] = []
+          for (let i = 0; i < value.length; i += size) {
+            const batch = value.slice(i, i + size)
+            while (fillWith !== null && batch.length < size) batch.push(fillWith)
+            result.push(batch)
+          }
+          return result
+        }
+        case 'sum': {
+          if (!Array.isArray(value)) return Number(arg2) || 0
+          let total = Number(arg2) || 0
+          for (let i = 0; i < value.length; i++) {
+            total += Number(arg1 ? value[i][arg1] : value[i]) || 0
+          }
+          return total
+        }
+        case 'max': {
+          if (!Array.isArray(value) || value.length === 0) return arg2
+          if (arg1) {
+            let maxItem = value[0]
+            for (let i = 1; i < value.length; i++) {
+              if (value[i][arg1] > maxItem[arg1]) maxItem = value[i]
+            }
+            return maxItem
+          }
+          let maxVal = value[0]
+          for (let i = 1; i < value.length; i++) {
+            if (value[i] > maxVal) maxVal = value[i]
+          }
+          return maxVal
+        }
+        case 'min': {
+          if (!Array.isArray(value) || value.length === 0) return arg2
+          if (arg1) {
+            let minItem = value[0]
+            for (let i = 1; i < value.length; i++) {
+              if (value[i][arg1] < minItem[arg1]) minItem = value[i]
+            }
+            return minItem
+          }
+          let minVal = value[0]
+          for (let i = 1; i < value.length; i++) {
+            if (value[i] < minVal) minVal = value[i]
+          }
+          return minVal
+        }
+        case 'timesince': {
+          const d = value instanceof Date ? value : new Date(value)
+          const now = arg1 instanceof Date ? arg1 : new Date(arg1 ?? Date.now())
+          const diff = (now.getTime() - d.getTime()) / 1000
+          const intervals: [number, string, string][] = [
+            [31536000, 'year', 'years'], [2592000, 'month', 'months'],
+            [604800, 'week', 'weeks'], [86400, 'day', 'days'],
+            [3600, 'hour', 'hours'], [60, 'minute', 'minutes']
+          ]
+          for (const [secs, sing, plur] of intervals) {
+            const count = Math.floor(diff / secs)
+            if (count >= 1) return `${count} ${count === 1 ? sing : plur}`
+          }
+          return 'just now'
+        }
+        case 'timeuntil': {
+          const d = value instanceof Date ? value : new Date(value)
+          const now = arg1 instanceof Date ? arg1 : new Date(arg1 ?? Date.now())
+          const diff = (d.getTime() - now.getTime()) / 1000
+          const intervals: [number, string, string][] = [
+            [31536000, 'year', 'years'], [2592000, 'month', 'months'],
+            [604800, 'week', 'weeks'], [86400, 'day', 'days'],
+            [3600, 'hour', 'hours'], [60, 'minute', 'minutes']
+          ]
+          for (const [secs, sing, plur] of intervals) {
+            const count = Math.floor(diff / secs)
+            if (count >= 1) return `${count} ${count === 1 ? sing : plur}`
+          }
+          return 'now'
+        }
+      }
+    }
+
+    // ==================== FALLBACK: Use filter registry ====================
     const args: any[] = []
-    for (let i = 0; i < node.args.length; i++) {
+    for (let i = 0; i < argsLen; i++) {
       args.push(this.eval(node.args[i], ctx))
     }
     const kwargs = this.evalObjectSync(node.kwargs, ctx)
-    const filter = this.filters[node.filter]
+    const filter = this.filters[filterName]
     if (!filter) {
       const available = Object.keys(this.filters)
-      const suggestion = findSimilar(node.filter, available)
-      throw new TemplateRuntimeError(`Unknown filter '${node.filter}'`, {
+      const suggestion = findSimilar(filterName, available)
+      throw new TemplateRuntimeError(`Unknown filter '${filterName}'`, {
         line: node.line,
         column: node.column,
         source: this.source,

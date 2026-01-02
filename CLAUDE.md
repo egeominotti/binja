@@ -34,13 +34,12 @@ binja/
 │   ├── cli.ts            # CLI tool (binja compile/check/watch)
 │   ├── lexer/
 │   │   ├── index.ts      # Lexer - tokenizes template strings
-│   │   ├── hybrid.ts     # Hybrid lexer (native Zig + JS fallback)
 │   │   └── tokens.ts     # Token types and interfaces
 │   ├── parser/
 │   │   ├── index.ts      # Parser - generates AST from tokens
 │   │   └── nodes.ts      # AST node type definitions
 │   ├── runtime/
-│   │   ├── index.ts      # Runtime - executes AST
+│   │   ├── index.ts      # Runtime - executes AST (with inline filter optimization)
 │   │   └── context.ts    # Context class with forloop/loop support
 │   ├── compiler/
 │   │   ├── index.ts      # AOT compiler - generates JS functions
@@ -49,22 +48,10 @@ binja/
 │   │   └── index.ts      # 80+ built-in filters
 │   ├── tests/
 │   │   └── index.ts      # 28 built-in tests (is operator)
-│   ├── native/
-│   │   └── index.ts      # Zig FFI bindings with fallback
 │   └── debug/
 │       ├── index.ts      # Debug panel exports
 │       ├── collector.ts  # DebugCollector for timing/context
 │       └── panel.ts      # HTML panel generator
-├── zig-native/           # Native Zig lexer source
-│   ├── src/
-│   │   ├── lexer.zig     # High-performance Zig lexer
-│   │   └── lib.zig       # FFI exports
-│   └── build.zig         # Zig build configuration
-├── native/               # Prebuilt binaries (per-platform)
-│   ├── darwin-arm64/     # macOS Apple Silicon
-│   ├── darwin-x64/       # macOS Intel
-│   ├── linux-x64/        # Linux x64
-│   └── linux-arm64/      # Linux ARM64
 ├── test/
 │   ├── lexer.test.ts     # Lexer tests
 │   ├── parser.test.ts    # Parser tests
@@ -74,7 +61,6 @@ binja/
 │   ├── inheritance.test.ts # Template inheritance tests
 │   ├── aot-inheritance.test.ts # AOT with extends/include tests
 │   ├── raw.test.ts       # Raw/verbatim tag tests
-│   ├── native.test.ts    # Native Zig lexer tests
 │   ├── debug.test.ts     # Debug panel tests
 │   └── ...
 ├── examples/             # Usage examples
@@ -102,6 +88,7 @@ Template String → Lexer → Tokens → Parser → AST → Runtime → Output S
    - 2-4x faster than Nunjucks
 2. **Parser** (`src/parser/`): Converts tokens into Abstract Syntax Tree (AST)
 3. **Runtime** (`src/runtime/`): Executes AST with context to produce output
+   - Inline filter optimization for ~70 common filters (10-15% faster)
 
 ### Performance
 
@@ -115,14 +102,6 @@ Binja is **2-4x faster** than Nunjucks in runtime mode:
 | Conditionals | 84K ops/s | 25K ops/s | **3.4x** |
 | HTML Escaping | 985K ops/s | 242K ops/s | **4.1x** |
 
-### Native Zig (Currently Disabled)
-
-There is a native Zig lexer implementation in `zig-native/` but it's currently disabled.
-The FFI overhead negates the performance benefits for lexer-only acceleration.
-Future work may include a full native pipeline (lexer + parser + runtime) in Zig.
-
-The native binaries are still included in the package for potential future use.
-
 ### Key Classes
 
 | Class | File | Purpose |
@@ -130,7 +109,7 @@ The native binaries are still included in the package for potential future use.
 | `Environment` | `src/index.ts` | Main API, template loading, configuration, debug |
 | `Lexer` | `src/lexer/index.ts` | Pure TypeScript lexer |
 | `Parser` | `src/parser/index.ts` | Generates AST from tokens |
-| `Runtime` | `src/runtime/index.ts` | Executes AST |
+| `Runtime` | `src/runtime/index.ts` | Executes AST with inline filter optimization |
 | `Context` | `src/runtime/context.ts` | Variable scope management |
 | `Compiler` | `src/compiler/index.ts` | AOT compilation to JS functions |
 | `TemplateFlattener` | `src/compiler/flattener.ts` | Resolves extends/include at compile-time |
@@ -214,6 +193,8 @@ export const builtinFilters: Record<string, FilterFunction> = {
 }
 ```
 
+For performance, also add inline version in `src/runtime/index.ts` in `evalFilter()`.
+
 ### Adding a New Tag
 
 1. Add token type in `src/lexer/tokens.ts` if needed
@@ -255,6 +236,10 @@ Supports both styles:
 - DTL style: `{{ items.0 }}` (dot notation with number)
 - Jinja2 style: `{{ items[0] }}` (bracket notation)
 
+### Inline Filter Optimization
+
+The runtime has inline implementations for ~70 common filters to avoid dictionary lookup and function call overhead. This provides 10-15% speedup on filter-heavy templates.
+
 ## Testing Guidelines
 
 1. All tests use Bun's test runner: `import { describe, test, expect } from 'bun:test'`
@@ -273,22 +258,6 @@ Filters returning HTML must return a `Markup` object or use `|safe`.
 ### Array Index in Parser
 The parser accepts NUMBER after DOT for DTL-style array access (`items.0`).
 
-## Building Native Library (Optional - Currently Disabled)
-
-The native Zig lexer is currently disabled because pure TypeScript + Bun is faster
-due to FFI overhead. The native code is kept for potential future full-pipeline implementation.
-
-To build the Zig native library from source:
-
-```bash
-cd zig-native
-zig build -Doptimize=ReleaseFast
-```
-
-The library will be output to `zig-native/zig-out/lib/libbinja.{dylib,so,dll}`.
-
-To re-enable native lexer, edit `src/lexer/hybrid.ts` and modify `checkNative()` to return true.
-
 ## Publishing to npm
 
 ### Release Process
@@ -300,9 +269,9 @@ To re-enable native lexer, edit `src/lexer/hybrid.ts` and modify `checkNative()`
    bun run version:major   # 0.4.1 -> 1.0.0
    ```
 
-2. **Build everything** (native + JS):
+2. **Build**:
    ```bash
-   bun run build:all
+   bun run build
    ```
 
 3. **Run tests**:
@@ -321,30 +290,24 @@ To re-enable native lexer, edit `src/lexer/hybrid.ts` and modify `checkNative()`
    ```bash
    npm publish
    ```
-   Note: `prepublishOnly` script runs `build:all` automatically.
 
 ### Build Scripts
 
 | Script | Description |
 |--------|-------------|
-| `build` | Build JS (index, cli, native, debug modules) + types |
-| `build:native` | Build Zig native libraries for all platforms |
-| `build:all` | Build native + JS |
+| `build` | Build JS (index, cli, debug modules) + types |
 | `build:types` | Generate TypeScript declarations |
 
 ### Package Structure
 
 The published package includes:
 - `dist/` - Compiled JavaScript and TypeScript declarations
-- `dist/native/index.js` - Native FFI bindings (subpath export)
 - `dist/debug/index.js` - Debug panel (subpath export)
-- `native/` - Prebuilt Zig binaries for all platforms
 
 ### Subpath Exports
 
 ```typescript
 import { render } from 'binja'           // Main API
-import { isNativeAvailable } from 'binja/native'  // Native status
 import { DebugCollector } from 'binja/debug'      // Debug tools
 ```
 
