@@ -27,10 +27,11 @@
 |---------|-----------|------------------|
 | **Runtime Performance** | ✅ 2-4x faster | ❌ |
 | **AOT Compilation** | ✅ 160x faster | ❌ |
+| **Multi-Engine** | ✅ Jinja2, Handlebars, Liquid | ❌ |
 | Django DTL Compatible | ✅ 100% | ❌ Partial |
 | Jinja2 Compatible | ✅ Full | ⚠️ Limited |
 | Template Inheritance | ✅ | ⚠️ |
-| 80+ Built-in Filters | ✅ | ❌ |
+| 84 Built-in Filters | ✅ | ❌ |
 | 28 Built-in Tests | ✅ | ❌ |
 | Debug Panel | ✅ | ❌ |
 | CLI Tool | ✅ | ⚠️ |
@@ -415,6 +416,69 @@ console.log(Object.keys(builtinTests))
 //  'iterable', 'sequence', 'callable', 'upper', 'lower', 'empty',
 //  'in', 'eq', 'ne', 'sameas', 'equalto', 'truthy', 'falsy', ...]
 ```
+
+---
+
+## Multi-Engine Support
+
+Binja supports multiple template engines through a unified API. All engines parse to a common AST and share the same runtime, filters, and optimizations.
+
+### Supported Engines
+
+| Engine | Syntax | Use Case |
+|--------|--------|----------|
+| **Jinja2/DTL** | `{{ var }}` `{% if %}` | Default, Python/Django compatibility |
+| **Handlebars** | `{{var}}` `{{#if}}` | JavaScript ecosystem, Ember.js |
+| **Liquid** | `{{ var }}` `{% if %}` | Shopify, Jekyll, static sites |
+
+### Usage
+
+```typescript
+// Direct engine imports
+import * as handlebars from 'binja/engines/handlebars'
+import * as liquid from 'binja/engines/liquid'
+
+// Handlebars
+await handlebars.render('Hello {{name}}!', { name: 'World' })
+await handlebars.render('{{#each items}}{{this}}{{/each}}', { items: ['a', 'b'] })
+await handlebars.render('{{{html}}}', { html: '<b>unescaped</b>' })
+
+// Liquid (Shopify)
+await liquid.render('Hello {{ name }}!', { name: 'World' })
+await liquid.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b'] })
+await liquid.render('{% assign x = "value" %}{{ x }}', {})
+```
+
+### MultiEngine API
+
+```typescript
+import { MultiEngine } from 'binja/engines'
+
+const engine = new MultiEngine()
+
+// Render with any engine
+await engine.render('Hello {{name}}!', { name: 'World' }, 'handlebars')
+await engine.render('Hello {{ name }}!', { name: 'World' }, 'liquid')
+await engine.render('Hello {{ name }}!', { name: 'World' }, 'jinja2')
+
+// Auto-detect from file extension
+import { detectEngine } from 'binja/engines'
+const eng = detectEngine('template.hbs')  // Returns Handlebars engine
+const eng2 = detectEngine('page.liquid')  // Returns Liquid engine
+```
+
+### Engine Feature Matrix
+
+| Feature | Jinja2 | Handlebars | Liquid |
+|---------|--------|------------|--------|
+| Variables | `{{ x }}` | `{{x}}` | `{{ x }}` |
+| Conditionals | `{% if %}` | `{{#if}}` | `{% if %}` |
+| Loops | `{% for %}` | `{{#each}}` | `{% for %}` |
+| Filters | `{{ x\|filter }}` | `{{ x }}` | `{{ x \| filter }}` |
+| Raw output | `{% raw %}` | - | `{% raw %}` |
+| Comments | `{# #}` | `{{! }}` | `{% comment %}` |
+| Assignment | `{% set %}` | - | `{% assign %}` |
+| Unescaped | `{{ x\|safe }}` | `{{{x}}}` | - |
 
 ---
 

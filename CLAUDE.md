@@ -48,6 +48,16 @@ binja/
 │   │   └── index.ts      # 80+ built-in filters
 │   ├── tests/
 │   │   └── index.ts      # 28 built-in tests (is operator)
+│   ├── engines/          # Multi-engine support
+│   │   ├── index.ts      # Unified MultiEngine API
+│   │   ├── handlebars/   # Handlebars engine
+│   │   │   ├── index.ts  # Entry point
+│   │   │   ├── lexer.ts  # Handlebars tokenizer
+│   │   │   └── parser.ts # Handlebars → common AST
+│   │   └── liquid/       # Liquid (Shopify) engine
+│   │       ├── index.ts  # Entry point
+│   │       ├── lexer.ts  # Liquid tokenizer
+│   │       └── parser.ts # Liquid → common AST
 │   └── debug/
 │       ├── index.ts      # Debug panel exports
 │       ├── collector.ts  # DebugCollector for timing/context
@@ -61,12 +71,14 @@ binja/
 │   ├── inheritance.test.ts # Template inheritance tests
 │   ├── aot-inheritance.test.ts # AOT with extends/include tests
 │   ├── raw.test.ts       # Raw/verbatim tag tests
+│   ├── engines.test.ts   # Multi-engine tests (Handlebars, Liquid)
 │   ├── debug.test.ts     # Debug panel tests
 │   └── ...
 ├── examples/             # Usage examples
 │   ├── 01-basic-usage.ts
 │   ├── ...
-│   └── 07-complete-reference.ts  # All features reference
+│   ├── 07-complete-reference.ts  # All features reference
+│   └── 09-multi-engine.ts # Multi-engine usage
 ├── website/              # Demo website with debug panel
 │   ├── server.ts         # Hono server
 │   └── templates/        # Demo templates
@@ -114,6 +126,11 @@ Binja is **2-4x faster** than Nunjucks in runtime mode:
 | `Compiler` | `src/compiler/index.ts` | AOT compilation to JS functions |
 | `TemplateFlattener` | `src/compiler/flattener.ts` | Resolves extends/include at compile-time |
 | `DebugCollector` | `src/debug/collector.ts` | Collects timing and context data |
+| `MultiEngine` | `src/engines/index.ts` | Unified API for multiple template engines |
+| `HandlebarsLexer` | `src/engines/handlebars/lexer.ts` | Handlebars tokenizer |
+| `HandlebarsParser` | `src/engines/handlebars/parser.ts` | Handlebars → common AST |
+| `LiquidLexer` | `src/engines/liquid/lexer.ts` | Liquid tokenizer |
+| `LiquidParser` | `src/engines/liquid/parser.ts` | Liquid → common AST |
 
 ## Supported Features
 
@@ -151,6 +168,34 @@ Binja is **2-4x faster** than Nunjucks in runtime mode:
 - Shows timing (lexer, parser, render), context variables, filters used
 - Expandable tree view for context objects
 - Dark/light mode, draggable, collapsible sections
+
+### Multi-Engine Support
+
+Binja supports multiple template engines through a unified API:
+
+**Engines:**
+- **Jinja2/DTL** - Default engine (full compatibility)
+- **Handlebars** - `{{#if}}`, `{{#each}}`, `{{>partial}}`, `{{{unescaped}}}`
+- **Liquid** - Shopify syntax: `{% if %}`, `{% for %}`, `{% assign %}`, `{% raw %}`
+
+**Usage:**
+```typescript
+import { MultiEngine } from 'binja/engines'
+import * as handlebars from 'binja/engines/handlebars'
+import * as liquid from 'binja/engines/liquid'
+
+// Direct engine use
+await handlebars.render('Hello {{name}}!', { name: 'World' })
+await liquid.render('Hello {{ name }}!', { name: 'World' })
+
+// Unified API
+const engine = new MultiEngine()
+await engine.render(template, context, 'handlebars')
+await engine.render(template, context, 'liquid')
+await engine.render(template, context, 'jinja2') // default
+```
+
+**Architecture:** All engines parse to a common AST format, which is then executed by the shared binja runtime. This means all engines benefit from binja's optimizations and 84+ built-in filters.
 
 ### Built-in Tests (28)
 
@@ -201,6 +246,25 @@ For performance, also add inline version in `src/runtime/index.ts` in `evalFilte
 2. Add AST node type in `src/parser/nodes.ts`
 3. Add parsing logic in `src/parser/index.ts`
 4. Add execution logic in `src/runtime/index.ts`
+
+### Adding a New Template Engine
+
+1. Create directory `src/engines/{engine}/`
+2. Create lexer `lexer.ts` that tokenizes the engine's syntax
+3. Create parser `parser.ts` that converts tokens to binja's common AST format
+4. Create entry point `index.ts` with `parse()`, `compile()`, `render()` functions
+5. Register engine in `src/engines/index.ts`
+6. Add tests in `test/engines.test.ts`
+
+Key AST node types to map:
+- `Template`, `Text`, `Output` - basic structure
+- `If` (with `test`, `body`, `elifs`, `else_`) - conditionals
+- `For` (with `target`, `iter`, `body`, `else_`) - loops
+- `Set` (with `target`, `value`) - variable assignment
+- `GetAttr` (with `object`, `attribute`) - property access
+- `GetItem` (with `object`, `index`) - array/dict access
+- `FilterExpr` (with `node`, `filter`, `args`) - filters
+- `Compare` (with `left`, `ops: [{ operator, right }]`) - comparisons
 
 ### Test Pattern
 
