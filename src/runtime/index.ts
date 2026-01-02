@@ -280,7 +280,7 @@ export class Runtime {
     ctx.pushForLoop(items, 0)
 
     // Optimized: use string concatenation for small loops, array for large
-    // String concat is faster for < 50 items, array.join for larger
+    // String concat is faster for < 25 items, array.join for larger
     let result: string
 
     // Optimized: hoist isUnpacking check outside loop - 8-12% faster
@@ -289,21 +289,15 @@ export class Runtime {
       const targets = node.target as string[]
       const targetsLen = targets.length
 
-      if (len < 50) {
+      if (len < 25) {
         // Small loop: string concat
         result = ''
         for (let i = 0; i < len; i++) {
           const item = items[i]
           if (i > 0) ctx.updateForLoop(i, items)
 
-          let values: any[]
-          if (Array.isArray(item)) {
-            values = item
-          } else if (item && typeof item === 'object' && ('0' in item || 'key' in item)) {
-            values = [item[0] ?? item.key, item[1] ?? item.value]
-          } else {
-            values = [item, item]
-          }
+          // Optimized: toIterable now returns pure arrays, so just check for array
+          const values = Array.isArray(item) ? item : [item, item]
 
           for (let j = 0; j < targetsLen; j++) {
             ctx.set(targets[j], values[j])
@@ -318,14 +312,8 @@ export class Runtime {
           const item = items[i]
           if (i > 0) ctx.updateForLoop(i, items)
 
-          let values: any[]
-          if (Array.isArray(item)) {
-            values = item
-          } else if (item && typeof item === 'object' && ('0' in item || 'key' in item)) {
-            values = [item[0] ?? item.key, item[1] ?? item.value]
-          } else {
-            values = [item, item]
-          }
+          // Optimized: toIterable now returns pure arrays, so just check for array
+          const values = Array.isArray(item) ? item : [item, item]
 
           for (let j = 0; j < targetsLen; j++) {
             ctx.set(targets[j], values[j])
@@ -339,7 +327,7 @@ export class Runtime {
       // Simple loop (hot path - 99% of use cases)
       const target = node.target as string
 
-      if (len < 50) {
+      if (len < 25) {
         // Small loop: string concat (faster for small N)
         result = ''
         for (let i = 0; i < len; i++) {
@@ -1501,26 +1489,190 @@ export class Runtime {
   }
 
   private evalTest(node: TestExprNode, ctx: Context): boolean {
-    if (node.test === 'defined' || node.test === 'undefined') {
+    const testName = node.test
+    const negated = node.negated
+
+    // ==================== FAST PATH: defined/undefined (special - checks existence) ====================
+    if (testName === 'defined' || testName === 'undefined') {
       let isDefined = false
       if (node.node.type === 'Name') {
         isDefined = ctx.has((node.node as NameNode).name)
       } else {
         isDefined = this.eval(node.node, ctx) !== undefined
       }
-      const result = node.test === 'defined' ? isDefined : !isDefined
-      return node.negated ? !result : result
+      const result = testName === 'defined' ? isDefined : !isDefined
+      return negated ? !result : result
     }
+
     const value = this.eval(node.node, ctx)
-    // Optimized: for loop instead of .map()
+
+    // ==================== FAST PATH: No argument tests ====================
+    if (node.args.length === 0) {
+      let result: boolean
+      switch (testName) {
+        // Number tests
+        case 'even': {
+          const n = Number(value)
+          result = Number.isInteger(n) && n % 2 === 0
+          break
+        }
+        case 'odd': {
+          const n = Number(value)
+          result = Number.isInteger(n) && n % 2 !== 0
+          break
+        }
+        case 'number':
+          result = typeof value === 'number' && !isNaN(value)
+          break
+        case 'integer':
+          result = Number.isInteger(value)
+          break
+        case 'float':
+          result = typeof value === 'number' && !Number.isInteger(value) && !isNaN(value)
+          break
+
+        // Type tests
+        case 'none':
+        case 'None':
+          result = value === null
+          break
+        case 'boolean':
+          result = typeof value === 'boolean'
+          break
+        case 'string':
+          result = typeof value === 'string'
+          break
+        case 'mapping':
+          result = value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)
+          break
+        case 'iterable':
+          result = value != null && (typeof value === 'string' || Array.isArray(value) || typeof value[Symbol.iterator] === 'function')
+          break
+        case 'sequence':
+          result = Array.isArray(value) || typeof value === 'string'
+          break
+        case 'callable':
+          result = typeof value === 'function'
+          break
+
+        // String tests
+        case 'lower':
+          result = typeof value === 'string' && value === value.toLowerCase() && value !== value.toUpperCase()
+          break
+        case 'upper':
+          result = typeof value === 'string' && value === value.toUpperCase() && value !== value.toLowerCase()
+          break
+
+        // Collection tests
+        case 'empty':
+          if (value == null) result = true
+          else if (typeof value === 'string' || Array.isArray(value)) result = value.length === 0
+          else if (typeof value === 'object') {
+            result = true
+            for (const _ in value) { result = false; break }
+          } else result = false
+          break
+
+        // Truthiness tests
+        case 'truthy':
+          if (value == null) result = false
+          else if (typeof value === 'boolean') result = value
+          else if (typeof value === 'number') result = value !== 0
+          else if (typeof value === 'string') result = value.length > 0
+          else if (Array.isArray(value)) result = value.length > 0
+          else if (typeof value === 'object') {
+            result = false
+            for (const _ in value) { result = true; break }
+          } else result = true
+          break
+        case 'falsy':
+          if (value == null) result = true
+          else if (typeof value === 'boolean') result = !value
+          else if (typeof value === 'number') result = value === 0
+          else if (typeof value === 'string') result = value.length === 0
+          else if (Array.isArray(value)) result = value.length === 0
+          else if (typeof value === 'object') {
+            result = true
+            for (const _ in value) { result = false; break }
+          } else result = false
+          break
+        case 'true':
+          result = value === true
+          break
+        case 'false':
+          result = value === false
+          break
+
+        default: {
+          // Fallback to registry
+          const test = this.tests[testName]
+          if (!test) throw new Error(`Unknown test: ${testName}`)
+          result = test(value)
+        }
+      }
+      return negated ? !result : result
+    }
+
+    // ==================== FAST PATH: Single argument tests ====================
+    if (node.args.length === 1) {
+      const arg = this.eval(node.args[0], ctx)
+      let result: boolean
+
+      switch (testName) {
+        case 'divisibleby': {
+          const n = Number(value)
+          const d = Number(arg)
+          result = d !== 0 && n % d === 0
+          break
+        }
+        case 'gt':
+        case 'greaterthan':
+          result = Number(value) > Number(arg)
+          break
+        case 'ge':
+          result = Number(value) >= Number(arg)
+          break
+        case 'lt':
+        case 'lessthan':
+          result = Number(value) < Number(arg)
+          break
+        case 'le':
+          result = Number(value) <= Number(arg)
+          break
+        case 'eq':
+        case 'equalto':
+        case 'sameas':
+          result = value === arg
+          break
+        case 'ne':
+          result = value !== arg
+          break
+        case 'in':
+          if (Array.isArray(arg)) result = arg.includes(value)
+          else if (typeof arg === 'string') result = arg.includes(String(value))
+          else if (typeof arg === 'object' && arg !== null) result = value in arg
+          else result = false
+          break
+
+        default: {
+          // Fallback to registry
+          const test = this.tests[testName]
+          if (!test) throw new Error(`Unknown test: ${testName}`)
+          result = test(value, arg)
+        }
+      }
+      return negated ? !result : result
+    }
+
+    // ==================== FALLBACK: Use test registry ====================
     const args: any[] = []
     for (let i = 0; i < node.args.length; i++) {
       args.push(this.eval(node.args[i], ctx))
     }
-    const test = this.tests[node.test]
-    if (!test) throw new Error(`Unknown test: ${node.test}`)
+    const test = this.tests[testName]
+    if (!test) throw new Error(`Unknown test: ${testName}`)
     const result = test(value, ...args)
-    return node.negated ? !result : result
+    return negated ? !result : result
   }
 
   private evalObjectSync(obj: Record<string, ExpressionNode>, ctx: Context): Record<string, any> {
@@ -1641,14 +1793,8 @@ export class Runtime {
       if (i > 0) ctx.updateForLoop(i, items)
 
       if (isUnpacking) {
-        let values: any[]
-        if (Array.isArray(item)) {
-          values = item
-        } else if (item && typeof item === 'object' && ('0' in item || 'key' in item)) {
-          values = [item[0] ?? item.key, item[1] ?? item.value]
-        } else {
-          values = [item, item]
-        }
+        // Optimized: toIterable now returns pure arrays
+        const values = Array.isArray(item) ? item : [item, item]
         const targets = node.target as string[]
         for (let j = 0; j < targets.length; j++) {
           ctx.set(targets[j], values[j])
@@ -1809,16 +1955,19 @@ export class Runtime {
       if (typeof value[Symbol.iterator] === 'function') {
         return Array.from(value)
       }
-      // Optimized: use lightweight array tuples instead of objects - 15-20% faster
-      // Arrays with index access are faster than object property access
+      // Optimized: create minimal object with both array-like and named access
+      // Uses Object.create(null) for faster property lookup (no prototype chain)
       const keys = Object.keys(value)
       const len = keys.length
       const result = new Array(len)
       for (let i = 0; i < len; i++) {
         const key = keys[i]
         const val = value[key]
-        // Create tuple-like object that supports both named and indexed access
-        result[i] = { key, value: val, 0: key, 1: val }
+        // Minimal tuple: indexed access (for unpacking) + named access (for {{ item.key }})
+        const tuple = [key, val] as any
+        tuple.key = key
+        tuple.value = val
+        result[i] = tuple
       }
       return result
     }

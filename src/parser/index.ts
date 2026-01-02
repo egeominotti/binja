@@ -1294,13 +1294,14 @@ export class Parser {
     return kwargs
   }
 
+  // Optimized: peek ahead without modifying state - avoids save/restore overhead
   private checkBlockTag(name: string): boolean {
     if (this.peek().type !== TokenType.BLOCK_START) return false
-    const saved = this.current
-    this.advance() // {%
-    const isMatch = this.check(TokenType.NAME) && this.peek().value === name
-    this.current = saved
-    return isMatch
+    // Peek at token after BLOCK_START without advancing
+    const nextIdx = this.current + 1
+    if (nextIdx >= this.tokens.length) return false
+    const nextToken = this.tokens[nextIdx]
+    return nextToken.type === TokenType.NAME && nextToken.value === name
   }
 
   private expectBlockTag(name: string): void {

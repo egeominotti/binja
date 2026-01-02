@@ -11,14 +11,12 @@
  */
 
 import { Environment } from '../src'
-import { isNativeAccelerated } from '../src/lexer'
 
 async function main() {
   const env = new Environment({ autoescape: true })
 
   console.log('='.repeat(60))
   console.log('BINJA COMPLETE REFERENCE')
-  console.log(`Using native Zig FFI: ${isNativeAccelerated()}`)
   console.log('='.repeat(60))
 
   // ============================================================
