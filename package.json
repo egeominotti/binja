@@ -1,6 +1,6 @@
 {
   "name": "binja",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "High-performance Jinja2/Django template engine for Bun",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -28,8 +28,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target bun && bun build ./src/cli.ts --outdir ./dist --target bun && bun build ./src/debug/index.ts --outdir ./dist/debug --target bun && bun run build:types",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun --minify && bun build ./src/cli.ts --outdir ./dist --target bun --minify && bun build ./src/debug/index.ts --outdir ./dist/debug --target bun --minify && bun run build:types && bun run build:clean",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist",
+    "build:clean": "rm -rf dist/native dist/lexer/hybrid.* && find dist -name '*.d.ts.map' -delete",
     "test": "bun test",
     "dev": "bun --watch src/index.ts",
     "typecheck": "tsc --noEmit",
