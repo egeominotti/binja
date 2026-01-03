@@ -31,7 +31,7 @@ bun run typecheck
 binja/
 ├── src/
 │   ├── index.ts          # Main entry point, Environment class
-│   ├── cli.ts            # CLI tool (binja compile/check/watch)
+│   ├── cli.ts            # CLI tool (binja compile/check/watch/lint)
 │   ├── lexer/
 │   │   ├── index.ts      # Lexer - tokenizes template strings
 │   │   └── tokens.ts     # Token types and interfaces
@@ -48,6 +48,17 @@ binja/
 │   │   └── index.ts      # 80+ built-in filters
 │   ├── tests/
 │   │   └── index.ts      # 28 built-in tests (is operator)
+│   ├── ai/               # AI-powered linting (optional)
+│   │   ├── index.ts      # Entry point for binja/ai
+│   │   ├── types.ts      # LintResult, Issue types
+│   │   ├── lint.ts       # Main lint function
+│   │   ├── prompt.ts     # AI prompt engineering
+│   │   └── providers/    # AI provider implementations
+│   │       ├── index.ts  # Auto-detect and provider factory
+│   │       ├── anthropic.ts  # Claude provider
+│   │       ├── openai.ts     # GPT-4 provider
+│   │       ├── ollama.ts     # Local Ollama provider
+│   │       └── groq.ts       # Groq provider (free tier)
 │   ├── engines/          # Multi-engine support
 │   │   ├── index.ts      # Unified MultiEngine API
 │   │   ├── handlebars/   # Handlebars engine
@@ -169,6 +180,43 @@ Binja is **2-4x faster** than Nunjucks in runtime mode:
 - Expandable tree view for context objects
 - Dark/light mode, draggable, collapsible sections
 
+### AI-Powered Linting (Optional)
+
+Binja includes an optional AI linting module (`binja/ai`) that detects:
+- **Security**: XSS vulnerabilities, unsafe user input
+- **Performance**: Heavy filters in loops, repeated calculations
+- **Accessibility**: Missing alt text, forms without labels
+- **Best Practices**: Missing `{% empty %}`, deep nesting
+
+**Providers supported:**
+- **Anthropic** (Claude) - `ANTHROPIC_API_KEY`
+- **OpenAI** (GPT-4) - `OPENAI_API_KEY`
+- **Groq** (free tier) - `GROQ_API_KEY`
+- **Ollama** (local) - no key needed
+
+**CLI Usage:**
+```bash
+binja lint ./templates           # Syntax only
+binja lint ./templates --ai      # With AI analysis
+binja lint ./templates --ai=ollama  # Specific provider
+```
+
+**Programmatic Usage:**
+```typescript
+import { lint } from 'binja/ai'
+
+// Auto-detect provider
+const result = await lint(template)
+
+// With explicit API key
+const result = await lint(template, {
+  provider: 'anthropic',
+  apiKey: 'sk-ant-...'
+})
+
+console.log(result.warnings) // [{ line: 5, type: 'security', message: '...' }]
+```
+
 ### Multi-Engine Support
 
 Binja supports multiple template engines through a unified API:
@@ -265,6 +313,30 @@ Key AST node types to map:
 - `GetItem` (with `object`, `index`) - array/dict access
 - `FilterExpr` (with `node`, `filter`, `args`) - filters
 - `Compare` (with `left`, `ops: [{ operator, right }]`) - comparisons
+
+### Adding a New AI Provider
+
+1. Create `src/ai/providers/{provider}.ts`:
+```typescript
+import type { AIProvider } from '../types'
+
+export function createMyProvider(model?: string, apiKey?: string): AIProvider {
+  const key = apiKey || process.env.MY_API_KEY
+
+  return {
+    name: 'myprovider',
+    async available() { return !!key },
+    async analyze(template, prompt) {
+      // Call your AI API here
+      return response
+    }
+  }
+}
+```
+
+2. Register in `src/ai/providers/index.ts`:
+   - Add to `getProvider()` switch
+   - Add to `detectProvider()` array
 
 ### Test Pattern
 
@@ -371,8 +443,9 @@ The published package includes:
 ### Subpath Exports
 
 ```typescript
-import { render } from 'binja'           // Main API
+import { render } from 'binja'                    // Main API
 import { DebugCollector } from 'binja/debug'      // Debug tools
+import { lint } from 'binja/ai'                   // AI linting (optional)
 ```
 
 ## GitHub

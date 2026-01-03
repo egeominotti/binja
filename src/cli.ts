@@ -20,7 +20,7 @@ import { Parser } from './parser'
 import { compileToString } from './compiler'
 import { flattenTemplate, canFlatten, TemplateLoader } from './compiler/flattener'
 
-const VERSION = '0.1.1'
+const VERSION = '0.9.0'
 
 interface CompileOptions {
   output: string
@@ -29,6 +29,13 @@ interface CompileOptions {
   name?: string
   extensions: string[]
   verbose: boolean
+}
+
+interface LintCliOptions {
+  ai: boolean
+  aiProvider?: 'auto' | 'anthropic' | 'openai' | 'ollama' | 'groq'
+  format: 'text' | 'json'
+  extensions: string[]
 }
 
 // Colors for terminal output
@@ -64,6 +71,7 @@ ${colors.cyan}binja${colors.reset} - High-performance template compiler
 ${colors.yellow}Usage:${colors.reset}
   binja compile <source> [options]    Compile templates to JavaScript
   binja check <source>                Check if templates can be AOT compiled
+  binja lint <source> [options]       Lint templates for issues
   binja --help                        Show this help
   binja --version                     Show version
 
@@ -74,6 +82,12 @@ ${colors.yellow}Compile Options:${colors.reset}
   -e, --ext <extensions>  File extensions to compile (default: .html,.jinja,.jinja2)
   -v, --verbose           Verbose output
   -w, --watch             Watch for changes and recompile
+
+${colors.yellow}Lint Options:${colors.reset}
+  --ai                    Enable AI-powered analysis (requires API key)
+  --ai=<provider>         Use specific AI provider (anthropic, openai, groq, ollama)
+  --format=<format>       Output format: text (default), json
+  -e, --ext <extensions>  File extensions to lint
 
 ${colors.yellow}Examples:${colors.reset}
   ${colors.dim}# Compile all templates in a directory${colors.reset}
@@ -88,6 +102,15 @@ ${colors.yellow}Examples:${colors.reset}
   ${colors.dim}# Watch mode for development${colors.reset}
   binja compile ./templates -o ./dist --watch
 
+  ${colors.dim}# Lint templates (syntax only)${colors.reset}
+  binja lint ./templates
+
+  ${colors.dim}# Lint with AI analysis${colors.reset}
+  binja lint ./templates --ai
+
+  ${colors.dim}# Lint with specific AI provider${colors.reset}
+  binja lint ./templates --ai=ollama
+
 ${colors.yellow}Output:${colors.reset}
   Generated files export a render function:
 
@@ -100,13 +123,26 @@ ${colors.yellow}Output:${colors.reset}
 `)
 }
 
-function parseArgs(args: string[]): { command: string; source: string; options: CompileOptions } {
-  const options: CompileOptions = {
+interface ParsedArgs {
+  command: string
+  source: string
+  compileOptions: CompileOptions
+  lintOptions: LintCliOptions
+}
+
+function parseArgs(args: string[]): ParsedArgs {
+  const compileOptions: CompileOptions = {
     output: '',
     minify: false,
     watch: false,
     extensions: ['.html', '.jinja', '.jinja2'],
     verbose: false,
+  }
+
+  const lintOptions: LintCliOptions = {
+    ai: false,
+    format: 'text',
+    extensions: ['.html', '.jinja', '.jinja2'],
   }
 
   let command = ''
@@ -115,24 +151,33 @@ function parseArgs(args: string[]): { command: string; source: string; options: 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
 
-    if (arg === 'compile' || arg === 'check' || arg === 'watch') {
+    if (arg === 'compile' || arg === 'check' || arg === 'watch' || arg === 'lint') {
       command = arg
       if (arg === 'watch') {
-        options.watch = true
+        compileOptions.watch = true
         command = 'compile'
       }
     } else if (arg === '-o' || arg === '--output') {
-      options.output = args[++i]
+      compileOptions.output = args[++i]
     } else if (arg === '-n' || arg === '--name') {
-      options.name = args[++i]
+      compileOptions.name = args[++i]
     } else if (arg === '-m' || arg === '--minify') {
-      options.minify = true
+      compileOptions.minify = true
     } else if (arg === '-w' || arg === '--watch') {
-      options.watch = true
+      compileOptions.watch = true
     } else if (arg === '-v' || arg === '--verbose') {
-      options.verbose = true
+      compileOptions.verbose = true
     } else if (arg === '-e' || arg === '--ext') {
-      options.extensions = args[++i].split(',').map(e => e.startsWith('.') ? e : `.${e}`)
+      const exts = args[++i].split(',').map(e => e.startsWith('.') ? e : `.${e}`)
+      compileOptions.extensions = exts
+      lintOptions.extensions = exts
+    } else if (arg === '--ai') {
+      lintOptions.ai = true
+    } else if (arg.startsWith('--ai=')) {
+      lintOptions.ai = true
+      lintOptions.aiProvider = arg.split('=')[1] as LintCliOptions['aiProvider']
+    } else if (arg.startsWith('--format=')) {
+      lintOptions.format = arg.split('=')[1] as 'text' | 'json'
     } else if (arg === '--help' || arg === '-h') {
       printHelp()
       process.exit(0)
@@ -144,7 +189,7 @@ function parseArgs(args: string[]): { command: string; source: string; options: 
     }
   }
 
-  return { command, source, options }
+  return { command, source, compileOptions, lintOptions }
 }
 
 function createTemplateLoader(baseDir: string, extensions: string[]): TemplateLoader {
@@ -415,6 +460,147 @@ async function watchAndCompile(sourceDir: string, outputDir: string, options: Co
   })
 }
 
+// Lint templates
+async function lintTemplates(sourcePath: string, isDirectory: boolean, options: LintCliOptions) {
+  type LintResult = {
+    valid: boolean
+    errors: Array<{ line: number; type: string; severity: string; message: string; suggestion?: string }>
+    warnings: Array<{ line: number; type: string; severity: string; message: string; suggestion?: string }>
+    suggestions: Array<{ line: number; type: string; severity: string; message: string; suggestion?: string }>
+    provider?: string
+    duration?: number
+  }
+
+  // Dynamic import of AI module (optional dependency)
+  let lintFn: (template: string, opts?: any) => Promise<LintResult>
+  let syntaxCheckFn: (template: string) => LintResult
+
+  if (options.ai) {
+    try {
+      const aiModule = await import('./ai')
+      lintFn = aiModule.lint
+      syntaxCheckFn = aiModule.syntaxCheck
+    } catch (e: any) {
+      error('AI lint requires the AI module.')
+      error('Make sure you have an AI provider configured:')
+      error('  - ANTHROPIC_API_KEY + bun add @anthropic-ai/sdk')
+      error('  - OPENAI_API_KEY + bun add openai')
+      error('  - GROQ_API_KEY')
+      error('  - Ollama running locally')
+      process.exit(1)
+    }
+  } else {
+    // Syntax-only check
+    syntaxCheckFn = (template: string): LintResult => {
+      try {
+        const lexer = new Lexer(template)
+        const tokens = lexer.tokenize()
+        const parser = new Parser(tokens, template)
+        parser.parse()
+        return { valid: true, errors: [], warnings: [], suggestions: [] }
+      } catch (e: any) {
+        return {
+          valid: false,
+          errors: [{ line: e.line || 1, type: 'syntax', severity: 'error', message: e.message }],
+          warnings: [],
+          suggestions: [],
+        }
+      }
+    }
+    lintFn = async (template: string) => syntaxCheckFn(template)
+  }
+
+  const files: string[] = []
+
+  if (isDirectory) {
+    function walkDir(dir: string) {
+      const entries = fs.readdirSync(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walkDir(fullPath)
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name)
+          if (options.extensions.includes(ext)) {
+            files.push(fullPath)
+          }
+        }
+      }
+    }
+    walkDir(sourcePath)
+  } else {
+    files.push(sourcePath)
+  }
+
+  let totalErrors = 0
+  let totalWarnings = 0
+  let totalSuggestions = 0
+
+  const allResults: Array<{ file: string; result: LintResult }> = []
+
+  for (const file of files) {
+    const source = fs.readFileSync(file, 'utf-8')
+    const result = await lintFn(source, {
+      provider: options.aiProvider || 'auto',
+    })
+
+    allResults.push({ file, result })
+    totalErrors += result.errors.length
+    totalWarnings += result.warnings.length
+    totalSuggestions += result.suggestions.length
+  }
+
+  // Output
+  if (options.format === 'json') {
+    console.log(JSON.stringify(allResults, null, 2))
+  } else {
+    for (const { file, result } of allResults) {
+      const relativePath = path.relative(process.cwd(), file)
+      const issues = [...result.errors, ...result.warnings, ...result.suggestions]
+
+      if (issues.length === 0) continue
+
+      log('')
+      log(`  ${colors.cyan}${relativePath}${colors.reset}`)
+      log('')
+
+      for (const issue of issues) {
+        const icon = issue.severity === 'error' ? colors.red + '✗' :
+                     issue.severity === 'warning' ? colors.yellow + '⚠' :
+                     colors.dim + '💡'
+        const typeColor = issue.type === 'security' ? colors.red :
+                         issue.type === 'performance' ? colors.yellow :
+                         colors.dim
+
+        log(`  ${icon}${colors.reset}  L${issue.line.toString().padEnd(4)} ${typeColor}${issue.type.padEnd(14)}${colors.reset} ${issue.message}`)
+        if (issue.suggestion) {
+          log(`                            ${colors.dim}→ ${issue.suggestion}${colors.reset}`)
+        }
+      }
+    }
+
+    log('')
+    if (totalErrors === 0 && totalWarnings === 0 && totalSuggestions === 0) {
+      success(`${files.length} template(s) checked, no issues found`)
+    } else {
+      const parts: string[] = []
+      if (totalErrors > 0) parts.push(`${colors.red}${totalErrors} error(s)${colors.reset}`)
+      if (totalWarnings > 0) parts.push(`${colors.yellow}${totalWarnings} warning(s)${colors.reset}`)
+      if (totalSuggestions > 0) parts.push(`${totalSuggestions} suggestion(s)`)
+
+      log(`  ${files.length} template(s): ${parts.join(', ')}`)
+
+      if (allResults[0]?.result.provider) {
+        log(`  ${colors.dim}AI provider: ${allResults[0].result.provider}${colors.reset}`)
+      }
+    }
+  }
+
+  if (totalErrors > 0) {
+    process.exit(1)
+  }
+}
+
 // Main
 async function main() {
   const args = process.argv.slice(2)
@@ -424,10 +610,10 @@ async function main() {
     process.exit(0)
   }
 
-  const { command, source, options } = parseArgs(args)
+  const { command, source, compileOptions, lintOptions } = parseArgs(args)
 
   if (!command) {
-    error('No command specified. Use "compile" or "check".')
+    error('No command specified. Use "compile", "check", or "lint".')
     printHelp()
     process.exit(1)
   }
@@ -446,11 +632,13 @@ async function main() {
 
   const isDirectory = fs.statSync(sourcePath).isDirectory()
 
-  if (command === 'check') {
+  if (command === 'lint') {
+    await lintTemplates(sourcePath, isDirectory, lintOptions)
+  } else if (command === 'check') {
     if (isDirectory) {
-      await checkTemplates(sourcePath, options)
+      await checkTemplates(sourcePath, compileOptions)
     } else {
-      const loader = createTemplateLoader(path.dirname(sourcePath), options.extensions)
+      const loader = createTemplateLoader(path.dirname(sourcePath), compileOptions.extensions)
       const src = fs.readFileSync(sourcePath, 'utf-8')
       const ast = loader.parse(src)
       const check = canFlatten(ast)
@@ -462,22 +650,22 @@ async function main() {
       }
     }
   } else if (command === 'compile') {
-    if (!options.output) {
+    if (!compileOptions.output) {
       error('Output directory required. Use -o <dir>')
       process.exit(1)
     }
 
-    const outputDir = path.resolve(options.output)
+    const outputDir = path.resolve(compileOptions.output)
 
-    if (options.watch) {
+    if (compileOptions.watch) {
       if (!isDirectory) {
         error('Watch mode requires a directory, not a single file.')
         process.exit(1)
       }
-      await watchAndCompile(sourcePath, outputDir, options)
+      await watchAndCompile(sourcePath, outputDir, compileOptions)
     } else if (isDirectory) {
       const startTime = Date.now()
-      const { compiled, failed } = await compileDirectory(sourcePath, outputDir, options)
+      const { compiled, failed } = await compileDirectory(sourcePath, outputDir, compileOptions)
       const elapsed = Date.now() - startTime
 
       log('')
@@ -487,7 +675,7 @@ async function main() {
         warn(`Compiled ${compiled} templates, ${failed} failed (${elapsed}ms)`)
       }
     } else {
-      const result = await compileFile(sourcePath, outputDir, path.dirname(sourcePath), options)
+      const result = await compileFile(sourcePath, outputDir, path.dirname(sourcePath), compileOptions)
 
       if (result.success) {
         success(`Compiled to ${result.outputPath}`)

@@ -708,7 +708,7 @@ debugOptions: {
 
 ## CLI Tool
 
-Binja includes a CLI for template pre-compilation:
+Binja includes a CLI for template pre-compilation and linting:
 
 ```bash
 # Compile all templates to JavaScript
@@ -719,6 +719,15 @@ binja check ./templates
 
 # Watch mode for development
 binja watch ./templates -o ./dist
+
+# Lint templates (syntax check)
+binja lint ./templates
+
+# Lint with AI analysis (requires API key)
+binja lint ./templates --ai
+
+# Lint with specific AI provider
+binja lint ./templates --ai=ollama
 ```
 
 ### Pre-compiled Templates
@@ -729,6 +738,104 @@ import { render } from './dist/home.js'
 
 const html = render({ title: 'Home', items: [...] })
 ```
+
+---
+
+## AI-Powered Linting (Optional)
+
+Binja includes an optional AI-powered linting module that detects security issues, performance problems, accessibility concerns, and best practice violations.
+
+### Installation
+
+The AI module is opt-in. Install the SDK for your preferred provider:
+
+```bash
+# For Claude (Anthropic)
+bun add @anthropic-ai/sdk
+
+# For OpenAI
+bun add openai
+
+# For Ollama (local) - no package needed
+# For Groq - no package needed
+```
+
+### Configuration
+
+Set the API key for your provider:
+
+```bash
+# Anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# OpenAI
+export OPENAI_API_KEY=sk-...
+
+# Groq (free tier available)
+export GROQ_API_KEY=gsk_...
+
+# Ollama - no key needed, just run: ollama serve
+```
+
+### Usage
+
+#### CLI
+
+```bash
+# Lint with AI (auto-detect provider)
+binja lint ./templates --ai
+
+# Use specific provider
+binja lint ./templates --ai=anthropic
+binja lint ./templates --ai=openai
+binja lint ./templates --ai=ollama
+binja lint ./templates --ai=groq
+
+# JSON output for CI/CD
+binja lint ./templates --ai --format=json
+```
+
+#### Programmatic
+
+```typescript
+import { lint } from 'binja/ai'
+
+// Auto-detect provider from environment
+const result = await lint(template)
+
+// Specify provider and API key directly
+const result = await lint(template, {
+  provider: 'anthropic',
+  apiKey: 'sk-ant-...',
+  model: 'claude-sonnet-4-20250514'
+})
+
+// Check results
+console.log(result.errors)      // Syntax errors
+console.log(result.warnings)    // Security, performance issues
+console.log(result.suggestions) // Best practice recommendations
+console.log(result.provider)    // Which AI was used
+```
+
+### What It Detects
+
+| Category | Examples |
+|----------|----------|
+| **Security** | XSS vulnerabilities, `\|safe` on user input, sensitive data exposure |
+| **Performance** | Heavy filters in loops, repeated calculations |
+| **Accessibility** | Missing alt text, forms without labels |
+| **Best Practices** | `{% for %}` without `{% empty %}`, deep nesting |
+
+### Provider Comparison
+
+| Provider | API Key | Speed | Cost |
+|----------|---------|-------|------|
+| **Anthropic** | `ANTHROPIC_API_KEY` | Fast | Paid |
+| **OpenAI** | `OPENAI_API_KEY` | Fast | Paid |
+| **Groq** | `GROQ_API_KEY` | Very Fast | Free tier |
+| **Ollama** | None (local) | Varies | Free |
+
+Auto-detect priority: Anthropic → OpenAI → Groq → Ollama
 
 ---
 
