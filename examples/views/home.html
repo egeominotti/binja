@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} - {{ siteName }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 0; text-align: center; }
+    header h1 { font-size: 3rem; margin-bottom: 10px; }
+    header p { font-size: 1.25rem; opacity: 0.9; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; padding: 60px 0; }
+    .feature { background: #f8f9fa; border-radius: 10px; padding: 30px; text-align: center; }
+    .feature .icon { font-size: 3rem; margin-bottom: 15px; }
+    .feature h3 { margin-bottom: 10px; color: #667eea; }
+    footer { background: #333; color: white; padding: 20px 0; text-align: center; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>{{ hero.heading }}</h1>
+      <p>{{ hero.subheading }}</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="features">
+      {% for feature in features %}
+      <div class="feature">
+        <div class="icon">{{ feature.icon }}</div>
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.description }}</p>
+      </div>
+      {% endfor %}
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; {{ year }} {{ siteName }}. Powered by binja.</p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} - {{ siteName }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    nav { background: #333; padding: 15px 0; }
+    nav .container { display: flex; justify-content: space-between; align-items: center; }
+    nav a { color: white; text-decoration: none; margin-left: 20px; }
+    nav a:hover { color: #667eea; }
+    .brand { font-weight: bold; font-size: 1.25rem; color: white !important; margin-left: 0 !important; }
+    .layout { display: grid; grid-template-columns: 1fr 300px; gap: 30px; margin-top: 30px; }
+    .featured { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 12px; margin-bottom: 30px; }
+    .featured h2 { font-size: 2rem; margin-bottom: 10px; }
+    .featured .meta { opacity: 0.8; }
+    .posts { display: grid; gap: 20px; }
+    .post { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .post h3 { margin-bottom: 10px; }
+    .post h3 a { color: #333; text-decoration: none; }
+    .post h3 a:hover { color: #667eea; }
+    .post .meta { color: #666; font-size: 0.875rem; }
+    .sidebar { background: #f8f9fa; padding: 20px; border-radius: 8px; height: fit-content; }
+    .sidebar h4 { margin-bottom: 15px; color: #333; }
+    .sidebar ul { list-style: none; }
+    .sidebar li { margin-bottom: 10px; }
+    .sidebar a { color: #667eea; text-decoration: none; }
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag { background: #667eea; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="/" class="brand">{{ siteName }}</a>
+      <div>
+        {% for item in navigation %}
+        <a href="{{ item.href }}">{{ item.label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="layout">
+      <div>
+        {% if featured %}
+        <article class="featured">
+          <h2>{{ featured.title }}</h2>
+          <p class="meta">By {{ featured.author }} • {{ featured.views }} views</p>
+        </article>
+        {% endif %}
+
+        <div class="posts">
+          {% for post in recentPosts %}
+          <article class="post">
+            <h3><a href="/blog/{{ post.id }}">{{ post.title }}</a></h3>
+            <p class="meta">By {{ post.author }} • {{ post.views }} views</p>
+          </article>
+          {% endfor %}
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <h4>Categories</h4>
+        <ul>
+          {% for cat in sidebar.categories %}
+          <li><a href="/categories/{{ cat.slug }}">{{ cat.name }} ({{ cat.count }})</a></li>
+          {% endfor %}
+        </ul>
+
+        <h4 style="margin-top: 25px;">Popular Tags</h4>
+        <div class="tags">
+          {% for tag in sidebar.popularTags %}
+          <span class="tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>

@@ -7,9 +7,9 @@
 <p align="center">
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •
-  <a href="#features">Features</a> •
-  <a href="#benchmarks">Benchmarks</a> •
-  <a href="#filters">Filters</a>
+  <a href="#framework-adapters">Hono/Elysia</a> •
+  <a href="#multi-engine-support">Multi-Engine</a> •
+  <a href="#filters-84-built-in">Filters</a>
 </p>
 
 <p align="center">
@@ -27,7 +27,8 @@
 |---------|-----------|------------------|
 | **Runtime Performance** | ✅ 2-4x faster | ❌ |
 | **AOT Compilation** | ✅ 160x faster | ❌ |
-| **Multi-Engine** | ✅ Jinja2, Handlebars, Liquid | ❌ |
+| **Multi-Engine** | ✅ Jinja2, Handlebars, Liquid, Twig | ❌ |
+| **Framework Adapters** | ✅ Hono, Elysia | ❌ |
 | Django DTL Compatible | ✅ 100% | ❌ Partial |
 | Jinja2 Compatible | ✅ Full | ⚠️ Limited |
 | Template Inheritance | ✅ | ⚠️ |
@@ -430,6 +431,7 @@ Binja supports multiple template engines through a unified API. All engines pars
 | **Jinja2/DTL** | `{{ var }}` `{% if %}` | Default, Python/Django compatibility |
 | **Handlebars** | `{{var}}` `{{#if}}` | JavaScript ecosystem, Ember.js |
 | **Liquid** | `{{ var }}` `{% if %}` | Shopify, Jekyll, static sites |
+| **Twig** | `{{ var }}` `{% if %}` | PHP/Symfony, Drupal, Craft CMS |
 
 ### Usage
 
@@ -437,6 +439,7 @@ Binja supports multiple template engines through a unified API. All engines pars
 // Direct engine imports
 import * as handlebars from 'binja/engines/handlebars'
 import * as liquid from 'binja/engines/liquid'
+import * as twig from 'binja/engines/twig'
 
 // Handlebars
 await handlebars.render('Hello {{name}}!', { name: 'World' })
@@ -447,6 +450,11 @@ await handlebars.render('{{{html}}}', { html: '<b>unescaped</b>' })
 await liquid.render('Hello {{ name }}!', { name: 'World' })
 await liquid.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b'] })
 await liquid.render('{% assign x = "value" %}{{ x }}', {})
+
+// Twig (Symfony)
+await twig.render('Hello {{ name }}!', { name: 'World' })
+await twig.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b'] })
+await twig.render('{{ name|upper }}', { name: 'world' })
 ```
 
 ### MultiEngine API
@@ -459,26 +467,117 @@ const engine = new MultiEngine()
 // Render with any engine
 await engine.render('Hello {{name}}!', { name: 'World' }, 'handlebars')
 await engine.render('Hello {{ name }}!', { name: 'World' }, 'liquid')
+await engine.render('Hello {{ name }}!', { name: 'World' }, 'twig')
 await engine.render('Hello {{ name }}!', { name: 'World' }, 'jinja2')
 
 // Auto-detect from file extension
 import { detectEngine } from 'binja/engines'
-const eng = detectEngine('template.hbs')  // Returns Handlebars engine
-const eng2 = detectEngine('page.liquid')  // Returns Liquid engine
+const eng = detectEngine('template.hbs')     // Returns Handlebars engine
+const eng2 = detectEngine('page.liquid')     // Returns Liquid engine
+const eng3 = detectEngine('page.twig')       // Returns Twig engine
 ```
 
 ### Engine Feature Matrix
 
-| Feature | Jinja2 | Handlebars | Liquid |
-|---------|--------|------------|--------|
-| Variables | `{{ x }}` | `{{x}}` | `{{ x }}` |
-| Conditionals | `{% if %}` | `{{#if}}` | `{% if %}` |
-| Loops | `{% for %}` | `{{#each}}` | `{% for %}` |
-| Filters | `{{ x\|filter }}` | `{{ x }}` | `{{ x \| filter }}` |
-| Raw output | `{% raw %}` | - | `{% raw %}` |
-| Comments | `{# #}` | `{{! }}` | `{% comment %}` |
-| Assignment | `{% set %}` | - | `{% assign %}` |
-| Unescaped | `{{ x\|safe }}` | `{{{x}}}` | - |
+| Feature | Jinja2 | Handlebars | Liquid | Twig |
+|---------|--------|------------|--------|------|
+| Variables | `{{ x }}` | `{{x}}` | `{{ x }}` | `{{ x }}` |
+| Conditionals | `{% if %}` | `{{#if}}` | `{% if %}` | `{% if %}` |
+| Loops | `{% for %}` | `{{#each}}` | `{% for %}` | `{% for %}` |
+| Filters | `{{ x\|filter }}` | `{{ x }}` | `{{ x \| filter }}` | `{{ x\|filter }}` |
+| Raw output | `{% raw %}` | - | `{% raw %}` | `{% raw %}` |
+| Comments | `{# #}` | `{{! }}` | `{% comment %}` | `{# #}` |
+| Assignment | `{% set %}` | - | `{% assign %}` | `{% set %}` |
+| Unescaped | `{{ x\|safe }}` | `{{{x}}}` | - | `{{ x\|raw }}` |
+
+---
+
+## Framework Adapters
+
+Binja provides first-class integration with Bun's most popular web frameworks.
+
+### Hono
+
+```typescript
+import { Hono } from 'hono'
+import { binja } from 'binja/hono'
+
+const app = new Hono()
+
+// Add binja middleware
+app.use(binja({
+  root: './views',           // Template directory
+  extension: '.html',        // Default extension
+  engine: 'jinja2',          // jinja2 | handlebars | liquid | twig
+  cache: true,               // Cache compiled templates
+  globals: { siteName: 'My App' },  // Global context
+  layout: 'layouts/base',    // Optional layout template
+}))
+
+// Render templates with c.render()
+app.get('/', (c) => c.render('index', { title: 'Home' }))
+app.get('/users/:id', async (c) => {
+  const user = await getUser(c.req.param('id'))
+  return c.render('users/profile', { user })
+})
+
+export default app
+```
+
+### Elysia
+
+```typescript
+import { Elysia } from 'elysia'
+import { binja } from 'binja/elysia'
+
+const app = new Elysia()
+  // Add binja plugin
+  .use(binja({
+    root: './views',
+    extension: '.html',
+    engine: 'jinja2',
+    cache: true,
+    globals: { siteName: 'My App' },
+    layout: 'layouts/base',
+  }))
+  // Render templates with render()
+  .get('/', ({ render }) => render('index', { title: 'Home' }))
+  .get('/users/:id', async ({ render, params }) => {
+    const user = await getUser(params.id)
+    return render('users/profile', { user })
+  })
+  .listen(3000)
+
+console.log('Server running at http://localhost:3000')
+```
+
+### Adapter Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `root` | `string` | `./views` | Template directory |
+| `extension` | `string` | `.html` | Default file extension |
+| `engine` | `string` | `jinja2` | Template engine (`jinja2`, `handlebars`, `liquid`, `twig`) |
+| `cache` | `boolean` | `true` (prod) | Cache compiled templates |
+| `debug` | `boolean` | `false` | Show error details |
+| `globals` | `object` | `{}` | Global context variables |
+| `layout` | `string` | - | Layout template path |
+| `contentVar` | `string` | `content` | Content variable name in layout |
+
+### Cache Management
+
+```typescript
+import { clearCache, getCacheStats } from 'binja/hono'
+// or
+import { clearCache, getCacheStats } from 'binja/elysia'
+
+// Clear all cached templates
+clearCache()
+
+// Get cache statistics
+const stats = getCacheStats()
+console.log(stats) // { size: 10, keys: ['jinja2:./views/index.html', ...] }
+```
 
 ---
 

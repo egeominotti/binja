@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} - {{ siteName }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: #f5f5f5; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    h1 { margin-bottom: 20px; }
+    .filters { margin-bottom: 20px; }
+    .filters a { margin-right: 15px; color: #667eea; text-decoration: none; padding: 8px 16px; border-radius: 4px; background: white; }
+    .filters a:hover, .filters a.active { background: #667eea; color: white; }
+    .products { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .product { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .product h3 { margin-bottom: 10px; }
+    .price { font-size: 1.5rem; font-weight: bold; color: #667eea; margin-bottom: 10px; }
+    .stock { font-size: 0.875rem; padding: 4px 8px; border-radius: 4px; }
+    .in-stock { background: #d4edda; color: #155724; }
+    .out-of-stock { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>{{ title }}</h1>
+
+    <div class="filters">
+      <a href="/products" {% if not filter %}class="active"{% endif %}>All</a>
+      <a href="/products?inStock=true" {% if filter == 'true' %}class="active"{% endif %}>In Stock</a>
+    </div>
+
+    <div class="products">
+      {% for product in products %}
+      <div class="product">
+        <h3>{{ product.name }}</h3>
+        <div class="price">${{ product.price }}</div>
+        {% if product.inStock %}
+        <span class="stock in-stock">In Stock</span>
+        {% else %}
+        <span class="stock out-of-stock">Out of Stock</span>
+        {% endif %}
+      </div>
+      {% empty %}
+      <p>No products found.</p>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>
