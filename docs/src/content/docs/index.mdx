@@ -3,7 +3,7 @@ title: binja
 description: High-performance Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT.
 template: splash
 hero:
-  tagline: High-performance Jinja2/Django template engine for Bun
+  tagline: The fastest Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT compilation.
   image:
     file: ../../assets/logo.svg
   actions:
@@ -14,9 +14,10 @@ hero:
     - text: View on GitHub
       link: https://github.com/egeominotti/binja
       icon: external
+      variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## Why binja?
 
@@ -43,18 +44,45 @@ bun add binja
 
 ## Quick Example
 
-```typescript
-import { render, compile } from 'binja'
+<Tabs>
+  <TabItem label="Runtime Mode">
+    ```typescript
+    import { render } from 'binja'
 
-// Runtime mode (development)
-const html = await render('Hello, {{ name|upper }}!', { name: 'world' })
-// Output: Hello, WORLD!
+    // Simple and fast for development
+    const html = await render('Hello, {{ name|upper }}!', { name: 'world' })
+    // Output: Hello, WORLD!
+    ```
+  </TabItem>
+  <TabItem label="AOT Mode">
+    ```typescript
+    import { compile } from 'binja'
 
-// AOT mode (production) - 160x faster
-const template = compile('<h1>{{ title }}</h1>')
-const html = template({ title: 'Welcome' })
-// Output: <h1>Welcome</h1>
-```
+    // Compile once at startup
+    const template = compile('<h1>{{ title }}</h1>')
+
+    // Use many times - sync and extremely fast
+    const html = template({ title: 'Welcome' })
+    // Output: <h1>Welcome</h1>
+    ```
+  </TabItem>
+  <TabItem label="Environment">
+    ```typescript
+    import { Environment } from 'binja'
+
+    const env = new Environment({
+      templates: './views',
+      cache: true,
+    })
+
+    // Render template files with inheritance
+    const html = await env.render('pages/home.html', {
+      title: 'Home',
+      user: { name: 'John' }
+    })
+    ```
+  </TabItem>
+</Tabs>
 
 ## Performance
 
@@ -65,15 +93,58 @@ const html = template({ title: 'Welcome' })
 | HTML Escaping | 985K ops/s | 242K ops/s | **4.1x** |
 | **AOT vs Nunjucks** | 14.3M ops/s | 96K ops/s | **160x** |
 
+## Framework Adapters
+
+<Tabs>
+  <TabItem label="Hono">
+    ```typescript
+    import { Hono } from 'hono'
+    import { binja } from 'binja/hono'
+
+    const app = new Hono()
+    app.use(binja({ root: './views' }))
+    app.get('/', (c) => c.render('index', { title: 'Home' }))
+
+    export default app
+    ```
+  </TabItem>
+  <TabItem label="Elysia">
+    ```typescript
+    import { Elysia } from 'elysia'
+    import { binja } from 'binja/elysia'
+
+    const app = new Elysia()
+      .use(binja({ root: './views' }))
+      .get('/', ({ render }) => render('index', { title: 'Home' }))
+      .listen(3000)
+    ```
+  </TabItem>
+</Tabs>
+
 ## Feature Comparison
 
 | Feature | binja | Nunjucks | Pug |
 |---------|-------|----------|-----|
-| Jinja2 Compatible | Full | Partial | No |
-| Django DTL Compatible | Full | No | No |
-| Multi-Engine | Yes | No | No |
-| AOT Compilation | Yes | No | Yes |
-| Framework Adapters | Hono, Elysia | Express | Express |
+| Jinja2 Compatible | ✅ Full | ⚠️ Partial | ❌ No |
+| Django DTL Compatible | ✅ Full | ❌ No | ❌ No |
+| Multi-Engine | ✅ Yes | ❌ No | ❌ No |
+| AOT Compilation | ✅ Yes | ❌ No | ✅ Yes |
+| Framework Adapters | ✅ Hono, Elysia | Express | Express |
 | Built-in Filters | 84 | 40 | 30 |
-| Debug Panel | Yes | No | No |
-| AI Linting | Yes | No | No |
+| Debug Panel | ✅ Yes | ❌ No | ❌ No |
+| AI Linting | ✅ Yes | ❌ No | ❌ No |
+
+## Ready to get started?
+
+<CardGrid>
+  <Card title="Installation" icon="laptop">
+    Get binja installed in your project in seconds.
+
+    [Install binja →](/binja/guide/installation/)
+  </Card>
+  <Card title="Quick Start" icon="open-book">
+    Learn the basics and build your first template.
+
+    [Read the guide →](/binja/guide/quickstart/)
+  </Card>
+</CardGrid>

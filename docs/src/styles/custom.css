@@ -11,7 +11,11 @@
   --sl-color-gray-4: #94a3b8;
   --sl-color-gray-5: #64748b;
   --sl-color-gray-6: #475569;
+  --sl-color-black: #0f172a;
   --sl-font-system: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sl-text-h1: 2.5rem;
+  --sl-text-h2: 1.75rem;
+  --sl-text-h3: 1.25rem;
 }
 
 :root[data-theme='dark'] {
@@ -25,6 +29,7 @@
   --sl-color-gray-4: #64748b;
   --sl-color-gray-5: #94a3b8;
   --sl-color-gray-6: #cbd5e1;
+  --sl-color-black: #f8fafc;
 }
 
 /* Typography improvements */
@@ -183,4 +188,223 @@ table tr:hover {
 
 :root[data-theme='dark'] .warning-box {
   background: #78350f20;
+}
+
+/* Links */
+a:hover {
+  text-decoration: underline;
+}
+
+/* Site header */
+header.header {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Logo styling */
+.site-title img {
+  border-radius: 8px;
+}
+
+/* Search improvements */
+.search-input {
+  border-radius: 8px !important;
+}
+
+/* Sidebar navigation */
+nav.sidebar a {
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+nav.sidebar a:hover {
+  background-color: var(--sl-color-gray-1);
+}
+
+nav.sidebar a[aria-current="page"] {
+  background-color: var(--sl-color-accent-low);
+  color: var(--sl-color-accent-high);
+  font-weight: 600;
+}
+
+/* Content area improvements */
+.content-panel {
+  max-width: 65ch;
+}
+
+/* Headings */
+h1, h2, h3, h4 {
+  scroll-margin-top: 5rem;
+}
+
+h1 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-weight: 600;
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--sl-color-gray-2);
+}
+
+h3 {
+  font-weight: 600;
+  margin-top: 1.5rem;
+}
+
+/* Inline code */
+:not(pre) > code {
+  background: var(--sl-color-gray-1);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  color: var(--sl-color-accent);
+  border: 1px solid var(--sl-color-gray-2);
+}
+
+:root[data-theme='dark'] :not(pre) > code {
+  background: var(--sl-color-gray-2);
+}
+
+/* Code blocks */
+.expressive-code {
+  margin: 1.5rem 0;
+}
+
+.expressive-code .frame {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Copy button */
+.expressive-code .copy button {
+  border-radius: 6px;
+}
+
+/* Tables responsive */
+.sl-markdown-content > table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .sl-markdown-content > table {
+    display: table;
+    white-space: normal;
+  }
+}
+
+/* Cards on homepage */
+.card-grid {
+  gap: 1rem;
+}
+
+.card {
+  border-radius: 12px;
+  border: 1px solid var(--sl-color-gray-2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+/* Starlight aside/callout improvements */
+.starlight-aside {
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}
+
+.starlight-aside--tip {
+  border-left-color: var(--sl-color-accent);
+}
+
+/* Pagination nav */
+.pagination-links a {
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.pagination-links a:hover {
+  border-color: var(--sl-color-accent);
+}
+
+/* TOC (Table of Contents) */
+starlight-toc a {
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+starlight-toc a:hover {
+  color: var(--sl-color-accent);
+}
+
+/* Mobile improvements */
+@media (max-width: 768px) {
+  :root {
+    --sl-text-h1: 2rem;
+    --sl-text-h2: 1.5rem;
+  }
+
+  .hero {
+    padding: 2rem 1rem;
+  }
+
+  table {
+    font-size: 0.875rem;
+  }
+
+  table th,
+  table td {
+    padding: 0.5rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  header.header,
+  nav.sidebar,
+  .pagination-links,
+  starlight-toc {
+    display: none !important;
+  }
+
+  main {
+    max-width: 100% !important;
+  }
+}
+
+/* Focus styles for accessibility */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 2px;
+}
+
+/* Selection color */
+::selection {
+  background: var(--sl-color-accent);
+  color: white;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

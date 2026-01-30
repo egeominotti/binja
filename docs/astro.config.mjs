@@ -147,7 +147,16 @@ export default defineConfig({
           ],
         },
       ],
+      favicon: '/favicon.svg',
       head: [
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'icon',
+            href: '/binja/favicon.svg',
+            type: 'image/svg+xml',
+          },
+        },
         {
           tag: 'meta',
           attrs: {
