@@ -1,0 +1,122 @@
+---
+title: Benchmarks
+description: Detailed performance benchmarks comparing binja to other template engines
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+All benchmarks run on Mac Studio M1 Max, Bun 1.3.5.
+
+## Two Rendering Modes
+
+<CardGrid stagger>
+  <Card title="Runtime Mode" icon="rocket">
+    `render()` - Best for development and templates with dynamic inheritance. **2-4x faster** than Nunjucks.
+  </Card>
+  <Card title="AOT Mode" icon="lightning">
+    `compile()` - Pre-compile templates to JavaScript functions. **160x faster** than Nunjucks.
+  </Card>
+</CardGrid>
+
+## Runtime Performance vs Nunjucks
+
+| Benchmark | binja | Nunjucks | Speedup |
+|-----------|-------|----------|---------|
+| Simple Template | 371K ops/s | 96K ops/s | **3.9x** |
+| Complex Template | 44K ops/s | 23K ops/s | **2.0x** |
+| Multiple Filters | 246K ops/s | 63K ops/s | **3.9x** |
+| Nested Loops | 76K ops/s | 26K ops/s | **3.0x** |
+| Conditionals | 84K ops/s | 25K ops/s | **3.4x** |
+| HTML Escaping | 985K ops/s | 242K ops/s | **4.1x** |
+| Large Dataset | 9.6K ops/s | 6.6K ops/s | **1.5x** |
+
+## AOT Compilation Performance
+
+AOT compilation provides massive speedups by pre-compiling templates to optimized JavaScript functions:
+
+| Benchmark | binja AOT | binja Runtime | Speedup |
+|-----------|-----------|---------------|---------|
+| Simple Template | **14.3M ops/s** | 371K ops/s | 39x |
+| Complex Template | **1.07M ops/s** | 44K ops/s | 24x |
+| Nested Loops | **1.75M ops/s** | 76K ops/s | 23x |
+
+### vs Nunjucks
+
+| Benchmark | binja AOT | Nunjucks | Speedup |
+|-----------|-----------|----------|---------|
+| Simple Template | 14.3M ops/s | 96K ops/s | **160x** |
+| Complex Template | 1.07M ops/s | 23K ops/s | **46x** |
+
+## Why binja is Faster
+
+### 1. Pure TypeScript for Bun
+
+binja is built from scratch in TypeScript, optimized specifically for the Bun runtime. No legacy code or Node.js compatibility layers.
+
+### 2. Inline Filter Optimization
+
+~70 common filters have inline implementations to avoid function call overhead:
+
+```typescript
+// Instead of:
+filters['upper'](value)
+
+// binja does:
+value.toUpperCase()
+```
+
+This provides 10-15% speedup on filter-heavy templates.
+
+### 3. AOT Compilation
+
+Pre-compiling templates eliminates:
+- Lexing overhead
+- Parsing overhead
+- AST traversal
+- Filter lookup
+
+```typescript
+// Compile once at startup
+const template = compile('<h1>{{ title|upper }}</h1>')
+
+// Renders in microseconds
+const html = template({ title: 'hello' })
+```
+
+### 4. Efficient AST Representation
+
+binja's AST is optimized for fast traversal and minimal memory allocation.
+
+## Running Benchmarks
+
+```bash
+# Clone the repo
+git clone https://github.com/egeominotti/binja.git
+cd binja
+
+# Install dependencies
+bun install
+
+# Run benchmarks
+bun run benchmark
+```
+
+## Production Recommendations
+
+1. **Use AOT in Production** - `compile()` for static templates
+2. **Pre-compile at Startup** - Compile templates once, use many times
+3. **Enable Caching** - Use `cache: true` in Environment
+4. **Monitor Cache** - Use `env.cacheStats()` to optimize `cacheMaxSize`
+
+```typescript
+import { compile } from 'binja'
+
+// Best practice: compile at startup
+const templates = {
+  home: compile(await Bun.file('./views/home.html').text()),
+  user: compile(await Bun.file('./views/user.html').text()),
+}
+
+// Sync rendering, extremely fast
+app.get('/', () => templates.home({ title: 'Home' }))
+```

@@ -1,0 +1,79 @@
+---
+title: binja
+description: High-performance Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT.
+template: splash
+hero:
+  tagline: High-performance Jinja2/Django template engine for Bun
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Get Started
+      link: /binja/guide/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/egeominotti/binja
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why binja?
+
+<CardGrid stagger>
+  <Card title="2-4x Faster Runtime" icon="rocket">
+    Pure TypeScript implementation optimized for Bun. Consistently outperforms Nunjucks in every benchmark.
+  </Card>
+  <Card title="160x Faster AOT" icon="lightning">
+    Pre-compile templates to JavaScript functions for maximum production performance.
+  </Card>
+  <Card title="Multi-Engine Support" icon="puzzle">
+    Jinja2, Handlebars, Liquid, and Twig - all through a unified API with shared filters.
+  </Card>
+  <Card title="84 Built-in Filters" icon="setting">
+    Complete Jinja2 + Django filter set. String, number, date, list, URL, and more.
+  </Card>
+</CardGrid>
+
+## Quick Install
+
+```bash
+bun add binja
+```
+
+## Quick Example
+
+```typescript
+import { render, compile } from 'binja'
+
+// Runtime mode (development)
+const html = await render('Hello, {{ name|upper }}!', { name: 'world' })
+// Output: Hello, WORLD!
+
+// AOT mode (production) - 160x faster
+const template = compile('<h1>{{ title }}</h1>')
+const html = template({ title: 'Welcome' })
+// Output: <h1>Welcome</h1>
+```
+
+## Performance
+
+| Benchmark | binja | Nunjucks | Speedup |
+|-----------|-------|----------|---------|
+| Simple Template | 371K ops/s | 96K ops/s | **3.9x** |
+| Complex Template | 44K ops/s | 23K ops/s | **2.0x** |
+| HTML Escaping | 985K ops/s | 242K ops/s | **4.1x** |
+| **AOT vs Nunjucks** | 14.3M ops/s | 96K ops/s | **160x** |
+
+## Feature Comparison
+
+| Feature | binja | Nunjucks | Pug |
+|---------|-------|----------|-----|
+| Jinja2 Compatible | Full | Partial | No |
+| Django DTL Compatible | Full | No | No |
+| Multi-Engine | Yes | No | No |
+| AOT Compilation | Yes | No | Yes |
+| Framework Adapters | Hono, Elysia | Express | Express |
+| Built-in Filters | 84 | 40 | 30 |
+| Debug Panel | Yes | No | No |
+| AI Linting | Yes | No | No |
