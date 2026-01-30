@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGrad)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="1100" cy="100" r="200" fill="#10b981" opacity="0.1"/>
+  <circle cx="100" cy="530" r="150" fill="#10b981" opacity="0.1"/>
+
+  <!-- Logo container -->
+  <rect x="80" y="80" width="100" height="100" rx="24" fill="url(#accentGrad)"/>
+
+  <!-- Ninja head in logo -->
+  <ellipse cx="130" cy="130" rx="25" ry="27" fill="#1f2937"/>
+  <rect x="102" y="120" width="56" height="16" rx="3" fill="#111827"/>
+  <ellipse cx="118" cy="128" rx="6" ry="4" fill="#ffffff"/>
+  <ellipse cx="142" cy="128" rx="6" ry="4" fill="#ffffff"/>
+  <circle cx="120" cy="128" r="2" fill="#111827"/>
+  <circle cx="144" cy="128" r="2" fill="#111827"/>
+
+  <!-- binja text -->
+  <text x="200" y="145" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="700" fill="#ffffff">binja</text>
+
+  <!-- Section icon - puzzle -->
+  <g transform="translate(80, 220)">
+    <rect width="80" height="80" rx="16" fill="#10b981" opacity="0.2"/>
+    <text x="40" y="55" font-size="40" text-anchor="middle">🧩</text>
+  </g>
+
+  <!-- Section title -->
+  <text x="180" y="275" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="700" fill="#ffffff">Multi-Engine</text>
+
+  <!-- Section description -->
+  <text x="80" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">One API, multiple template engines. Use Handlebars,</text>
+  <text x="80" y="400" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Liquid, or Twig with binja's optimized runtime.</text>
+
+  <!-- Engine badges -->
+  <rect x="80" y="460" width="160" height="55" rx="10" fill="#f97316" opacity="0.2"/>
+  <text x="160" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#f97316" text-anchor="middle">Handlebars</text>
+
+  <rect x="260" y="460" width="130" height="55" rx="10" fill="#06b6d4" opacity="0.2"/>
+  <text x="325" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#06b6d4" text-anchor="middle">Liquid</text>
+
+  <rect x="410" y="460" width="110" height="55" rx="10" fill="#84cc16" opacity="0.2"/>
+  <text x="465" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#84cc16" text-anchor="middle">Twig</text>
+
+  <rect x="540" y="460" width="120" height="55" rx="10" fill="#10b981" opacity="0.2"/>
+  <text x="600" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#10b981" text-anchor="middle">Jinja2</text>
+
+  <!-- URL -->
+  <text x="80" y="580" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#64748b">egeominotti.github.io/binja/guide/multi-engine</text>
+</svg>
