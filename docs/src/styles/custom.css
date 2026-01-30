@@ -173,11 +173,25 @@ pre code {
   box-shadow: 0 8px 25px -5px rgba(16, 185, 129, 0.15) !important;
 }
 
-/* Starlight Cards */
+/* Starlight Cards - Remove stagger and align evenly */
+.card-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 1rem !important;
+}
+
 .card-grid > .card {
   background: var(--sl-color-bg-sidebar);
   border: 1px solid var(--sl-color-hairline);
   border-radius: 12px;
+  transform: none !important;
+  margin: 0 !important;
+}
+
+.card-grid > .card:nth-child(odd),
+.card-grid > .card:nth-child(even) {
+  transform: none !important;
+  margin-top: 0 !important;
 }
 
 .card-grid > .card:hover {
