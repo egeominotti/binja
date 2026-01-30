@@ -1,10 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#10b981"/>
       <stop offset="100%" style="stop-color:#059669"/>
     </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="28" fill="url(#grad)"/>
-  <text x="64" y="88" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="white" text-anchor="middle">b</text>
+
+  <!-- Background -->
+  <rect width="128" height="128" rx="28" fill="url(#bgGrad)"/>
+
+  <!-- Ninja head -->
+  <ellipse cx="64" cy="64" rx="32" ry="34" fill="#1f2937"/>
+
+  <!-- Ninja mask/bandana -->
+  <rect x="28" y="52" width="72" height="20" rx="4" fill="#111827"/>
+
+  <!-- Eyes -->
+  <ellipse cx="48" cy="62" rx="8" ry="5" fill="#ffffff"/>
+  <ellipse cx="80" cy="62" rx="8" ry="5" fill="#ffffff"/>
+
+  <!-- Eye pupils -->
+  <circle cx="50" cy="62" r="3" fill="#111827"/>
+  <circle cx="82" cy="62" r="3" fill="#111827"/>
+
+  <!-- Eye shine -->
+  <circle cx="51" cy="61" r="1" fill="#ffffff"/>
+  <circle cx="83" cy="61" r="1" fill="#ffffff"/>
+
+  <!-- Bandana knot/tails on right side -->
+  <path d="M96 56 Q108 50 112 58 Q108 54 100 58" fill="#111827"/>
+  <path d="M96 64 Q110 66 114 74 Q108 68 100 66" fill="#111827"/>
 </svg>
