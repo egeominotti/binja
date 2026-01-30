@@ -6,28 +6,58 @@
     </linearGradient>
   </defs>
 
+  <style>
+    @keyframes blink {
+      0%, 90%, 100% { transform: scaleY(1); }
+      95% { transform: scaleY(0.1); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    @keyframes wave {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(5deg); }
+      75% { transform: rotate(-3deg); }
+    }
+    @keyframes pupilMove {
+      0%, 100% { transform: translateX(0); }
+      30% { transform: translateX(1px); }
+      70% { transform: translateX(-1px); }
+    }
+    .ninja-body { animation: float 3s ease-in-out infinite; transform-origin: center; }
+    .eye-left { animation: blink 4s ease-in-out infinite; transform-origin: 48px 62px; }
+    .eye-right { animation: blink 4s ease-in-out infinite 0.1s; transform-origin: 80px 62px; }
+    .pupil-left { animation: pupilMove 5s ease-in-out infinite; }
+    .pupil-right { animation: pupilMove 5s ease-in-out infinite; }
+    .tail-1 { animation: wave 2s ease-in-out infinite; transform-origin: 96px 56px; }
+    .tail-2 { animation: wave 2.5s ease-in-out infinite 0.3s; transform-origin: 96px 64px; }
+  </style>
+
   <!-- Background -->
   <rect width="128" height="128" rx="28" fill="url(#bgGrad)"/>
 
-  <!-- Ninja head -->
-  <ellipse cx="64" cy="64" rx="32" ry="34" fill="#1f2937"/>
+  <g class="ninja-body">
+    <!-- Ninja head -->
+    <ellipse cx="64" cy="64" rx="32" ry="34" fill="#1f2937"/>
 
-  <!-- Ninja mask/bandana -->
-  <rect x="28" y="52" width="72" height="20" rx="4" fill="#111827"/>
+    <!-- Ninja mask/bandana -->
+    <rect x="28" y="52" width="72" height="20" rx="4" fill="#111827"/>
 
-  <!-- Eyes -->
-  <ellipse cx="48" cy="62" rx="8" ry="5" fill="#ffffff"/>
-  <ellipse cx="80" cy="62" rx="8" ry="5" fill="#ffffff"/>
+    <!-- Eyes -->
+    <ellipse class="eye-left" cx="48" cy="62" rx="8" ry="5" fill="#ffffff"/>
+    <ellipse class="eye-right" cx="80" cy="62" rx="8" ry="5" fill="#ffffff"/>
 
-  <!-- Eye pupils -->
-  <circle cx="50" cy="62" r="3" fill="#111827"/>
-  <circle cx="82" cy="62" r="3" fill="#111827"/>
+    <!-- Eye pupils -->
+    <circle class="pupil-left" cx="50" cy="62" r="3" fill="#111827"/>
+    <circle class="pupil-right" cx="82" cy="62" r="3" fill="#111827"/>
 
-  <!-- Eye shine -->
-  <circle cx="51" cy="61" r="1" fill="#ffffff"/>
-  <circle cx="83" cy="61" r="1" fill="#ffffff"/>
+    <!-- Eye shine -->
+    <circle cx="51" cy="61" r="1" fill="#ffffff"/>
+    <circle cx="83" cy="61" r="1" fill="#ffffff"/>
 
-  <!-- Bandana knot/tails on right side -->
-  <path d="M96 56 Q108 50 112 58 Q108 54 100 58" fill="#111827"/>
-  <path d="M96 64 Q110 66 114 74 Q108 68 100 66" fill="#111827"/>
+    <!-- Bandana knot/tails on right side -->
+    <path class="tail-1" d="M96 56 Q108 50 112 58 Q108 54 100 58" fill="#111827"/>
+    <path class="tail-2" d="M96 64 Q110 66 114 74 Q108 68 100 66" fill="#111827"/>
+  </g>
 </svg>
