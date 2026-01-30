@@ -1,11 +1,12 @@
 /**
- * Jinja2/DTL Lexer - Tokenizes template source into tokens
- * Compatible with both Jinja2 and Django Template Language
+ * Optimized Lexer with indexOf-based scanText
+ * For benchmarking comparison
  */
-import { Token, TokenType, KEYWORDS, LexerState } from './tokens'
-import { TemplateSyntaxError } from '../errors'
 
-export class Lexer {
+import { Token, TokenType, KEYWORDS, LexerState } from '../src/lexer/tokens'
+import { TemplateSyntaxError } from '../src/errors'
+
+export class LexerOptimized {
   private state: LexerState
   private variableStart: string
   private variableEnd: string
@@ -33,7 +34,6 @@ export class Lexer {
       tokens: [],
     }
 
-    // Configurable delimiters (default Jinja2/DTL)
     this.variableStart = options.variableStart ?? '{{'
     this.variableEnd = options.variableEnd ?? '}}'
     this.blockStart = options.blockStart ?? '{%'
@@ -52,7 +52,6 @@ export class Lexer {
   }
 
   private scanToken(): void {
-    // Check for template delimiters
     if (this.match(this.variableStart)) {
       this.addToken(TokenType.VARIABLE_START, this.variableStart)
       this.scanExpression(this.variableEnd, TokenType.VARIABLE_END)
@@ -60,11 +59,9 @@ export class Lexer {
     }
 
     if (this.match(this.blockStart)) {
-      // Check for special block tags with whitespace control
       const wsControl = this.peek() === '-'
       if (wsControl) this.advance()
 
-      // Check for raw/verbatim block - capture content as-is until endraw/endverbatim
       const savedPos = this.state.pos
       this.skipWhitespace()
       if (this.checkWord('raw') || this.checkWord('verbatim')) {
@@ -72,7 +69,6 @@ export class Lexer {
         this.scanRawBlock(tagName, wsControl)
         return
       }
-      // Reset position if not raw/verbatim
       this.state.pos = savedPos
 
       this.addToken(TokenType.BLOCK_START, this.blockStart + (wsControl ? '-' : ''))
@@ -85,116 +81,15 @@ export class Lexer {
       return
     }
 
-    // Regular text
-    this.scanText()
-  }
-
-  private checkWord(word: string): boolean {
-    const start = this.state.pos
-    for (let i = 0; i < word.length; i++) {
-      if (this.state.source[start + i]?.toLowerCase() !== word[i]) {
-        return false
-      }
-    }
-    // Check that word ends (not part of larger identifier)
-    const nextChar = this.state.source[start + word.length]
-    return !nextChar || !this.isAlphaNumeric(nextChar)
-  }
-
-  private scanRawBlock(tagName: string, wsControl: boolean): void {
-    const startLine = this.state.line
-    const startColumn = this.state.column
-
-    // Skip the tag name
-    for (let i = 0; i < tagName.length; i++) {
-      this.advance()
-    }
-    this.skipWhitespace()
-
-    // Skip optional whitespace control before closing
-    if (this.peek() === '-') this.advance()
-
-    // Expect block end
-    if (!this.match(this.blockEnd)) {
-      throw new TemplateSyntaxError(`Expected '${this.blockEnd}' after '${tagName}'`, {
-        line: this.state.line,
-        column: this.state.column,
-        source: this.state.source,
-      })
-    }
-
-    // Now capture everything until {% endraw %} or {% endverbatim %}
-    const endTag = `end${tagName}`
-    const contentStart = this.state.pos
-
-    while (!this.isAtEnd()) {
-      // Look for {% endraw %} or {% endverbatim %}
-      if (this.check(this.blockStart)) {
-        const savedPos = this.state.pos
-        const savedLine = this.state.line
-        const savedColumn = this.state.column
-
-        this.match(this.blockStart)
-        if (this.peek() === '-') this.advance()
-        this.skipWhitespace()
-
-        if (this.checkWord(endTag)) {
-          // Found end tag - emit content as TEXT
-          const content = this.state.source.slice(contentStart, savedPos)
-          if (content.length > 0) {
-            this.state.tokens.push({
-              type: TokenType.TEXT,
-              value: content,
-              line: startLine,
-              column: startColumn,
-            })
-          }
-
-          // Skip the end tag
-          for (let i = 0; i < endTag.length; i++) {
-            this.advance()
-          }
-          this.skipWhitespace()
-          if (this.peek() === '-') this.advance()
-
-          if (!this.match(this.blockEnd)) {
-            throw new TemplateSyntaxError(`Expected '${this.blockEnd}' after '${endTag}'`, {
-              line: this.state.line,
-              column: this.state.column,
-              source: this.state.source,
-            })
-          }
-          return
-        }
-
-        // Not the end tag, restore position and continue
-        this.state.pos = savedPos
-        this.state.line = savedLine
-        this.state.column = savedColumn
-      }
-
-      if (this.peek() === '\n') {
-        this.state.line++
-        this.state.column = 0
-      }
-      this.advance()
-    }
-
-    throw new TemplateSyntaxError(`Unclosed '${tagName}' block`, {
-      line: startLine,
-      column: startColumn,
-      source: this.state.source,
-      suggestion: `Add {% end${tagName} %} to close the block`,
-    })
+    this.scanTextOptimized()
   }
 
   /**
-   * Optimized scanText using indexOf
+   * OPTIMIZED scanText using indexOf
    * Instead of checking 3 delimiters at each character position,
-   * we use indexOf to jump directly to the next '{' character.
-   * Benchmarks show +178% average speedup, up to +393% for text-heavy templates.
+   * we use indexOf to jump directly to the next '{' character
    */
-  private scanText(): void {
+  private scanTextOptimized(): void {
     const start = this.state.pos
     const startLine = this.state.line
     const startColumn = this.state.column
@@ -206,13 +101,13 @@ export class Lexer {
 
       if (nextBrace === -1) {
         // No more braces - consume rest as text
-        this.advanceToEnd()
+        this.advanceToEndTracking()
         break
       }
 
       // Fast-forward to the brace, tracking newlines
       if (nextBrace > this.state.pos) {
-        this.advanceTo(nextBrace)
+        this.advanceToPositionTracking(nextBrace)
       }
 
       // Check if it's actually a template delimiter
@@ -244,8 +139,10 @@ export class Lexer {
     }
   }
 
-  /** Advance to target position while tracking line/column */
-  private advanceTo(targetPos: number): void {
+  /**
+   * Advance to target position while tracking line/column
+   */
+  private advanceToPositionTracking(targetPos: number): void {
     const source = this.state.source
     while (this.state.pos < targetPos) {
       if (source[this.state.pos] === '\n') {
@@ -257,8 +154,10 @@ export class Lexer {
     }
   }
 
-  /** Advance to end while tracking line/column */
-  private advanceToEnd(): void {
+  /**
+   * Advance to end while tracking line/column
+   */
+  private advanceToEndTracking(): void {
     const source = this.state.source
     const len = source.length
     while (this.state.pos < len) {
@@ -271,24 +170,111 @@ export class Lexer {
     }
   }
 
+  private checkWord(word: string): boolean {
+    const start = this.state.pos
+    for (let i = 0; i < word.length; i++) {
+      if (this.state.source[start + i]?.toLowerCase() !== word[i]) {
+        return false
+      }
+    }
+    const nextChar = this.state.source[start + word.length]
+    return !nextChar || !this.isAlphaNumeric(nextChar)
+  }
+
+  private scanRawBlock(tagName: string, wsControl: boolean): void {
+    const startLine = this.state.line
+    const startColumn = this.state.column
+
+    for (let i = 0; i < tagName.length; i++) {
+      this.advance()
+    }
+    this.skipWhitespace()
+
+    if (this.peek() === '-') this.advance()
+
+    if (!this.match(this.blockEnd)) {
+      throw new TemplateSyntaxError(`Expected '${this.blockEnd}' after '${tagName}'`, {
+        line: this.state.line,
+        column: this.state.column,
+        source: this.state.source,
+      })
+    }
+
+    const endTag = `end${tagName}`
+    const contentStart = this.state.pos
+
+    while (!this.isAtEnd()) {
+      if (this.check(this.blockStart)) {
+        const savedPos = this.state.pos
+        const savedLine = this.state.line
+        const savedColumn = this.state.column
+
+        this.match(this.blockStart)
+        if (this.peek() === '-') this.advance()
+        this.skipWhitespace()
+
+        if (this.checkWord(endTag)) {
+          const content = this.state.source.slice(contentStart, savedPos)
+          if (content.length > 0) {
+            this.state.tokens.push({
+              type: TokenType.TEXT,
+              value: content,
+              line: startLine,
+              column: startColumn,
+            })
+          }
+
+          for (let i = 0; i < endTag.length; i++) {
+            this.advance()
+          }
+          this.skipWhitespace()
+          if (this.peek() === '-') this.advance()
+
+          if (!this.match(this.blockEnd)) {
+            throw new TemplateSyntaxError(`Expected '${this.blockEnd}' after '${endTag}'`, {
+              line: this.state.line,
+              column: this.state.column,
+              source: this.state.source,
+            })
+          }
+          return
+        }
+
+        this.state.pos = savedPos
+        this.state.line = savedLine
+        this.state.column = savedColumn
+      }
+
+      if (this.peek() === '\n') {
+        this.state.line++
+        this.state.column = 0
+      }
+      this.advance()
+    }
+
+    throw new TemplateSyntaxError(`Unclosed '${tagName}' block`, {
+      line: startLine,
+      column: startColumn,
+      source: this.state.source,
+      suggestion: `Add {% end${tagName} %} to close the block`,
+    })
+  }
+
   private scanExpression(endDelimiter: string, endTokenType: TokenType): void {
     this.skipWhitespace()
 
     while (!this.isAtEnd()) {
       this.skipWhitespace()
 
-      // Check for whitespace control before end delimiter
       if (this.peek() === '-' && this.check(endDelimiter, 1)) {
-        this.advance() // skip -
+        this.advance()
       }
 
-      // Check for end delimiter
       if (this.match(endDelimiter)) {
         this.addToken(endTokenType, endDelimiter)
         return
       }
 
-      // Scan expression token
       this.scanExpressionToken()
     }
 
@@ -307,35 +293,31 @@ export class Lexer {
 
     const c = this.peek()
 
-    // String literals
     if (c === '"' || c === "'") {
       this.scanString(c)
       return
     }
 
-    // Numbers
     if (this.isDigit(c)) {
       this.scanNumber()
       return
     }
 
-    // Identifiers and keywords
     if (this.isAlpha(c) || c === '_') {
       this.scanIdentifier()
       return
     }
 
-    // Operators and punctuation
     this.scanOperator()
   }
 
   private scanString(quote: string): void {
-    this.advance() // consume opening quote
+    this.advance()
     const start = this.state.pos
 
     while (!this.isAtEnd() && this.peek() !== quote) {
       if (this.peek() === '\\' && this.peekNext() === quote) {
-        this.advance() // skip escape
+        this.advance()
       }
       if (this.peek() === '\n') {
         this.state.line++
@@ -354,7 +336,7 @@ export class Lexer {
     }
 
     const value = this.state.source.slice(start, this.state.pos)
-    this.advance() // consume closing quote
+    this.advance()
 
     this.addToken(TokenType.STRING, value)
   }
@@ -366,9 +348,8 @@ export class Lexer {
       this.advance()
     }
 
-    // Decimal part
     if (this.peek() === '.' && this.isDigit(this.peekNext())) {
-      this.advance() // consume .
+      this.advance()
       while (this.isDigit(this.peek())) {
         this.advance()
       }
@@ -463,7 +444,6 @@ export class Lexer {
   }
 
   private scanComment(): void {
-    // Skip until comment end
     while (!this.isAtEnd() && !this.check(this.commentEnd)) {
       if (this.peek() === '\n') {
         this.state.line++
@@ -473,11 +453,10 @@ export class Lexer {
     }
 
     if (!this.isAtEnd()) {
-      this.match(this.commentEnd) // consume end delimiter
+      this.match(this.commentEnd)
     }
   }
 
-  // Helper methods
   private isAtEnd(): boolean {
     return this.state.pos >= this.state.source.length
   }
@@ -505,7 +484,6 @@ export class Lexer {
     const len = expected.length
     if (start + len > source.length) return false
 
-    // Optimized: char-by-char comparison instead of slice() - 39% faster
     for (let i = 0; i < len; i++) {
       if (source[start + i] !== expected[i]) return false
     }
@@ -523,7 +501,6 @@ export class Lexer {
     const len = expected.length
     if (start + len > source.length) return false
 
-    // Optimized: char-by-char comparison instead of slice() - 39% faster
     for (let i = 0; i < len; i++) {
       if (source[start + i] !== expected[i]) return false
     }
@@ -544,22 +521,21 @@ export class Lexer {
     return c === ' ' || c === '\t' || c === '\n' || c === '\r'
   }
 
-  // Optimized: use charCodeAt for faster character classification - 10-15% faster
   private isDigit(c: string): boolean {
     const code = c.charCodeAt(0)
-    return code >= 48 && code <= 57 // '0'-'9'
+    return code >= 48 && code <= 57
   }
 
   private isAlpha(c: string): boolean {
     const code = c.charCodeAt(0)
-    return (code >= 97 && code <= 122) || (code >= 65 && code <= 90) // a-z, A-Z
+    return (code >= 97 && code <= 122) || (code >= 65 && code <= 90)
   }
 
   private isAlphaNumeric(c: string): boolean {
     const code = c.charCodeAt(0)
-    return (code >= 48 && code <= 57) ||  // 0-9
-           (code >= 97 && code <= 122) || // a-z
-           (code >= 65 && code <= 90)     // A-Z
+    return (code >= 48 && code <= 57) ||
+           (code >= 97 && code <= 122) ||
+           (code >= 65 && code <= 90)
   }
 
   private addToken(type: TokenType, value: string): void {
@@ -571,6 +547,3 @@ export class Lexer {
     })
   }
 }
-
-export { TokenType, KEYWORDS } from './tokens'
-export type { Token, LexerState } from './tokens'
