@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://egeominotti.github.io/binja/"><strong>📚 Documentation</strong></a> •
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#framework-adapters">Hono/Elysia</a> •
@@ -13,10 +14,16 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/binja"><img src="https://img.shields.io/npm/v/binja?label=npm&color=10b981" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/binja"><img src="https://img.shields.io/npm/dm/binja?color=10b981" alt="npm downloads"></a>
+  <a href="https://github.com/egeominotti/binja/actions"><img src="https://github.com/egeominotti/binja/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/egeominotti/binja/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg" alt="BSD-3-Clause License"></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white" alt="Bun" />
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django Compatible" />
-  <img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg?style=for-the-badge" alt="BSD-3-Clause License" />
 </p>
 
 ---
