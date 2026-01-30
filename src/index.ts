@@ -74,7 +74,10 @@ export interface CacheStats {
 }
 
 export class Environment {
-  private options: Omit<Required<EnvironmentOptions>, 'timezone' | 'cacheMaxSize'> & { timezone?: string; cacheMaxSize: number }
+  private options: Omit<Required<EnvironmentOptions>, 'timezone' | 'cacheMaxSize'> & {
+    timezone?: string
+    cacheMaxSize: number
+  }
   private runtime: Runtime
   private templateCache: Map<string, TemplateNode> = new Map()
   private routes: Map<string, string> = new Map()
@@ -133,7 +136,10 @@ export class Environment {
   /**
    * Internal: Render with debug panel
    */
-  private async renderWithDebug(templateName: string, context: Record<string, any>): Promise<string> {
+  private async renderWithDebug(
+    templateName: string,
+    context: Record<string, any>
+  ): Promise<string> {
     const collector = startDebugCollection()
     collector.captureContext(context)
     collector.addTemplate(templateName, 'root')
@@ -155,7 +161,10 @@ export class Environment {
   /**
    * Internal: Render string with debug panel
    */
-  private async renderStringWithDebug(source: string, context: Record<string, any>): Promise<string> {
+  private async renderStringWithDebug(
+    source: string,
+    context: Record<string, any>
+  ): Promise<string> {
     const collector = startDebugCollection()
     collector.captureContext(context)
     collector.setMode('runtime')
@@ -462,7 +471,7 @@ export async function compileWithInheritance(
       const tokens = lexer.tokenize()
       const parser = new Parser(tokens, source)
       return parser.parse()
-    }
+    },
   }
 
   // Load and parse the main template
@@ -474,7 +483,7 @@ export async function compileWithInheritance(
   if (!check.canFlatten) {
     throw new Error(
       `Cannot compile template with AOT: ${check.reason}\n` +
-      `Use Environment.render() for dynamic template names.`
+        `Use Environment.render() for dynamic template names.`
     )
   }
 
@@ -513,7 +522,7 @@ export async function compileWithInheritanceToCode(
       const tokens = lexer.tokenize()
       const parser = new Parser(tokens, source)
       return parser.parse()
-    }
+    },
   }
 
   const source = loader.load(templateName)
@@ -538,10 +547,7 @@ export async function compileWithInheritanceToCode(
  * // Returns: "function renderHeader(__ctx) { ... }"
  * ```
  */
-export function compileToCode(
-  source: string,
-  options: CompileOptions = {}
-): string {
+export function compileToCode(source: string, options: CompileOptions = {}): string {
   const lexer = new Lexer(source)
   const tokens = lexer.tokenize()
   const parser = new Parser(tokens, source)

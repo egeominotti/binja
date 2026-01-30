@@ -4,7 +4,13 @@
  * at compile-time for maximum performance (160x faster than runtime)
  */
 import { describe, test, expect, beforeAll } from 'bun:test'
-import { compileWithInheritance, compileWithInheritanceToCode, canFlatten, Lexer, Parser } from '../src'
+import {
+  compileWithInheritance,
+  compileWithInheritanceToCode,
+  canFlatten,
+  Lexer,
+  Parser,
+} from '../src'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -69,10 +75,7 @@ describe('AOT Template Inheritance', () => {
     )
 
     // Simple partial for include
-    await fs.promises.writeFile(
-      path.join(TEMPLATES_DIR, 'partial.html'),
-      `<span>{{ name }}</span>`
-    )
+    await fs.promises.writeFile(path.join(TEMPLATES_DIR, 'partial.html'), `<span>{{ name }}</span>`)
 
     // Template with include and context
     await fs.promises.writeFile(
@@ -221,21 +224,19 @@ describe('AOT Template Inheritance', () => {
         return Bun.escapeHTML(String(v))
       }
       const isTruthy = (v: any) => v != null && v !== false && v !== 0 && v !== ''
-      const toArray = (v: any) => Array.isArray(v) ? v : []
+      const toArray = (v: any) => (Array.isArray(v) ? v : [])
       const applyFilter = () => ''
       const applyTest = () => true
 
       const fn = new Function(
-        '__ctx', '__helpers',
+        '__ctx',
+        '__helpers',
         `const { escape, isTruthy, toArray, applyFilter, applyTest } = __helpers;
         ${code}
         return renderSimple(__ctx);`
       )
 
-      const result = fn(
-        { title: 'test' },
-        { escape, isTruthy, toArray, applyFilter, applyTest }
-      )
+      const result = fn({ title: 'test' }, { escape, isTruthy, toArray, applyFilter, applyTest })
 
       expect(result).toBe('<h1>TEST</h1>')
     })

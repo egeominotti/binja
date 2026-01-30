@@ -3,7 +3,12 @@
  */
 import { describe, test, expect, beforeAll } from 'bun:test'
 import { Environment } from '../src'
-import { renderWithDebug, renderStringWithDebug, generateDebugPanel, createDebugRenderer } from '../src/debug'
+import {
+  renderWithDebug,
+  renderStringWithDebug,
+  generateDebugPanel,
+  createDebugRenderer,
+} from '../src/debug'
 import { DebugCollector } from '../src/debug/collector'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -214,11 +219,9 @@ describe('Debug Panel', () => {
 
   describe('renderStringWithDebug', () => {
     test('works with string templates', async () => {
-      const result = await renderStringWithDebug(
-        env,
-        '<html><body>{{ name }}</body></html>',
-        { name: 'World' }
-      )
+      const result = await renderStringWithDebug(env, '<html><body>{{ name }}</body></html>', {
+        name: 'World',
+      })
 
       expect(result).toContain('World')
       expect(result).toContain('Binja Debug Panel')

@@ -16,7 +16,12 @@ import { DebugCollector, startDebugCollection, endDebugCollection } from './coll
 import { generateDebugPanel, PanelOptions } from './panel'
 import type { DebugData } from './collector'
 
-export { DebugCollector, startDebugCollection, endDebugCollection, getDebugCollector } from './collector'
+export {
+  DebugCollector,
+  startDebugCollection,
+  endDebugCollection,
+  getDebugCollector,
+} from './collector'
 export type { DebugData, ContextValue, QueryInfo, QueryStats } from './collector'
 export { generateDebugPanel } from './panel'
 export type { PanelOptions } from './panel'

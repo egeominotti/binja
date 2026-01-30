@@ -226,7 +226,15 @@ describe('LRU Template Cache', () => {
       const env = new Environment({ templates: testDir, cacheMaxSize: 3 })
 
       // Simulate rapid access pattern
-      const templates = ['t1.html', 't2.html', 't3.html', 't1.html', 't4.html', 't1.html', 't5.html']
+      const templates = [
+        't1.html',
+        't2.html',
+        't3.html',
+        't1.html',
+        't4.html',
+        't1.html',
+        't5.html',
+      ]
 
       for (const t of templates) {
         await env.render(t, {})

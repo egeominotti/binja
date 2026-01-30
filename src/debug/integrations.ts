@@ -48,7 +48,7 @@ export function createPrismaMiddleware() {
         sql,
         params: params.args ? [JSON.stringify(params.args)] : undefined,
         duration,
-        rows: Array.isArray(result) ? result.length : (result ? 1 : 0),
+        rows: Array.isArray(result) ? result.length : result ? 1 : 0,
         source: 'prisma',
       })
     }
@@ -110,7 +110,7 @@ export function createDrizzleLogger() {
           source: 'drizzle',
         })
       }
-    }
+    },
   }
 }
 
@@ -126,10 +126,7 @@ export function createDrizzleLogger() {
  * )
  * ```
  */
-export async function wrapDrizzleQuery<T>(
-  query: Promise<T>,
-  sql?: string
-): Promise<T> {
+export async function wrapDrizzleQuery<T>(query: Promise<T>, sql?: string): Promise<T> {
   const collector = getDebugCollector()
   const start = performance.now()
 
@@ -141,7 +138,7 @@ export async function wrapDrizzleQuery<T>(
     collector.recordQuery({
       sql: sql || 'Drizzle Query',
       duration,
-      rows: Array.isArray(result) ? result.length : (result ? 1 : 0),
+      rows: Array.isArray(result) ? result.length : result ? 1 : 0,
       source: 'drizzle',
     })
   }
@@ -170,7 +167,7 @@ export function wrapBunSQL<T extends object>(db: T): T {
       if (typeof value === 'function') {
         // Wrap query methods
         if (prop === 'query' || prop === 'run' || prop === 'prepare') {
-          return function(...args: any[]) {
+          return function (...args: any[]) {
             const collector = getDebugCollector()
             const sql = typeof args[0] === 'string' ? args[0] : 'SQL Query'
             const start = performance.now()
@@ -200,7 +197,7 @@ export function wrapBunSQL<T extends object>(db: T): T {
       }
 
       return value
-    }
+    },
   }
 
   return new Proxy(db, handler)
@@ -215,7 +212,7 @@ function wrapPreparedStatement(stmt: any, sql: string): any {
       const value = target[prop]
 
       if (typeof value === 'function' && (prop === 'all' || prop === 'get' || prop === 'run')) {
-        return function(...args: any[]) {
+        return function (...args: any[]) {
           const collector = getDebugCollector()
           const start = performance.now()
 
@@ -228,7 +225,7 @@ function wrapPreparedStatement(stmt: any, sql: string): any {
               sql,
               params: args,
               duration,
-              rows: Array.isArray(result) ? result.length : (result ? 1 : 0),
+              rows: Array.isArray(result) ? result.length : result ? 1 : 0,
               source: 'bun:sqlite',
             })
           }
@@ -238,7 +235,7 @@ function wrapPreparedStatement(stmt: any, sql: string): any {
       }
 
       return value
-    }
+    },
   }
 
   return new Proxy(stmt, handler)
@@ -275,7 +272,7 @@ export async function wrapQuery<T>(
     collector.recordQuery({
       sql,
       duration,
-      rows: Array.isArray(result) ? result.length : (result ? 1 : 0),
+      rows: Array.isArray(result) ? result.length : result ? 1 : 0,
       source,
     })
   }

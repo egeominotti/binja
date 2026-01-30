@@ -137,9 +137,10 @@ function formatError(type: string, message: string, options: ErrorOptions): stri
   if (options.availableOptions && options.availableOptions.length > 0) {
     parts.push('')
     const truncated = options.availableOptions.slice(0, 8)
-    const more = options.availableOptions.length > 8
-      ? ` ${c('gray', `... and ${options.availableOptions.length - 8} more`)}`
-      : ''
+    const more =
+      options.availableOptions.length > 8
+        ? ` ${c('gray', `... and ${options.availableOptions.length - 8} more`)}`
+        : ''
     parts.push(`${c('gray', 'Available')}: ${truncated.join(', ')}${more}`)
   }
 
@@ -167,7 +168,9 @@ function generateSnippet(source: string, errorLine: number, errorColumn: number)
 
     if (isErrorLine) {
       // Error line with arrow
-      parts.push(`${c('red', ' \u2192')} ${c('gray', lineNum)} ${c('dim', '\u2502')} ${lineContent}`)
+      parts.push(
+        `${c('red', ' \u2192')} ${c('gray', lineNum)} ${c('dim', '\u2502')} ${lineContent}`
+      )
 
       // Caret line
       const caretPadding = ' '.repeat(gutterWidth + 4 + Math.max(0, errorColumn - 1))
@@ -228,8 +231,8 @@ function levenshteinDistance(a: string, b: string): number {
       } else {
         matrix[i][j] = Math.min(
           matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1,     // insertion
-          matrix[i - 1][j] + 1      // deletion
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1 // deletion
         )
       }
     }

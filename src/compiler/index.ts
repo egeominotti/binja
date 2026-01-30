@@ -52,14 +52,21 @@ export function compileToString(ast: TemplateNode, options: CompileOptions = {})
 /**
  * Compile AST to executable function
  */
-export function compileToFunction(ast: TemplateNode, options: CompileOptions = {}): (ctx: Record<string, any>) => string {
+export function compileToFunction(
+  ast: TemplateNode,
+  options: CompileOptions = {}
+): (ctx: Record<string, any>) => string {
   const code = compileToString(ast, options)
   // Create function with runtime helpers in scope
-  const fn = new Function('__ctx', '__helpers', `
+  const fn = new Function(
+    '__ctx',
+    '__helpers',
+    `
     const { escape, isTruthy, toArray, applyFilter, applyTest } = __helpers;
     ${code}
     return render(__ctx);
-  `)
+  `
+  )
 
   return (ctx: Record<string, any>) => fn(ctx, runtimeHelpers)
 }
@@ -108,7 +115,7 @@ const runtimeHelpers = {
     const test = builtinTests[name]
     if (!test) throw new Error(`Unknown test: ${name}`)
     return test(value, ...args)
-  }
+  },
 }
 
 class Compiler {
@@ -152,15 +159,17 @@ class Compiler {
     const body = this.compileNodes(ast.body)
     const nl = this.options.minify ? '' : '\n'
 
-    return `function ${this.options.functionName}(__ctx) {${nl}` +
+    return (
+      `function ${this.options.functionName}(__ctx) {${nl}` +
       `  let __out = '';${nl}` +
       body +
       `  return __out;${nl}` +
       `}`
+    )
   }
 
   private compileNodes(nodes: ASTNode[]): string {
-    return nodes.map(node => this.compileNode(node)).join('')
+    return nodes.map((node) => this.compileNode(node)).join('')
   }
 
   private compileNode(node: ASTNode): string {
@@ -182,10 +191,14 @@ class Compiler {
       case 'Extends':
       case 'Block':
       case 'Include':
-        throw new Error(`AOT compilation does not support '${node.type}' - use Environment.render() for templates with inheritance`)
+        throw new Error(
+          `AOT compilation does not support '${node.type}' - use Environment.render() for templates with inheritance`
+        )
       case 'Url':
       case 'Static':
-        throw new Error(`AOT compilation does not support '${node.type}' tag - use Environment.render() with urlResolver/staticResolver`)
+        throw new Error(
+          `AOT compilation does not support '${node.type}' tag - use Environment.render() with urlResolver/staticResolver`
+        )
       default:
         throw new Error(`Unknown node type in AOT compiler: ${node.type}`)
     }
@@ -242,7 +255,8 @@ class Compiler {
     const valueVar = Array.isArray(node.target) && node.target[1] ? node.target[1] : null
 
     // Get parent loop variable name if nested
-    const parentLoopVar = this.loopStack.length > 0 ? this.loopStack[this.loopStack.length - 1] : null
+    const parentLoopVar =
+      this.loopStack.length > 0 ? this.loopStack[this.loopStack.length - 1] : null
 
     const iter = this.compileExpr(node.iter)
     let code = ''
@@ -387,16 +401,18 @@ class Compiler {
   }
 
   private compileArray(node: ArrayNode): string {
-    const elements = node.elements.map(el => this.compileExpr(el)).join(', ')
+    const elements = node.elements.map((el) => this.compileExpr(el)).join(', ')
     return `[${elements}]`
   }
 
   private compileObject(node: ObjectNode): string {
-    const pairs = node.pairs.map(({ key, value }) => {
-      const k = this.compileExpr(key)
-      const v = this.compileExpr(value)
-      return `[${k}]: ${v}`
-    }).join(', ')
+    const pairs = node.pairs
+      .map(({ key, value }) => {
+        const k = this.compileExpr(key)
+        const v = this.compileExpr(value)
+        return `[${k}]: ${v}`
+      })
+      .join(', ')
     return `{${pairs}}`
   }
 
@@ -405,12 +421,18 @@ class Compiler {
     const right = this.compileExpr(node.right)
 
     switch (node.operator) {
-      case 'and': return `(${left} && ${right})`
-      case 'or': return `(${left} || ${right})`
-      case '~': return `(String(${left}) + String(${right}))`
-      case 'in': return `(Array.isArray(${right}) ? ${right}.includes(${left}) : String(${right}).includes(String(${left})))`
-      case 'not in': return `!(Array.isArray(${right}) ? ${right}.includes(${left}) : String(${right}).includes(String(${left})))`
-      default: return `(${left} ${node.operator} ${right})`
+      case 'and':
+        return `(${left} && ${right})`
+      case 'or':
+        return `(${left} || ${right})`
+      case '~':
+        return `(String(${left}) + String(${right}))`
+      case 'in':
+        return `(Array.isArray(${right}) ? ${right}.includes(${left}) : String(${right}).includes(String(${left})))`
+      case 'not in':
+        return `!(Array.isArray(${right}) ? ${right}.includes(${left}) : String(${right}).includes(String(${left})))`
+      default:
+        return `(${left} ${node.operator} ${right})`
     }
   }
 
@@ -418,10 +440,14 @@ class Compiler {
     const operand = this.compileExpr(node.operand)
 
     switch (node.operator) {
-      case 'not': return `!isTruthy(${operand})`
-      case '-': return `-(${operand})`
-      case '+': return `+(${operand})`
-      default: return operand
+      case 'not':
+        return `!isTruthy(${operand})`
+      case '-':
+        return `-(${operand})`
+      case '+':
+        return `+(${operand})`
+      default:
+        return operand
     }
   }
 
@@ -461,7 +487,7 @@ class Compiler {
 
   private compileFilter(node: FilterExprNode): string {
     const value = this.compileExpr(node.node)
-    const args = node.args.map(arg => this.compileExpr(arg))
+    const args = node.args.map((arg) => this.compileExpr(arg))
 
     // Inline common filters for performance
     switch (node.filter) {
@@ -509,7 +535,7 @@ class Compiler {
 
   private compileTest(node: TestExprNode): string {
     const value = this.compileExpr(node.node)
-    const args = node.args.map(arg => this.compileExpr(arg))
+    const args = node.args.map((arg) => this.compileExpr(arg))
     const negation = node.negated ? '!' : ''
 
     // Inline common tests

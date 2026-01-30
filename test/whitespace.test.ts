@@ -137,10 +137,9 @@ describe('Whitespace Control', () => {
   // ==================== For Loop Whitespace Control ====================
   describe('For Loop Whitespace Control', () => {
     test.todo('removes extra whitespace in for loops', async () => {
-      const result = await render(
-        '{%- for i in items -%}{{ i }}{%- endfor -%}',
-        { items: [1, 2, 3] }
-      )
+      const result = await render('{%- for i in items -%}{{ i }}{%- endfor -%}', {
+        items: [1, 2, 3],
+      })
       expect(result).toBe('123')
     })
 
@@ -160,14 +159,20 @@ describe('Whitespace Control', () => {
     })
 
     test('for loop with comma separator (no trimming needed)', async () => {
-      const template = '{% for item in items %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}'
+      const template =
+        '{% for item in items %}{{ item }}{% if not forloop.last %}, {% endif %}{% endfor %}'
       const result = await render(template, { items: ['apple', 'banana', 'cherry'] })
       expect(result).toBe('apple, banana, cherry')
     })
 
     test.todo('handles nested loops with whitespace control', async () => {
       const template = `{%- for row in matrix -%}[{%- for col in row -%}{{ col }}{%- endfor -%}]{%- endfor -%}`
-      const result = await render(template, { matrix: [[1, 2], [3, 4]] })
+      const result = await render(template, {
+        matrix: [
+          [1, 2],
+          [3, 4],
+        ],
+      })
       expect(result).toBe('[12][34]')
     })
 
@@ -220,10 +225,7 @@ describe('Whitespace Control', () => {
     })
 
     test.todo('handles with tag trimming', async () => {
-      const result = await render(
-        'start   {%- with x=1 -%}   {{ x }}   {%- endwith -%}   end',
-        {}
-      )
+      const result = await render('start   {%- with x=1 -%}   {{ x }}   {%- endwith -%}   end', {})
       expect(result).toBe('start1end')
     })
 
@@ -279,10 +281,7 @@ describe('Whitespace Control', () => {
   // ==================== Mixed Content ====================
   describe('Mixed Trimmed and Non-Trimmed Tags', () => {
     test.todo('mixes trimmed and non-trimmed tags', async () => {
-      const result = await render(
-        'a   {{- x }}   {{ y -}}   z',
-        { x: 'b', y: 'c' }
-      )
+      const result = await render('a   {{- x }}   {{ y -}}   z', { x: 'b', y: 'c' })
       expect(result).toBe('ab   cz')
     })
 
@@ -357,18 +356,12 @@ end
     })
 
     test.todo('handles multiple consecutive trimmed tags', async () => {
-      const result = await render(
-        '{%- if true -%}{%- if true -%}x{%- endif -%}{%- endif -%}',
-        {}
-      )
+      const result = await render('{%- if true -%}{%- if true -%}x{%- endif -%}{%- endif -%}', {})
       expect(result).toBe('x')
     })
 
     test('handles multiple consecutive tags without trimming', async () => {
-      const result = await render(
-        '{% if true %}{% if true %}x{% endif %}{% endif %}',
-        {}
-      )
+      const result = await render('{% if true %}{% if true %}x{% endif %}{% endif %}', {})
       expect(result).toBe('x')
     })
 
@@ -416,21 +409,21 @@ end
     test('recognizes {%- block start', () => {
       const lexer = new Lexer('{%- if true %}')
       const tokens = lexer.tokenize()
-      const blockStart = tokens.find(t => t.type === TokenType.BLOCK_START)
+      const blockStart = tokens.find((t) => t.type === TokenType.BLOCK_START)
       expect(blockStart?.value).toBe('{%-')
     })
 
     test.todo('recognizes {{- variable start', () => {
       const lexer = new Lexer('{{- name }}')
       const tokens = lexer.tokenize()
-      const varStart = tokens.find(t => t.type === TokenType.VARIABLE_START)
+      const varStart = tokens.find((t) => t.type === TokenType.VARIABLE_START)
       expect(varStart?.value).toBe('{{-')
     })
 
     test('recognizes -%} block end', () => {
       const lexer = new Lexer('{% if true -%}')
       const tokens = lexer.tokenize()
-      const blockEnd = tokens.find(t => t.type === TokenType.BLOCK_END)
+      const blockEnd = tokens.find((t) => t.type === TokenType.BLOCK_END)
       // The lexer should handle the dash before %}
       expect(blockEnd).toBeDefined()
     })
@@ -438,7 +431,7 @@ end
     test.todo('recognizes -}} variable end', () => {
       const lexer = new Lexer('{{ name -}}')
       const tokens = lexer.tokenize()
-      const varEnd = tokens.find(t => t.type === TokenType.VARIABLE_END)
+      const varEnd = tokens.find((t) => t.type === TokenType.VARIABLE_END)
       expect(varEnd).toBeDefined()
     })
 
@@ -446,7 +439,7 @@ end
       const lexer = new Lexer('{%- for x in y -%}content{%- endfor -%}')
       const tokens = lexer.tokenize()
 
-      const blockStarts = tokens.filter(t => t.type === TokenType.BLOCK_START)
+      const blockStarts = tokens.filter((t) => t.type === TokenType.BLOCK_START)
       expect(blockStarts.length).toBe(2)
     })
 
@@ -454,8 +447,8 @@ end
       const lexer = new Lexer('{% for x in y %}{{ x }}{% endfor %}')
       const tokens = lexer.tokenize()
 
-      const blockStarts = tokens.filter(t => t.type === TokenType.BLOCK_START)
-      const varStarts = tokens.filter(t => t.type === TokenType.VARIABLE_START)
+      const blockStarts = tokens.filter((t) => t.type === TokenType.BLOCK_START)
+      const varStarts = tokens.filter((t) => t.type === TokenType.VARIABLE_START)
 
       expect(blockStarts.length).toBe(2)
       expect(varStarts.length).toBe(1)
@@ -517,7 +510,7 @@ end
     })
 
     test('preserves special whitespace characters (NBSP)', async () => {
-      const result = await render('a\u00A0b', {})  // NBSP
+      const result = await render('a\u00A0b', {}) // NBSP
       expect(result).toBe('a\u00A0b')
     })
   })

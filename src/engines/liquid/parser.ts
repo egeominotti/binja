@@ -269,7 +269,7 @@ export class LiquidParser {
     }
 
     const first = cases[0]
-    const elifs = cases.slice(1).map(c => ({
+    const elifs = cases.slice(1).map((c) => ({
       test: {
         type: 'Compare',
         left: target,
@@ -351,8 +351,10 @@ export class LiquidParser {
 
   private parseForIterable(): ExpressionNode {
     // Check for range: (1..5)
-    if (this.check(LiquidTokenType.LBRACKET) ||
-        (this.peek().type === LiquidTokenType.ID && this.peek().value === '(')) {
+    if (
+      this.check(LiquidTokenType.LBRACKET) ||
+      (this.peek().type === LiquidTokenType.ID && this.peek().value === '(')
+    ) {
       // Skip opening paren if present
       if (this.peek().value === '(') this.advance()
       if (this.check(LiquidTokenType.LBRACKET)) this.advance()
@@ -369,7 +371,12 @@ export class LiquidParser {
 
         return {
           type: 'FunctionCall',
-          callee: { type: 'Name', name: 'range', line: (start as any).line, column: (start as any).column },
+          callee: {
+            type: 'Name',
+            name: 'range',
+            line: (start as any).line,
+            column: (start as any).column,
+          },
           args: [start, end],
           kwargs: {},
           line: (start as any).line,
@@ -633,16 +640,31 @@ export class LiquidParser {
     switch (token.type) {
       case LiquidTokenType.STRING:
         this.advance()
-        return { type: 'Literal', value: token.value, line: token.line, column: token.column } as any
+        return {
+          type: 'Literal',
+          value: token.value,
+          line: token.line,
+          column: token.column,
+        } as any
 
       case LiquidTokenType.NUMBER:
         this.advance()
-        return { type: 'Literal', value: parseFloat(token.value), line: token.line, column: token.column } as any
+        return {
+          type: 'Literal',
+          value: parseFloat(token.value),
+          line: token.line,
+          column: token.column,
+        } as any
 
       case LiquidTokenType.ID:
         if (token.value === 'true' || token.value === 'false') {
           this.advance()
-          return { type: 'Literal', value: token.value === 'true', line: token.line, column: token.column } as any
+          return {
+            type: 'Literal',
+            value: token.value === 'true',
+            line: token.line,
+            column: token.column,
+          } as any
         }
         if (token.value === 'nil' || token.value === 'null') {
           this.advance()
@@ -662,7 +684,12 @@ export class LiquidParser {
 
   private parsePath(): ExpressionNode {
     const first = this.advance()
-    let expr: ExpressionNode = { type: 'Name', name: first.value, line: first.line, column: first.column } as any
+    let expr: ExpressionNode = {
+      type: 'Name',
+      name: first.value,
+      line: first.line,
+      column: first.column,
+    } as any
 
     // Handle forloop special variables
     if (first.value === 'forloop') {
@@ -672,16 +699,22 @@ export class LiquidParser {
           const attr = this.advance()
           // Map Liquid's forloop to common format
           const mapping: Record<string, string> = {
-            index: 'counter',      // 1-indexed
-            index0: 'counter0',    // 0-indexed
+            index: 'counter', // 1-indexed
+            index0: 'counter0', // 0-indexed
             first: 'first',
             last: 'last',
             length: 'length',
-            rindex: 'revcounter',  // reverse 1-indexed
+            rindex: 'revcounter', // reverse 1-indexed
             rindex0: 'revcounter0', // reverse 0-indexed
           }
           const mappedAttr = mapping[attr.value] || attr.value
-          expr = { type: 'GetAttr', object: expr, attribute: mappedAttr, line: attr.line, column: attr.column } as any
+          expr = {
+            type: 'GetAttr',
+            object: expr,
+            attribute: mappedAttr,
+            line: attr.line,
+            column: attr.column,
+          } as any
         }
       }
       return expr
@@ -693,13 +726,25 @@ export class LiquidParser {
         this.advance()
         if (this.check(LiquidTokenType.ID)) {
           const attr = this.advance()
-          expr = { type: 'GetAttr', object: expr, attribute: attr.value, line: attr.line, column: attr.column } as any
+          expr = {
+            type: 'GetAttr',
+            object: expr,
+            attribute: attr.value,
+            line: attr.line,
+            column: attr.column,
+          } as any
         }
       } else if (this.check(LiquidTokenType.LBRACKET)) {
         this.advance()
         const index = this.parseExpressionAtom()
         this.expect(LiquidTokenType.RBRACKET)
-        expr = { type: 'GetItem', object: expr, index, line: (index as any).line, column: (index as any).column } as any
+        expr = {
+          type: 'GetItem',
+          object: expr,
+          index,
+          line: (index as any).line,
+          column: (index as any).column,
+        } as any
       }
     }
 

@@ -82,10 +82,10 @@ export interface IfNode extends BaseNode {
 
 export interface ForNode extends BaseNode {
   type: 'For'
-  target: string | string[]  // loop variable(s)
-  iter: ExpressionNode       // iterable
+  target: string | string[] // loop variable(s)
+  iter: ExpressionNode // iterable
   body: ASTNode[]
-  else_: ASTNode[]           // {% empty %} or {% else %}
+  else_: ASTNode[] // {% empty %} or {% else %}
   recursive: boolean
 }
 
@@ -106,8 +106,8 @@ export interface ExtendsNode extends BaseNode {
 export interface IncludeNode extends BaseNode {
   type: 'Include'
   template: ExpressionNode
-  context: Record<string, ExpressionNode> | null  // {% include ... with x=y %}
-  only: boolean                                    // {% include ... only %}
+  context: Record<string, ExpressionNode> | null // {% include ... with x=y %}
+  only: boolean // {% include ... only %}
   ignoreMissing: boolean
 }
 
@@ -129,7 +129,7 @@ export interface WithNode extends BaseNode {
 
 export interface LoadNode extends BaseNode {
   type: 'Load'
-  names: string[]  // {% load static humanize %}
+  names: string[] // {% load static humanize %}
 }
 
 export interface UrlNode extends BaseNode {
@@ -137,7 +137,7 @@ export interface UrlNode extends BaseNode {
   name: ExpressionNode
   args: ExpressionNode[]
   kwargs: Record<string, ExpressionNode>
-  asVar: string | null  // {% url 'name' as var %}
+  asVar: string | null // {% url 'name' as var %}
 }
 
 export interface StaticNode extends BaseNode {
@@ -201,7 +201,7 @@ export interface WidthratioNode extends BaseNode {
 export interface LoremNode extends BaseNode {
   type: 'Lorem'
   count: ExpressionNode | null
-  method: 'w' | 'p' | 'b'  // words, paragraphs, or plain/blocked
+  method: 'w' | 'p' | 'b' // words, paragraphs, or plain/blocked
   random: boolean
 }
 
@@ -215,7 +215,15 @@ export interface DebugNode extends BaseNode {
 
 export interface TemplatetagNode extends BaseNode {
   type: 'Templatetag'
-  tagType: 'openblock' | 'closeblock' | 'openvariable' | 'closevariable' | 'openbrace' | 'closebrace' | 'opencomment' | 'closecomment'
+  tagType:
+    | 'openblock'
+    | 'closeblock'
+    | 'openvariable'
+    | 'closevariable'
+    | 'openbrace'
+    | 'closebrace'
+    | 'opencomment'
+    | 'closecomment'
 }
 
 // ==================== Expressions ====================

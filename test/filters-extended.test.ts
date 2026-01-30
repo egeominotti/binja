@@ -8,21 +8,21 @@ describe('Extended Filters', () => {
   describe('wordwrap', () => {
     test('wraps text at specified width', async () => {
       const result = await render('{{ text|wordwrap(10) }}', {
-        text: 'hello world foo bar'
+        text: 'hello world foo bar',
       })
       expect(result).toBe('hello\nworld foo\nbar')
     })
 
     test('handles long words', async () => {
       const result = await render('{{ text|wordwrap(5) }}', {
-        text: 'abcdefghij'
+        text: 'abcdefghij',
       })
       expect(result).toBe('abcde\nfghij')
     })
 
     test('uses default width of 79', async () => {
       const result = await render('{{ text|wordwrap }}', {
-        text: 'short'
+        text: 'short',
       })
       expect(result).toBe('short')
     })
@@ -31,21 +31,21 @@ describe('Extended Filters', () => {
   describe('indent', () => {
     test('indents lines with spaces', async () => {
       const result = await render('{{ text|indent(2) }}', {
-        text: 'line1\nline2\nline3'
+        text: 'line1\nline2\nline3',
       })
       expect(result).toBe('line1\n  line2\n  line3')
     })
 
     test('indents first line when first=true', async () => {
       const result = await render('{{ text|indent(2, true) }}', {
-        text: 'line1\nline2'
+        text: 'line1\nline2',
       })
       expect(result).toBe('  line1\n  line2')
     })
 
     test('uses default indent of 4', async () => {
       const result = await render('{{ text|indent }}', {
-        text: 'a\nb'
+        text: 'a\nb',
       })
       expect(result).toBe('a\n    b')
     })
@@ -54,14 +54,14 @@ describe('Extended Filters', () => {
   describe('replace', () => {
     test('replaces all occurrences', async () => {
       const result = await render('{{ text|replace("o", "0") }}', {
-        text: 'hello world'
+        text: 'hello world',
       })
       expect(result).toBe('hell0 w0rld')
     })
 
     test('replaces limited occurrences', async () => {
       const result = await render('{{ text|replace("o", "0", 1) }}', {
-        text: 'hello world'
+        text: 'hello world',
       })
       expect(result).toBe('hell0 world')
     })
@@ -101,7 +101,7 @@ describe('Extended Filters', () => {
   describe('map', () => {
     test('extracts attribute from objects', async () => {
       const result = await render('{{ items|map("name")|join(", ") }}', {
-        items: [{ name: 'a' }, { name: 'b' }, { name: 'c' }]
+        items: [{ name: 'a' }, { name: 'b' }, { name: 'c' }],
       })
       expect(result).toBe('a, b, c')
     })
@@ -110,7 +110,7 @@ describe('Extended Filters', () => {
   describe('select', () => {
     test('filters truthy values', async () => {
       const result = await render('{{ items|select|join }}', {
-        items: [0, 1, '', 'a', null, true, false]
+        items: [0, 1, '', 'a', null, true, false],
       })
       expect(result).toBe('1atrue')
     })
@@ -119,7 +119,7 @@ describe('Extended Filters', () => {
   describe('reject', () => {
     test('filters falsy values', async () => {
       const result = await render('{{ items|reject|length }}', {
-        items: [0, 1, '', 'a', null, true, false]
+        items: [0, 1, '', 'a', null, true, false],
       })
       expect(result).toBe('4') // 0, '', null, false
     })
@@ -131,8 +131,8 @@ describe('Extended Filters', () => {
         items: [
           { name: 'a', active: true },
           { name: 'b', active: false },
-          { name: 'c', active: true }
-        ]
+          { name: 'c', active: true },
+        ],
       })
       expect(result).toBe('2')
     })
@@ -142,8 +142,8 @@ describe('Extended Filters', () => {
         items: [
           { name: 'a', type: 'admin' },
           { name: 'b', type: 'user' },
-          { name: 'c', type: 'admin' }
-        ]
+          { name: 'c', type: 'admin' },
+        ],
       })
       expect(result).toBe('2')
     })
@@ -155,8 +155,8 @@ describe('Extended Filters', () => {
         items: [
           { name: 'a', active: true },
           { name: 'b', active: false },
-          { name: 'c', active: true }
-        ]
+          { name: 'c', active: true },
+        ],
       })
       expect(result).toBe('1')
     })
@@ -165,14 +165,14 @@ describe('Extended Filters', () => {
   describe('attr', () => {
     test('gets attribute from object', async () => {
       const result = await render('{{ obj|attr("name") }}', {
-        obj: { name: 'test', value: 42 }
+        obj: { name: 'test', value: 42 },
       })
       expect(result).toBe('test')
     })
 
     test('returns undefined for missing attribute', async () => {
       const result = await render('{{ obj|attr("missing")|default("none") }}', {
-        obj: { name: 'test' }
+        obj: { name: 'test' },
       })
       expect(result).toBe('none')
     })
@@ -186,7 +186,7 @@ describe('Extended Filters', () => {
 
     test('returns max object by attribute', async () => {
       const result = await render('{{ (items|max("score")).score }}', {
-        items: [{ score: 10 }, { score: 50 }, { score: 30 }]
+        items: [{ score: 10 }, { score: 50 }, { score: 30 }],
       })
       expect(result).toBe('50')
     })
@@ -205,7 +205,7 @@ describe('Extended Filters', () => {
 
     test('returns min object by attribute', async () => {
       const result = await render('{{ (items|min("score")).score }}', {
-        items: [{ score: 10 }, { score: 50 }, { score: 30 }]
+        items: [{ score: 10 }, { score: 50 }, { score: 30 }],
       })
       expect(result).toBe('10')
     })
@@ -219,7 +219,7 @@ describe('Extended Filters', () => {
 
     test('sums by attribute', async () => {
       const result = await render('{{ items|sum("value") }}', {
-        items: [{ value: 10 }, { value: 20 }, { value: 30 }]
+        items: [{ value: 10 }, { value: 20 }, { value: 30 }],
       })
       expect(result).toBe('60')
     })
@@ -241,7 +241,7 @@ describe('Extended Filters', () => {
   describe('forceescape', () => {
     test('escapes even safe strings', async () => {
       const result = await render('{{ html|safe|forceescape }}', {
-        html: '<b>bold</b>'
+        html: '<b>bold</b>',
       })
       expect(result).toBe('&lt;b&gt;bold&lt;/b&gt;')
     })
@@ -250,7 +250,7 @@ describe('Extended Filters', () => {
   describe('phone2numeric', () => {
     test('converts letters to phone numbers', async () => {
       const result = await render('{{ phone|phone2numeric }}', {
-        phone: '1-800-COLLECT'
+        phone: '1-800-COLLECT',
       })
       expect(result).toBe('1-800-2655328')
     })
@@ -259,7 +259,7 @@ describe('Extended Filters', () => {
   describe('linenumbers', () => {
     test('adds line numbers', async () => {
       const result = await render('{{ text|linenumbers }}', {
-        text: 'line1\nline2\nline3'
+        text: 'line1\nline2\nline3',
       })
       expect(result).toBe('1. line1\n2. line2\n3. line3')
     })
@@ -275,7 +275,7 @@ describe('Extended Filters', () => {
   describe('unordered_list', () => {
     test('creates HTML list', async () => {
       const result = await render('{{ items|unordered_list }}', {
-        items: ['a', 'b', 'c']
+        items: ['a', 'b', 'c'],
       })
       expect(result).toContain('<li>a</li>')
       expect(result).toContain('<li>b</li>')
@@ -284,7 +284,7 @@ describe('Extended Filters', () => {
 
     test('handles nested lists', async () => {
       const result = await render('{{ items|unordered_list }}', {
-        items: ['a', ['b', 'c']]
+        items: ['a', ['b', 'c']],
       })
       expect(result).toContain('<li>a')
       expect(result).toContain('<ul>')
@@ -301,8 +301,8 @@ describe('Extended Filters', () => {
             { name: 'apple', category: 'fruit' },
             { name: 'banana', category: 'fruit' },
             { name: 'carrot', category: 'vegetable' },
-            { name: 'broccoli', category: 'vegetable' }
-          ]
+            { name: 'broccoli', category: 'vegetable' },
+          ],
         }
       )
       expect(result).toBe('fruit:applebanana;vegetable:carrotbroccoli;')
@@ -333,8 +333,8 @@ describe('Extended Filters', () => {
           items: [
             { name: 'a', cat: 'x' },
             { name: 'b' }, // missing cat
-            { name: 'c', cat: 'x' }
-          ]
+            { name: 'c', cat: 'x' },
+          ],
         }
       )
       expect(result).toContain('x:2')
@@ -347,21 +347,16 @@ describe('Extended Filters', () => {
       const result = await render(
         '{% for item in items|dictsortreversed("name") %}{{ item.name }}{% endfor %}',
         {
-          items: [
-            { name: 'cherry' },
-            { name: 'apple' },
-            { name: 'banana' }
-          ]
+          items: [{ name: 'cherry' }, { name: 'apple' }, { name: 'banana' }],
         }
       )
       expect(result).toBe('cherrybananaapple')
     })
 
     test('sorts by value when no key specified', async () => {
-      const result = await render(
-        '{{ items|dictsortreversed|join(",") }}',
-        { items: [1, 3, 2, 5, 4] }
-      )
+      const result = await render('{{ items|dictsortreversed|join(",") }}', {
+        items: [1, 3, 2, 5, 4],
+      })
       expect(result).toBe('5,4,3,2,1')
     })
 
@@ -382,8 +377,8 @@ describe('Extended Filters', () => {
           items: [
             { name: 'a', score: 50 },
             { name: 'b', score: 100 },
-            { name: 'c', score: 25 }
-          ]
+            { name: 'c', score: 25 },
+          ],
         }
       )
       expect(result).toBe('1005025')

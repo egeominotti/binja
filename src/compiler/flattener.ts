@@ -213,7 +213,7 @@ class TemplateFlattener {
         return {
           ...ifNode,
           body: this.processNodes(ifNode.body),
-          elifs: ifNode.elifs.map(elif => ({
+          elifs: ifNode.elifs.map((elif) => ({
             test: elif.test,
             body: this.processNodes(elif.body),
           })),
@@ -288,8 +288,8 @@ class TemplateFlattener {
     }
     throw new Error(
       `AOT compilation requires static template names. ` +
-      `Found dynamic expression at line ${expr.line}. ` +
-      `Use Environment.render() for dynamic template names.`
+        `Found dynamic expression at line ${expr.line}. ` +
+        `Use Environment.render() for dynamic template names.`
     )
   }
 }

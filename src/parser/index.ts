@@ -210,7 +210,11 @@ export class Parser {
 
       const elifBody: ASTNode[] = []
       while (!this.isAtEnd()) {
-        if (this.checkBlockTag('elif') || this.checkBlockTag('else') || this.checkBlockTag('endif')) {
+        if (
+          this.checkBlockTag('elif') ||
+          this.checkBlockTag('else') ||
+          this.checkBlockTag('endif')
+        ) {
           break
         }
         const node = this.parseStatement()
@@ -282,7 +286,11 @@ export class Parser {
 
     while (!this.isAtEnd()) {
       // DTL uses {% empty %}, Jinja uses {% else %}
-      if (this.checkBlockTag('empty') || this.checkBlockTag('else') || this.checkBlockTag('endfor')) {
+      if (
+        this.checkBlockTag('empty') ||
+        this.checkBlockTag('else') ||
+        this.checkBlockTag('endfor')
+      ) {
         break
       }
       const node = this.parseStatement()
@@ -431,7 +439,10 @@ export class Parser {
       this.expect(TokenType.ASSIGN)
       const value = this.parseExpression()
       assignments.push({ target, value })
-    } while (this.match(TokenType.COMMA) || (this.check(TokenType.NAME) && this.peekNext()?.type === TokenType.ASSIGN))
+    } while (
+      this.match(TokenType.COMMA) ||
+      (this.check(TokenType.NAME) && this.peekNext()?.type === TokenType.ASSIGN)
+    )
 
     this.expect(TokenType.BLOCK_END)
 
@@ -910,7 +921,10 @@ export class Parser {
   private parseAnd(): ExpressionNode {
     let left = this.parseNot()
 
-    while (this.check(TokenType.AND) || (this.check(TokenType.NAME) && this.peek().value === 'and')) {
+    while (
+      this.check(TokenType.AND) ||
+      (this.check(TokenType.NAME) && this.peek().value === 'and')
+    ) {
       this.advance()
       const right = this.parseNot()
       left = {
@@ -1229,13 +1243,28 @@ export class Parser {
 
       // Boolean/null literals
       if (name === 'true' || name === 'True') {
-        return { type: 'Literal', value: true, line: token.line, column: token.column } as LiteralNode
+        return {
+          type: 'Literal',
+          value: true,
+          line: token.line,
+          column: token.column,
+        } as LiteralNode
       }
       if (name === 'false' || name === 'False') {
-        return { type: 'Literal', value: false, line: token.line, column: token.column } as LiteralNode
+        return {
+          type: 'Literal',
+          value: false,
+          line: token.line,
+          column: token.column,
+        } as LiteralNode
       }
       if (name === 'none' || name === 'None' || name === 'null') {
-        return { type: 'Literal', value: null, line: token.line, column: token.column } as LiteralNode
+        return {
+          type: 'Literal',
+          value: null,
+          line: token.line,
+          column: token.column,
+        } as LiteralNode
       }
 
       return { type: 'Name', name, line: token.line, column: token.column } as NameNode

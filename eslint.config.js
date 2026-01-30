@@ -7,11 +7,6 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
-    languageOptions: {
-      parserOptions: {
-        project: './tsconfig.json',
-      },
-    },
     rules: {
       // TypeScript specific
       '@typescript-eslint/no-unused-vars': ['warn', {
@@ -30,6 +25,8 @@ export default tseslint.config(
       'prefer-const': 'warn',
       'no-var': 'error',
       'eqeqeq': ['warn', 'smart'],
+      'no-case-declarations': 'off',
+      'no-shadow-restricted-names': 'off',
     },
   },
   {

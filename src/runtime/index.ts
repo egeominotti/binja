@@ -79,9 +79,11 @@ export class Runtime {
       globals: options.globals ?? {},
       urlResolver: options.urlResolver ?? ((name) => `#${name}`),
       staticResolver: options.staticResolver ?? ((path) => `/static/${path}`),
-      templateLoader: options.templateLoader ?? (async () => {
-        throw new Error('Template loader not configured')
-      }),
+      templateLoader:
+        options.templateLoader ??
+        (async () => {
+          throw new Error('Template loader not configured')
+        }),
       timezone: options.timezone ?? undefined,
     }
 
@@ -545,14 +547,68 @@ export class Runtime {
     const method = node.method
 
     const words = [
-      'lorem', 'ipsum', 'dolor', 'sit', 'amet', 'consectetur', 'adipiscing', 'elit',
-      'sed', 'do', 'eiusmod', 'tempor', 'incididunt', 'ut', 'labore', 'et', 'dolore',
-      'magna', 'aliqua', 'enim', 'ad', 'minim', 'veniam', 'quis', 'nostrud',
-      'exercitation', 'ullamco', 'laboris', 'nisi', 'aliquip', 'ex', 'ea', 'commodo',
-      'consequat', 'duis', 'aute', 'irure', 'in', 'reprehenderit', 'voluptate',
-      'velit', 'esse', 'cillum', 'fugiat', 'nulla', 'pariatur', 'excepteur', 'sint',
-      'occaecat', 'cupidatat', 'non', 'proident', 'sunt', 'culpa', 'qui', 'officia',
-      'deserunt', 'mollit', 'anim', 'id', 'est', 'laborum'
+      'lorem',
+      'ipsum',
+      'dolor',
+      'sit',
+      'amet',
+      'consectetur',
+      'adipiscing',
+      'elit',
+      'sed',
+      'do',
+      'eiusmod',
+      'tempor',
+      'incididunt',
+      'ut',
+      'labore',
+      'et',
+      'dolore',
+      'magna',
+      'aliqua',
+      'enim',
+      'ad',
+      'minim',
+      'veniam',
+      'quis',
+      'nostrud',
+      'exercitation',
+      'ullamco',
+      'laboris',
+      'nisi',
+      'aliquip',
+      'ex',
+      'ea',
+      'commodo',
+      'consequat',
+      'duis',
+      'aute',
+      'irure',
+      'in',
+      'reprehenderit',
+      'voluptate',
+      'velit',
+      'esse',
+      'cillum',
+      'fugiat',
+      'nulla',
+      'pariatur',
+      'excepteur',
+      'sint',
+      'occaecat',
+      'cupidatat',
+      'non',
+      'proident',
+      'sunt',
+      'culpa',
+      'qui',
+      'officia',
+      'deserunt',
+      'mollit',
+      'anim',
+      'id',
+      'est',
+      'laborum',
     ]
 
     const getWord = (index: number) => {
@@ -593,7 +649,7 @@ export class Runtime {
         return paragraphs.join('\n\n')
       }
       // HTML paragraphs
-      return paragraphs.map(p => `<p>${p}</p>`).join('\n')
+      return paragraphs.map((p) => `<p>${p}</p>`).join('\n')
     }
 
     return ''
@@ -616,22 +672,30 @@ export class Runtime {
   // Django: {% templatetag %} - outputs template syntax characters
   private renderTemplatetagSync(node: TemplatetagNode): string {
     const tagMap: Record<string, string> = {
-      'openblock': '{%',
-      'closeblock': '%}',
-      'openvariable': '{{',
-      'closevariable': '}}',
-      'openbrace': '{',
-      'closebrace': '}',
-      'opencomment': '{#',
-      'closecomment': '#}'
+      openblock: '{%',
+      closeblock: '%}',
+      openvariable: '{{',
+      closevariable: '}}',
+      openbrace: '{',
+      closebrace: '}',
+      opencomment: '{#',
+      closecomment: '#}',
     }
     return tagMap[node.tagType] || ''
   }
 
   // Get date components in the specified timezone
-  private getDateInTimezone(d: Date, tz?: string): {
-    year: number, month: number, day: number, weekday: number,
-    hours: number, minutes: number, seconds: number
+  private getDateInTimezone(
+    d: Date,
+    tz?: string
+  ): {
+    year: number
+    month: number
+    day: number
+    weekday: number
+    hours: number
+    minutes: number
+    seconds: number
   } {
     if (!tz) {
       // Use local timezone
@@ -660,9 +724,17 @@ export class Runtime {
     })
 
     const parts = formatter.formatToParts(d)
-    const get = (type: string) => parts.find(p => p.type === type)?.value || ''
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || ''
 
-    const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+    const weekdayMap: Record<string, number> = {
+      Sun: 0,
+      Mon: 1,
+      Tue: 2,
+      Wed: 3,
+      Thu: 4,
+      Fri: 5,
+      Sat: 6,
+    }
 
     return {
       year: parseInt(get('year'), 10),
@@ -678,9 +750,43 @@ export class Runtime {
   // Django date format helper for {% now %} tag
   private formatDate(d: Date, format: string): string {
     const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    const DAY_NAMES_LONG = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ]
+    const MONTH_NAMES_SHORT = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ]
+    const MONTH_NAMES_LONG = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ]
 
     // Get date components in the configured timezone
     const tz = this.options.timezone
@@ -691,30 +797,67 @@ export class Runtime {
       const char = format[i]
       switch (char) {
         // Day
-        case 'd': result += String(day).padStart(2, '0'); break
-        case 'j': result += String(day); break
-        case 'D': result += DAY_NAMES_SHORT[weekday]; break
-        case 'l': result += DAY_NAMES_LONG[weekday]; break
+        case 'd':
+          result += String(day).padStart(2, '0')
+          break
+        case 'j':
+          result += String(day)
+          break
+        case 'D':
+          result += DAY_NAMES_SHORT[weekday]
+          break
+        case 'l':
+          result += DAY_NAMES_LONG[weekday]
+          break
         // Month
-        case 'm': result += String(month + 1).padStart(2, '0'); break
-        case 'n': result += String(month + 1); break
-        case 'M': result += MONTH_NAMES_SHORT[month]; break
-        case 'F': result += MONTH_NAMES_LONG[month]; break
+        case 'm':
+          result += String(month + 1).padStart(2, '0')
+          break
+        case 'n':
+          result += String(month + 1)
+          break
+        case 'M':
+          result += MONTH_NAMES_SHORT[month]
+          break
+        case 'F':
+          result += MONTH_NAMES_LONG[month]
+          break
         // Year
-        case 'y': result += String(year).slice(-2); break
-        case 'Y': result += String(year); break
+        case 'y':
+          result += String(year).slice(-2)
+          break
+        case 'Y':
+          result += String(year)
+          break
         // Time
-        case 'H': result += String(hours).padStart(2, '0'); break
-        case 'G': result += String(hours); break
-        case 'i': result += String(minutes).padStart(2, '0'); break
-        case 's': result += String(seconds).padStart(2, '0'); break
+        case 'H':
+          result += String(hours).padStart(2, '0')
+          break
+        case 'G':
+          result += String(hours)
+          break
+        case 'i':
+          result += String(minutes).padStart(2, '0')
+          break
+        case 's':
+          result += String(seconds).padStart(2, '0')
+          break
         // AM/PM
-        case 'a': result += hours < 12 ? 'a.m.' : 'p.m.'; break
-        case 'A': result += hours < 12 ? 'AM' : 'PM'; break
+        case 'a':
+          result += hours < 12 ? 'a.m.' : 'p.m.'
+          break
+        case 'A':
+          result += hours < 12 ? 'AM' : 'PM'
+          break
         // 12-hour
-        case 'g': result += String(hours % 12 || 12); break
-        case 'h': result += String(hours % 12 || 12).padStart(2, '0'); break
-        default: result += char
+        case 'g':
+          result += String(hours % 12 || 12)
+          break
+        case 'h':
+          result += String(hours % 12 || 12).padStart(2, '0')
+          break
+        default:
+          result += char
       }
     }
     return result
@@ -867,7 +1010,7 @@ export class Runtime {
           return s.charAt(0).toUpperCase() + s.slice(1)
         }
         case 'title':
-          return String(value ?? '').replace(Runtime.TITLE_REGEX, c => c.toUpperCase())
+          return String(value ?? '').replace(Runtime.TITLE_REGEX, (c) => c.toUpperCase())
         case 'striptags':
           return String(value ?? '').replace(Runtime.STRIPTAGS_REGEX, '')
         case 'slugify':
@@ -931,8 +1074,12 @@ export class Runtime {
         case 'filesizeformat': {
           const bytes = Number(value) || 0
           const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB']
-          let i = 0, size = bytes
-          while (size >= 1024 && i < units.length - 1) { size /= 1024; i++ }
+          let i = 0,
+            size = bytes
+          while (size >= 1024 && i < units.length - 1) {
+            size /= 1024
+            i++
+          }
           return `${size.toFixed(1)} ${units[i]}`
         }
 
@@ -989,14 +1136,18 @@ export class Runtime {
             const jsonStr = new String(JSON.stringify(value)) as any
             jsonStr.__safe__ = true
             return jsonStr
-          } catch { return '' }
+          } catch {
+            return ''
+          }
         }
         case 'pprint': {
           try {
             const result = new String(JSON.stringify(value, null, 2)) as any
             result.__safe__ = true
             return result
-          } catch { return String(value) }
+          } catch {
+            return String(value)
+          }
         }
 
         // URL
@@ -1049,7 +1200,9 @@ export class Runtime {
         case 'rjust':
           return String(value ?? '').padStart(Number(arg) || 80)
         case 'cut':
-          return String(value ?? '').split(String(arg)).join('')
+          return String(value ?? '')
+            .split(String(arg))
+            .join('')
 
         // Number filters with args
         case 'add': {
@@ -1112,7 +1265,9 @@ export class Runtime {
           return result
         }
         case 'length_is':
-          return (value == null ? 0 : (value.length ?? Object.keys(value).length ?? 0)) === Number(arg)
+          return (
+            (value == null ? 0 : (value.length ?? Object.keys(value).length ?? 0)) === Number(arg)
+          )
         case 'attr':
           return value == null ? undefined : value[arg]
         case 'dictsort':
@@ -1131,16 +1286,16 @@ export class Runtime {
           })
         case 'map':
           if (!Array.isArray(value)) return []
-          if (typeof arg === 'string') return value.map(item => item?.[arg])
+          if (typeof arg === 'string') return value.map((item) => item?.[arg])
           return value
         case 'select':
           if (!Array.isArray(value)) return []
-          if (arg === undefined) return value.filter(item => !!item)
-          return value.filter(item => !!item?.[arg])
+          if (arg === undefined) return value.filter((item) => !!item)
+          return value.filter((item) => !!item?.[arg])
         case 'reject':
           if (!Array.isArray(value)) return []
-          if (arg === undefined) return value.filter(item => !item)
-          return value.filter(item => !item?.[arg])
+          if (arg === undefined) return value.filter((item) => !item)
+          return value.filter((item) => !item?.[arg])
         case 'groupby': {
           if (!Array.isArray(value)) return []
           const groups: Record<string, any[]> = {}
@@ -1184,7 +1339,9 @@ export class Runtime {
             const jsonStr = new String(JSON.stringify(value, null, arg)) as any
             jsonStr.__safe__ = true
             return jsonStr
-          } catch { return '' }
+          } catch {
+            return ''
+          }
         }
 
         // URL
@@ -1314,9 +1471,12 @@ export class Runtime {
           const now = arg1 instanceof Date ? arg1 : new Date(arg1 ?? Date.now())
           const diff = (now.getTime() - d.getTime()) / 1000
           const intervals: [number, string, string][] = [
-            [31536000, 'year', 'years'], [2592000, 'month', 'months'],
-            [604800, 'week', 'weeks'], [86400, 'day', 'days'],
-            [3600, 'hour', 'hours'], [60, 'minute', 'minutes']
+            [31536000, 'year', 'years'],
+            [2592000, 'month', 'months'],
+            [604800, 'week', 'weeks'],
+            [86400, 'day', 'days'],
+            [3600, 'hour', 'hours'],
+            [60, 'minute', 'minutes'],
           ]
           for (const [secs, sing, plur] of intervals) {
             const count = Math.floor(diff / secs)
@@ -1329,9 +1489,12 @@ export class Runtime {
           const now = arg1 instanceof Date ? arg1 : new Date(arg1 ?? Date.now())
           const diff = (d.getTime() - now.getTime()) / 1000
           const intervals: [number, string, string][] = [
-            [31536000, 'year', 'years'], [2592000, 'month', 'months'],
-            [604800, 'week', 'weeks'], [86400, 'day', 'days'],
-            [3600, 'hour', 'hours'], [60, 'minute', 'minutes']
+            [31536000, 'year', 'years'],
+            [2592000, 'month', 'months'],
+            [604800, 'week', 'weeks'],
+            [86400, 'day', 'days'],
+            [3600, 'hour', 'hours'],
+            [60, 'minute', 'minutes'],
           ]
           for (const [secs, sing, plur] of intervals) {
             const count = Math.floor(diff / secs)
@@ -1397,21 +1560,30 @@ export class Runtime {
 
     // Other operators
     switch (op) {
-      case '-': return Number(left) - Number(right)
-      case '*': return Number(left) * Number(right)
-      case '/': return Number(left) / Number(right)
-      case '~': return String(left) + String(right)
-      default: return undefined
+      case '-':
+        return Number(left) - Number(right)
+      case '*':
+        return Number(left) * Number(right)
+      case '/':
+        return Number(left) / Number(right)
+      case '~':
+        return String(left) + String(right)
+      default:
+        return undefined
     }
   }
 
   private evalUnaryOp(node: UnaryOpNode, ctx: Context): any {
     const operand = this.eval(node.operand, ctx)
     switch (node.operator) {
-      case 'not': return !this.isTruthy(operand)
-      case '-': return -Number(operand)
-      case '+': return +Number(operand)
-      default: return operand
+      case 'not':
+        return !this.isTruthy(operand)
+      case '-':
+        return -Number(operand)
+      case '+':
+        return +Number(operand)
+      default:
+        return operand
     }
   }
 
@@ -1445,17 +1617,38 @@ export class Runtime {
       const right = this.eval(rightNode, ctx)
       let result: boolean
       switch (operator) {
-        case '==': result = current === right; break
-        case '!=': result = current !== right; break
-        case '<': result = current < right; break
-        case '>': result = current > right; break
-        case '<=': result = current <= right; break
-        case '>=': result = current >= right; break
-        case 'in': result = this.isIn(current, right); break
-        case 'not in': result = !this.isIn(current, right); break
-        case 'is': result = current === right; break
-        case 'is not': result = current !== right; break
-        default: result = false
+        case '==':
+          result = current === right
+          break
+        case '!=':
+          result = current !== right
+          break
+        case '<':
+          result = current < right
+          break
+        case '>':
+          result = current > right
+          break
+        case '<=':
+          result = current <= right
+          break
+        case '>=':
+          result = current >= right
+          break
+        case 'in':
+          result = this.isIn(current, right)
+          break
+        case 'not in':
+          result = !this.isIn(current, right)
+          break
+        case 'is':
+          result = current === right
+          break
+        case 'is not':
+          result = current !== right
+          break
+        default:
+          result = false
       }
       if (!result) return false
       current = right
@@ -1543,10 +1736,18 @@ export class Runtime {
           result = typeof value === 'string'
           break
         case 'mapping':
-          result = value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)
+          result =
+            value !== null &&
+            typeof value === 'object' &&
+            !Array.isArray(value) &&
+            !(value instanceof Date)
           break
         case 'iterable':
-          result = value != null && (typeof value === 'string' || Array.isArray(value) || typeof value[Symbol.iterator] === 'function')
+          result =
+            value != null &&
+            (typeof value === 'string' ||
+              Array.isArray(value) ||
+              typeof value[Symbol.iterator] === 'function')
           break
         case 'sequence':
           result = Array.isArray(value) || typeof value === 'string'
@@ -1557,10 +1758,16 @@ export class Runtime {
 
         // String tests
         case 'lower':
-          result = typeof value === 'string' && value === value.toLowerCase() && value !== value.toUpperCase()
+          result =
+            typeof value === 'string' &&
+            value === value.toLowerCase() &&
+            value !== value.toUpperCase()
           break
         case 'upper':
-          result = typeof value === 'string' && value === value.toUpperCase() && value !== value.toLowerCase()
+          result =
+            typeof value === 'string' &&
+            value === value.toUpperCase() &&
+            value !== value.toLowerCase()
           break
 
         // Collection tests
@@ -1569,7 +1776,10 @@ export class Runtime {
           else if (typeof value === 'string' || Array.isArray(value)) result = value.length === 0
           else if (typeof value === 'object') {
             result = true
-            for (const _ in value) { result = false; break }
+            for (const _ in value) {
+              result = false
+              break
+            }
           } else result = false
           break
 
@@ -1582,7 +1792,10 @@ export class Runtime {
           else if (Array.isArray(value)) result = value.length > 0
           else if (typeof value === 'object') {
             result = false
-            for (const _ in value) { result = true; break }
+            for (const _ in value) {
+              result = true
+              break
+            }
           } else result = true
           break
         case 'falsy':
@@ -1593,7 +1806,10 @@ export class Runtime {
           else if (Array.isArray(value)) result = value.length === 0
           else if (typeof value === 'object') {
             result = true
-            for (const _ in value) { result = false; break }
+            for (const _ in value) {
+              result = false
+              break
+            }
           } else result = false
           break
         case 'true':

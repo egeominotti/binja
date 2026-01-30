@@ -19,10 +19,57 @@ const WHITESPACE_REGEX = /\s+/
 
 // Pre-defined date format arrays (avoid recreation on each date filter call)
 const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const DAY_NAMES_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-const MONTH_NAMES_AP = ['Jan.', 'Feb.', 'March', 'April', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.']
+const DAY_NAMES_LONG = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+]
+const MONTH_NAMES_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+const MONTH_NAMES_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+const MONTH_NAMES_AP = [
+  'Jan.',
+  'Feb.',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'Aug.',
+  'Sept.',
+  'Oct.',
+  'Nov.',
+  'Dec.',
+]
 
 // ==================== String Filters ====================
 
@@ -45,8 +92,7 @@ export const title: FilterFunction = (value) =>
 
 export const trim: FilterFunction = (value) => String(value).trim()
 
-export const striptags: FilterFunction = (value) =>
-  String(value).replace(STRIPTAGS_REGEX, '')
+export const striptags: FilterFunction = (value) => String(value).replace(STRIPTAGS_REGEX, '')
 
 export const escape: FilterFunction = (value) => {
   // If already safe, don't double-escape
@@ -68,8 +114,7 @@ export const safe: FilterFunction = (value) => {
   return safeString
 }
 
-export const escapejs: FilterFunction = (value) =>
-  JSON.stringify(String(value)).slice(1, -1)
+export const escapejs: FilterFunction = (value) => JSON.stringify(String(value)).slice(1, -1)
 
 export const linebreaks: FilterFunction = (value) => {
   const str = String(value)
@@ -117,14 +162,11 @@ export const center: FilterFunction = (value, width = 80) => {
   return ' '.repeat(left) + str + ' '.repeat(right)
 }
 
-export const ljust: FilterFunction = (value, width = 80) =>
-  String(value).padEnd(width)
+export const ljust: FilterFunction = (value, width = 80) => String(value).padEnd(width)
 
-export const rjust: FilterFunction = (value, width = 80) =>
-  String(value).padStart(width)
+export const rjust: FilterFunction = (value, width = 80) => String(value).padStart(width)
 
-export const cut: FilterFunction = (value, arg = '') =>
-  String(value).split(arg).join('')
+export const cut: FilterFunction = (value, arg = '') => String(value).split(arg).join('')
 
 export const slugify: FilterFunction = (value) =>
   String(value)
@@ -171,8 +213,7 @@ export const add: FilterFunction = (value, arg) => {
 }
 
 // DTL: divisibleby
-export const divisibleby: FilterFunction = (value, arg) =>
-  Number(value) % Number(arg) === 0
+export const divisibleby: FilterFunction = (value, arg) => Number(value) % Number(arg) === 0
 
 export const filesizeformat: FilterFunction = (value) => {
   const bytes = Number(value)
@@ -202,8 +243,7 @@ export const length: FilterFunction = (value) => {
   return 0
 }
 
-export const length_is: FilterFunction = (value, len) =>
-  length(value) === Number(len)
+export const length_is: FilterFunction = (value, len) => length(value) === Number(len)
 
 export const first: FilterFunction = (value) => {
   if (Array.isArray(value)) return value[0]
@@ -305,31 +345,51 @@ export const columns: FilterFunction = (value, cols) => {
 const formatDateChar = (d: Date, char: string): string => {
   switch (char) {
     // Day
-    case 'd': return String(d.getDate()).padStart(2, '0')
-    case 'j': return String(d.getDate())
-    case 'D': return DAY_NAMES_SHORT[d.getDay()]
-    case 'l': return DAY_NAMES_LONG[d.getDay()]
+    case 'd':
+      return String(d.getDate()).padStart(2, '0')
+    case 'j':
+      return String(d.getDate())
+    case 'D':
+      return DAY_NAMES_SHORT[d.getDay()]
+    case 'l':
+      return DAY_NAMES_LONG[d.getDay()]
     // Month
-    case 'm': return String(d.getMonth() + 1).padStart(2, '0')
-    case 'n': return String(d.getMonth() + 1)
-    case 'M': return MONTH_NAMES_SHORT[d.getMonth()]
-    case 'F': return MONTH_NAMES_LONG[d.getMonth()]
-    case 'N': return MONTH_NAMES_AP[d.getMonth()]
+    case 'm':
+      return String(d.getMonth() + 1).padStart(2, '0')
+    case 'n':
+      return String(d.getMonth() + 1)
+    case 'M':
+      return MONTH_NAMES_SHORT[d.getMonth()]
+    case 'F':
+      return MONTH_NAMES_LONG[d.getMonth()]
+    case 'N':
+      return MONTH_NAMES_AP[d.getMonth()]
     // Year
-    case 'y': return String(d.getFullYear()).slice(-2)
-    case 'Y': return String(d.getFullYear())
+    case 'y':
+      return String(d.getFullYear()).slice(-2)
+    case 'Y':
+      return String(d.getFullYear())
     // Time
-    case 'H': return String(d.getHours()).padStart(2, '0')
-    case 'G': return String(d.getHours())
-    case 'i': return String(d.getMinutes()).padStart(2, '0')
-    case 's': return String(d.getSeconds()).padStart(2, '0')
+    case 'H':
+      return String(d.getHours()).padStart(2, '0')
+    case 'G':
+      return String(d.getHours())
+    case 'i':
+      return String(d.getMinutes()).padStart(2, '0')
+    case 's':
+      return String(d.getSeconds()).padStart(2, '0')
     // AM/PM
-    case 'a': return d.getHours() < 12 ? 'a.m.' : 'p.m.'
-    case 'A': return d.getHours() < 12 ? 'AM' : 'PM'
+    case 'a':
+      return d.getHours() < 12 ? 'a.m.' : 'p.m.'
+    case 'A':
+      return d.getHours() < 12 ? 'AM' : 'PM'
     // 12-hour
-    case 'g': return String(d.getHours() % 12 || 12)
-    case 'h': return String(d.getHours() % 12 || 12).padStart(2, '0')
-    default: return char
+    case 'g':
+      return String(d.getHours() % 12 || 12)
+    case 'h':
+      return String(d.getHours() % 12 || 12).padStart(2, '0')
+    default:
+      return char
   }
 }
 
@@ -496,7 +556,12 @@ export const groupby: FilterFunction = (value, attribute) => {
 // ==================== Additional Jinja2/Django Filters ====================
 
 // Jinja2: wordwrap - Wrap text at N characters
-export const wordwrap: FilterFunction = (value, width = 79, breakLongWords = true, wrapString = '\n') => {
+export const wordwrap: FilterFunction = (
+  value,
+  width = 79,
+  breakLongWords = true,
+  wrapString = '\n'
+) => {
   const str = String(value)
   if (str.length <= width) return str
 
@@ -617,7 +682,7 @@ export const map: FilterFunction = (value, attribute) => {
   if (!Array.isArray(value)) return []
   if (typeof attribute === 'string') {
     // Map by attribute name
-    return value.map(item => item?.[attribute])
+    return value.map((item) => item?.[attribute])
   }
   return value
 }
@@ -626,25 +691,25 @@ export const map: FilterFunction = (value, attribute) => {
 export const select: FilterFunction = (value, attribute) => {
   if (!Array.isArray(value)) return []
   if (attribute === undefined) {
-    return value.filter(item => !!item)
+    return value.filter((item) => !!item)
   }
   // Filter by attribute being truthy
-  return value.filter(item => !!item?.[attribute])
+  return value.filter((item) => !!item?.[attribute])
 }
 
 // Jinja2: reject - Filter elements that are falsy (or fail test)
 export const reject: FilterFunction = (value, attribute) => {
   if (!Array.isArray(value)) return []
   if (attribute === undefined) {
-    return value.filter(item => !item)
+    return value.filter((item) => !item)
   }
-  return value.filter(item => !item?.[attribute])
+  return value.filter((item) => !item?.[attribute])
 }
 
 // Jinja2: selectattr - Filter by attribute value
 export const selectattr: FilterFunction = (value, attribute, test, testValue) => {
   if (!Array.isArray(value)) return []
-  return value.filter(item => {
+  return value.filter((item) => {
     const attrValue = item?.[attribute]
     if (test === undefined) return !!attrValue
     if (test === 'eq' || test === 'equalto') return attrValue === testValue
@@ -667,7 +732,7 @@ export const selectattr: FilterFunction = (value, attribute, test, testValue) =>
 export const rejectattr: FilterFunction = (value, attribute, test, testValue) => {
   if (!Array.isArray(value)) return []
   const selected = selectattr(value, attribute, test, testValue)
-  return value.filter(item => !selected.includes(item))
+  return value.filter((item) => !selected.includes(item))
 }
 
 // Jinja2: attr - Get attribute from object
@@ -730,7 +795,6 @@ export const sum: FilterFunction = (value, attribute, start = 0) => {
   return total
 }
 
-
 // Jinja2: pprint - Pretty print for debugging
 export const pprint: FilterFunction = (value) => {
   try {
@@ -756,14 +820,32 @@ export const forceescape: FilterFunction = (value) => {
 
 // Django: phone2numeric - Convert phone letters to numbers
 const PHONE_MAP: Record<string, string> = {
-  a: '2', b: '2', c: '2',
-  d: '3', e: '3', f: '3',
-  g: '4', h: '4', i: '4',
-  j: '5', k: '5', l: '5',
-  m: '6', n: '6', o: '6',
-  p: '7', q: '7', r: '7', s: '7',
-  t: '8', u: '8', v: '8',
-  w: '9', x: '9', y: '9', z: '9',
+  a: '2',
+  b: '2',
+  c: '2',
+  d: '3',
+  e: '3',
+  f: '3',
+  g: '4',
+  h: '4',
+  i: '4',
+  j: '5',
+  k: '5',
+  l: '5',
+  m: '6',
+  n: '6',
+  o: '6',
+  p: '7',
+  q: '7',
+  r: '7',
+  s: '7',
+  t: '8',
+  u: '8',
+  v: '8',
+  w: '9',
+  x: '9',
+  y: '9',
+  z: '9',
 }
 // Optimized: array buffer instead of string concatenation - 15-20% faster
 export const phone2numeric: FilterFunction = (value) => {
@@ -826,10 +908,7 @@ export const unordered_list: FilterFunction = (value): any => {
 
 // Django: addslashes - Escape backslash, single and double quotes
 export const addslashes: FilterFunction = (value) => {
-  const result = String(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '\\"')
+  const result = String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"')
   // Mark as safe since quotes are escaped for JS strings
   const safeString = new String(result) as any
   safeString.__safe__ = true
@@ -839,7 +918,7 @@ export const addslashes: FilterFunction = (value) => {
 // Django: get_digit - Get nth digit from right (1=rightmost)
 export const get_digit: FilterFunction = (value, digit) => {
   const num = parseInt(String(value), 10)
-  if (isNaN(num)) return value  // Return original for non-integers
+  if (isNaN(num)) return value // Return original for non-integers
   const str = String(Math.abs(num))
   const pos = Number(digit) || 1
   if (pos < 1 || pos > str.length) return value
@@ -865,8 +944,8 @@ export const iriencode: FilterFunction = (value) => {
 // Django: json_script - Output JSON in a <script> tag safely (for embedding in HTML)
 export const json_script: FilterFunction = (value, elementId) => {
   const jsonStr = JSON.stringify(value)
-    .replace(/</g, '\\u003C')  // Escape < to prevent </script> injection
-    .replace(/>/g, '\\u003E')  // Escape > for safety
+    .replace(/</g, '\\u003C') // Escape < to prevent </script> injection
+    .replace(/>/g, '\\u003E') // Escape > for safety
     .replace(/&/g, '\\u0026') // Escape & for HTML safety
 
   const id = elementId ? ` id="${String(elementId)}"` : ''
@@ -880,7 +959,7 @@ export const json_script: FilterFunction = (value, elementId) => {
 // Django: safeseq - Mark each item in sequence as safe
 export const safeseq: FilterFunction = (value) => {
   if (!Array.isArray(value)) return value
-  return value.map(item => {
+  return value.map((item) => {
     const safeString = new String(item) as any
     safeString.__safe__ = true
     return safeString
@@ -896,11 +975,11 @@ export const stringformat: FilterFunction = (value, formatStr) => {
   if (fmt === 's') return String(val)
   if (fmt === 'd' || fmt === 'i') return String(parseInt(String(val), 10) || 0)
   if (fmt === 'f') return String(parseFloat(String(val)) || 0)
-  if (fmt === 'x') return (parseInt(String(val), 10) || 0).toString(16)  // hex lowercase
-  if (fmt === 'X') return (parseInt(String(val), 10) || 0).toString(16).toUpperCase()  // hex uppercase
-  if (fmt === 'o') return (parseInt(String(val), 10) || 0).toString(8)  // octal
-  if (fmt === 'b') return (parseInt(String(val), 10) || 0).toString(2)  // binary
-  if (fmt === 'e') return (parseFloat(String(val)) || 0).toExponential()  // exponential
+  if (fmt === 'x') return (parseInt(String(val), 10) || 0).toString(16) // hex lowercase
+  if (fmt === 'X') return (parseInt(String(val), 10) || 0).toString(16).toUpperCase() // hex uppercase
+  if (fmt === 'o') return (parseInt(String(val), 10) || 0).toString(8) // octal
+  if (fmt === 'b') return (parseInt(String(val), 10) || 0).toString(2) // binary
+  if (fmt === 'e') return (parseFloat(String(val)) || 0).toExponential() // exponential
 
   // Handle precision: .2f, .3f, etc.
   const precisionMatch = fmt.match(/^\.?(\d+)f$/)

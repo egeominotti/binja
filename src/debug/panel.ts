@@ -232,7 +232,12 @@ const icons = {
   warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
 }
 
-function generateHTML(id: string, data: DebugData, c: typeof darkTheme, opts: Required<PanelOptions>): string {
+function generateHTML(
+  id: string,
+  data: DebugData,
+  c: typeof darkTheme,
+  opts: Required<PanelOptions>
+): string {
   const time = (data.totalTime || 0).toFixed(1)
   const queryCount = data.queries?.length || 0
   const hasWarnings = data.warnings.length > 0 || data.queryStats?.n1Count > 0
@@ -240,18 +245,48 @@ function generateHTML(id: string, data: DebugData, c: typeof darkTheme, opts: Re
   // Build tabs array with counts
   const tabs = [
     { id: 'perf', icon: icons.perf, label: 'Performance', count: `${time}ms` },
-    { id: 'context', icon: icons.context, label: 'Context', count: Object.keys(data.contextSnapshot).length || null },
-    { id: 'templates', icon: icons.template, label: 'Templates', count: data.templateChain.length || null },
+    {
+      id: 'context',
+      icon: icons.context,
+      label: 'Context',
+      count: Object.keys(data.contextSnapshot).length || null,
+    },
+    {
+      id: 'templates',
+      icon: icons.template,
+      label: 'Templates',
+      count: data.templateChain.length || null,
+    },
     { id: 'filters', icon: icons.filter, label: 'Filters', count: data.filtersUsed.size || null },
-    { id: 'queries', icon: icons.database, label: 'Queries', count: queryCount || null, warn: data.queryStats?.n1Count > 0 },
-    { id: 'cache', icon: icons.cache, label: 'Cache', count: (data.cacheHits + data.cacheMisses) || null },
-    { id: 'warnings', icon: icons.warning, label: 'Warnings', count: data.warnings.length || null, warn: hasWarnings },
+    {
+      id: 'queries',
+      icon: icons.database,
+      label: 'Queries',
+      count: queryCount || null,
+      warn: data.queryStats?.n1Count > 0,
+    },
+    {
+      id: 'cache',
+      icon: icons.cache,
+      label: 'Cache',
+      count: data.cacheHits + data.cacheMisses || null,
+    },
+    {
+      id: 'warnings',
+      icon: icons.warning,
+      label: 'Warnings',
+      count: data.warnings.length || null,
+      warn: hasWarnings,
+    },
   ]
 
-  const tabsHtml = tabs.map((t, i) => {
-    const countHtml = t.count !== null ? `<span class="count${t.warn ? ' warn' : ''}">${t.count}</span>` : ''
-    return `<button class="devtools-tab${i === 0 ? ' active' : ''}" data-tab="${t.id}">${t.icon}${t.label}${countHtml}</button>`
-  }).join('')
+  const tabsHtml = tabs
+    .map((t, i) => {
+      const countHtml =
+        t.count !== null ? `<span class="count${t.warn ? ' warn' : ''}">${t.count}</span>` : ''
+      return `<button class="devtools-tab${i === 0 ? ' active' : ''}" data-tab="${t.id}">${t.icon}${t.label}${countHtml}</button>`
+    })
+    .join('')
 
   return `
 <button class="devtools-toggle" onclick="document.getElementById('${id}').dataset.open='true'">
@@ -313,17 +348,17 @@ function generatePerfPane(data: DebugData): string {
   <div class="perf-breakdown">
     <div class="perf-row">
       <span class="perf-row-label">Lexer</span>
-      <div class="perf-row-bar"><div class="perf-row-fill lexer" style="width:${(lexer/total)*100}%"></div></div>
+      <div class="perf-row-bar"><div class="perf-row-fill lexer" style="width:${(lexer / total) * 100}%"></div></div>
       <span class="perf-row-value">${lexer.toFixed(2)}ms</span>
     </div>
     <div class="perf-row">
       <span class="perf-row-label">Parser</span>
-      <div class="perf-row-bar"><div class="perf-row-fill parser" style="width:${(parser/total)*100}%"></div></div>
+      <div class="perf-row-bar"><div class="perf-row-fill parser" style="width:${(parser / total) * 100}%"></div></div>
       <span class="perf-row-value">${parser.toFixed(2)}ms</span>
     </div>
     <div class="perf-row">
       <span class="perf-row-label">Render</span>
-      <div class="perf-row-bar"><div class="perf-row-fill render" style="width:${(render/total)*100}%"></div></div>
+      <div class="perf-row-bar"><div class="perf-row-fill render" style="width:${(render / total) * 100}%"></div></div>
       <span class="perf-row-value">${render.toFixed(2)}ms</span>
     </div>
   </div>
@@ -336,19 +371,23 @@ function generateContextPane(data: DebugData): string {
     return `<div class="devtools-pane" data-pane="context"><div class="empty-state">${icons.context}<span>No context variables</span></div></div>`
   }
 
-  const items = keys.map(key => renderTreeItem(key, data.contextSnapshot[key])).join('')
+  const items = keys.map((key) => renderTreeItem(key, data.contextSnapshot[key])).join('')
   return `<div class="devtools-pane" data-pane="context"><div class="tree">${items}</div></div>`
 }
 
 function renderTreeItem(key: string, ctx: ContextValue): string {
   const hasChildren = ctx.expandable && ctx.children && Object.keys(ctx.children).length > 0
-  const arrowHtml = hasChildren ? `<span class="tree-arrow">${icons.arrow}</span>` : '<span class="tree-arrow" style="visibility:hidden">${icons.arrow}</span>'
+  const arrowHtml = hasChildren
+    ? `<span class="tree-arrow">${icons.arrow}</span>`
+    : '<span class="tree-arrow" style="visibility:hidden">${icons.arrow}</span>'
   const expandableClass = hasChildren ? 'expandable' : ''
   const valueClass = getValueClass(ctx.type)
 
   let childrenHtml = ''
   if (hasChildren && ctx.children) {
-    childrenHtml = `<div class="tree-children">${Object.entries(ctx.children).map(([k, v]) => renderTreeItem(k, v)).join('')}</div>`
+    childrenHtml = `<div class="tree-children">${Object.entries(ctx.children)
+      .map(([k, v]) => renderTreeItem(k, v))
+      .join('')}</div>`
   }
 
   return `
@@ -376,13 +415,17 @@ function generateTemplatesPane(data: DebugData): string {
     return `<div class="devtools-pane" data-pane="templates"><div class="empty-state">${icons.template}<span>No templates loaded</span></div></div>`
   }
 
-  const items = data.templateChain.map(t => `
+  const items = data.templateChain
+    .map(
+      (t) => `
     <div class="template-item">
       <span class="template-icon">${icons.template}</span>
       <span class="template-name">${escapeHtml(t.name)}</span>
       <span class="template-badge ${t.type}">${t.type}</span>
     </div>
-  `).join('')
+  `
+    )
+    .join('')
 
   return `<div class="devtools-pane" data-pane="templates"><div class="template-list">${items}</div></div>`
 }
@@ -393,9 +436,13 @@ function generateFiltersPane(data: DebugData): string {
     return `<div class="devtools-pane" data-pane="filters"><div class="empty-state">${icons.filter}<span>No filters used</span></div></div>`
   }
 
-  const items = filters.map(([name, count]) => `
+  const items = filters
+    .map(
+      ([name, count]) => `
     <span class="filter-chip">${escapeHtml(name)}<span class="filter-count">×${count}</span></span>
-  `).join('')
+  `
+    )
+    .join('')
 
   return `<div class="devtools-pane" data-pane="filters"><div class="filter-grid">${items}</div></div>`
 }
@@ -426,14 +473,17 @@ function generateQueriesPane(data: DebugData): string {
       </div>
     </div>`
 
-  const queries = data.queries.map(q => {
-    const isSlow = q.duration > 100
-    const classes = ['query-item', q.isN1 ? 'n1' : '', isSlow ? 'slow' : ''].filter(Boolean).join(' ')
-    const badge = q.isN1 ? '<span class="query-badge n1">N+1</span>' : ''
-    const source = q.source ? `<span class="query-source">${escapeHtml(q.source)}</span>` : ''
-    const rows = q.rows !== undefined ? `<span class="query-rows">${q.rows} rows</span>` : ''
+  const queries = data.queries
+    .map((q) => {
+      const isSlow = q.duration > 100
+      const classes = ['query-item', q.isN1 ? 'n1' : '', isSlow ? 'slow' : '']
+        .filter(Boolean)
+        .join(' ')
+      const badge = q.isN1 ? '<span class="query-badge n1">N+1</span>' : ''
+      const source = q.source ? `<span class="query-source">${escapeHtml(q.source)}</span>` : ''
+      const rows = q.rows !== undefined ? `<span class="query-rows">${q.rows} rows</span>` : ''
 
-    return `
+      return `
     <div class="${classes}">
       <div class="query-header">
         <span class="query-sql" title="${escapeHtml(q.sql)}">${escapeHtml(q.sql)}</span>
@@ -443,7 +493,8 @@ function generateQueriesPane(data: DebugData): string {
         </div>
       </div>
     </div>`
-  }).join('')
+    })
+    .join('')
 
   return `<div class="devtools-pane" data-pane="queries">${statsHtml}<div class="query-list">${queries}</div></div>`
 }
@@ -480,12 +531,16 @@ function generateWarningsPane(data: DebugData): string {
     return `<div class="devtools-pane" data-pane="warnings"><div class="empty-state">${icons.warning}<span>No warnings</span></div></div>`
   }
 
-  const items = data.warnings.map(w => `
+  const items = data.warnings
+    .map(
+      (w) => `
     <div class="warning-item">
       <span class="warning-icon">${icons.warning}</span>
       <span class="warning-text">${escapeHtml(w)}</span>
     </div>
-  `).join('')
+  `
+    )
+    .join('')
 
   return `<div class="devtools-pane" data-pane="warnings"><div class="warning-list">${items}</div></div>`
 }
@@ -562,5 +617,9 @@ function generateScript(id: string, data: DebugData, opts: Required<PanelOptions
 }
 
 function escapeHtml(str: string): string {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }

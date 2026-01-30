@@ -147,7 +147,10 @@ export class HandlebarsParser {
     const hash: Record<string, ExpressionNode> = {}
 
     while (!this.check(HbsTokenType.CLOSE)) {
-      if (this.check(HbsTokenType.ID) && this.tokens[this.current + 1]?.type === HbsTokenType.EQUALS) {
+      if (
+        this.check(HbsTokenType.ID) &&
+        this.tokens[this.current + 1]?.type === HbsTokenType.EQUALS
+      ) {
         // Hash argument: key=value
         const key = this.advance().value
         this.advance() // =
@@ -240,7 +243,7 @@ export class HandlebarsParser {
 
     return {
       type: 'For',
-      target: 'this',  // Handlebars uses 'this' for current item
+      target: 'this', // Handlebars uses 'this' for current item
       iter: iterable,
       body,
       else_,
@@ -262,7 +265,13 @@ export class HandlebarsParser {
     } as any
   }
 
-  private parseCustomBlock(name: string, args: ExpressionNode[], hash: Record<string, ExpressionNode>, line: number, column: number): ASTNode {
+  private parseCustomBlock(
+    name: string,
+    args: ExpressionNode[],
+    hash: Record<string, ExpressionNode>,
+    line: number,
+    column: number
+  ): ASTNode {
     const body = this.parseNodes([name])
     this.consumeEndBlock()
 
@@ -297,7 +306,7 @@ export class HandlebarsParser {
     return {
       type: 'Include',
       template: { type: 'Literal', value: name, line: token.line, column: token.column },
-      context: context ? { _: context } as any : undefined,
+      context: context ? ({ _: context } as any) : undefined,
       line: token.line,
       column: token.column,
     } as any
@@ -307,10 +316,18 @@ export class HandlebarsParser {
     let expr = this.parseExpressionAtom()
 
     // Handle helpers (function calls)
-    while (this.check(HbsTokenType.ID) || this.check(HbsTokenType.STRING) || this.check(HbsTokenType.NUMBER)) {
+    while (
+      this.check(HbsTokenType.ID) ||
+      this.check(HbsTokenType.STRING) ||
+      this.check(HbsTokenType.NUMBER)
+    ) {
       // This is a helper call with arguments
       const args: ExpressionNode[] = [expr]
-      while (!this.check(HbsTokenType.CLOSE) && !this.check(HbsTokenType.CLOSE_UNESCAPED) && !this.check(HbsTokenType.PIPE)) {
+      while (
+        !this.check(HbsTokenType.CLOSE) &&
+        !this.check(HbsTokenType.CLOSE_UNESCAPED) &&
+        !this.check(HbsTokenType.PIPE)
+      ) {
         args.push(this.parseExpressionAtom())
       }
 
@@ -337,15 +354,30 @@ export class HandlebarsParser {
     switch (token.type) {
       case HbsTokenType.STRING:
         this.advance()
-        return { type: 'Literal', value: token.value, line: token.line, column: token.column } as any
+        return {
+          type: 'Literal',
+          value: token.value,
+          line: token.line,
+          column: token.column,
+        } as any
 
       case HbsTokenType.NUMBER:
         this.advance()
-        return { type: 'Literal', value: parseFloat(token.value), line: token.line, column: token.column } as any
+        return {
+          type: 'Literal',
+          value: parseFloat(token.value),
+          line: token.line,
+          column: token.column,
+        } as any
 
       case HbsTokenType.BOOLEAN:
         this.advance()
-        return { type: 'Literal', value: token.value === 'true', line: token.line, column: token.column } as any
+        return {
+          type: 'Literal',
+          value: token.value === 'true',
+          line: token.line,
+          column: token.column,
+        } as any
 
       case HbsTokenType.ID:
         return this.parsePath()
@@ -362,7 +394,12 @@ export class HandlebarsParser {
 
   private parsePath(): ExpressionNode {
     const first = this.advance()
-    let expr: ExpressionNode = { type: 'Name', name: first.value, line: first.line, column: first.column } as any
+    let expr: ExpressionNode = {
+      type: 'Name',
+      name: first.value,
+      line: first.line,
+      column: first.column,
+    } as any
 
     // Handle @index, @key, @first, @last -> forloop equivalents
     if (first.value.startsWith('@')) {
@@ -377,7 +414,13 @@ export class HandlebarsParser {
         const parts = mapping[loopVar].split('.')
         expr = { type: 'Name', name: parts[0], line: first.line, column: first.column } as any
         for (let i = 1; i < parts.length; i++) {
-          expr = { type: 'GetAttr', object: expr, attribute: parts[i], line: first.line, column: first.column } as any
+          expr = {
+            type: 'GetAttr',
+            object: expr,
+            attribute: parts[i],
+            line: first.line,
+            column: first.column,
+          } as any
         }
       }
     }
@@ -387,7 +430,13 @@ export class HandlebarsParser {
       this.advance()
       if (this.check(HbsTokenType.ID)) {
         const attr = this.advance()
-        expr = { type: 'GetAttr', object: expr, attribute: attr.value, line: attr.line, column: attr.column } as any
+        expr = {
+          type: 'GetAttr',
+          object: expr,
+          attribute: attr.value,
+          line: attr.line,
+          column: attr.column,
+        } as any
       }
     }
 

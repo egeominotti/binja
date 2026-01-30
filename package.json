@@ -63,7 +63,8 @@
     "version:major": "npm version major --no-git-tag-version",
     "release:patch": "bun run version:patch && bun run build",
     "release:minor": "bun run version:minor && bun run build",
-    "release:major": "bun run version:major && bun run build"
+    "release:major": "bun run version:major && bun run build",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -97,6 +98,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "hono": "^4.11.3",
+    "husky": "^9.1.7",
     "openai": "^4.77.0",
     "prettier": "^3.8.1",
     "typescript": "latest",

@@ -168,7 +168,7 @@ function parseArgs(args: string[]): ParsedArgs {
     } else if (arg === '-v' || arg === '--verbose') {
       compileOptions.verbose = true
     } else if (arg === '-e' || arg === '--ext') {
-      const exts = args[++i].split(',').map(e => e.startsWith('.') ? e : `.${e}`)
+      const exts = args[++i].split(',').map((e) => (e.startsWith('.') ? e : `.${e}`))
       compileOptions.extensions = exts
       lintOptions.extensions = exts
     } else if (arg === '--ai') {
@@ -209,7 +209,7 @@ function createTemplateLoader(baseDir: string, extensions: string[]): TemplateLo
       const tokens = lexer.tokenize()
       const parser = new Parser(tokens)
       return parser.parse()
-    }
+    },
   }
 }
 
@@ -282,7 +282,9 @@ async function compileFile(
     if (!check.canFlatten) {
       // Template has dynamic inheritance - compile without flattening
       if (options.verbose) {
-        warn(`${path.basename(filePath)}: ${check.reason} - compiling without inheritance resolution`)
+        warn(
+          `${path.basename(filePath)}: ${check.reason} - compiling without inheritance resolution`
+        )
       }
     } else {
       // Flatten the template
@@ -291,12 +293,14 @@ async function compileFile(
 
     // Determine function name
     const relativePath = path.relative(baseDir, filePath)
-    const functionName = options.name ||
-      'render' + relativePath
-        .replace(/\.[^.]+$/, '')
-        .replace(/[^a-zA-Z0-9]/g, '_')
-        .replace(/^_+|_+$/g, '')
-        .replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+    const functionName =
+      options.name ||
+      'render' +
+        relativePath
+          .replace(/\.[^.]+$/, '')
+          .replace(/[^a-zA-Z0-9]/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .replace(/_([a-z])/g, (_, c) => c.toUpperCase())
 
     // Compile to JavaScript
     const code = compileToString(finalAst, {
@@ -361,7 +365,9 @@ async function compileDirectory(
     if (result.success) {
       compiled++
       if (options.verbose) {
-        success(`${path.relative(sourceDir, fullPath)} → ${path.relative(process.cwd(), result.outputPath!)}`)
+        success(
+          `${path.relative(sourceDir, fullPath)} → ${path.relative(process.cwd(), result.outputPath!)}`
+        )
       }
     } else {
       failed++
@@ -428,7 +434,10 @@ async function watchAndCompile(sourceDir: string, outputDir: string, options: Co
   log('')
 
   // Initial compile
-  const { compiled, failed } = await compileDirectory(sourceDir, outputDir, { ...options, verbose: true })
+  const { compiled, failed } = await compileDirectory(sourceDir, outputDir, {
+    ...options,
+    verbose: true,
+  })
   log('')
   log(`Compiled ${compiled} templates${failed > 0 ? `, ${failed} failed` : ''}`)
   log('')
@@ -464,9 +473,27 @@ async function watchAndCompile(sourceDir: string, outputDir: string, options: Co
 async function lintTemplates(sourcePath: string, isDirectory: boolean, options: LintCliOptions) {
   type LintResult = {
     valid: boolean
-    errors: Array<{ line: number; type: string; severity: string; message: string; suggestion?: string }>
-    warnings: Array<{ line: number; type: string; severity: string; message: string; suggestion?: string }>
-    suggestions: Array<{ line: number; type: string; severity: string; message: string; suggestion?: string }>
+    errors: Array<{
+      line: number
+      type: string
+      severity: string
+      message: string
+      suggestion?: string
+    }>
+    warnings: Array<{
+      line: number
+      type: string
+      severity: string
+      message: string
+      suggestion?: string
+    }>
+    suggestions: Array<{
+      line: number
+      type: string
+      severity: string
+      message: string
+      suggestion?: string
+    }>
     provider?: string
     duration?: number
   }
@@ -565,14 +592,22 @@ async function lintTemplates(sourcePath: string, isDirectory: boolean, options: 
       log('')
 
       for (const issue of issues) {
-        const icon = issue.severity === 'error' ? colors.red + '✗' :
-                     issue.severity === 'warning' ? colors.yellow + '⚠' :
-                     colors.dim + '💡'
-        const typeColor = issue.type === 'security' ? colors.red :
-                         issue.type === 'performance' ? colors.yellow :
-                         colors.dim
+        const icon =
+          issue.severity === 'error'
+            ? colors.red + '✗'
+            : issue.severity === 'warning'
+              ? colors.yellow + '⚠'
+              : colors.dim + '💡'
+        const typeColor =
+          issue.type === 'security'
+            ? colors.red
+            : issue.type === 'performance'
+              ? colors.yellow
+              : colors.dim
 
-        log(`  ${icon}${colors.reset}  L${issue.line.toString().padEnd(4)} ${typeColor}${issue.type.padEnd(14)}${colors.reset} ${issue.message}`)
+        log(
+          `  ${icon}${colors.reset}  L${issue.line.toString().padEnd(4)} ${typeColor}${issue.type.padEnd(14)}${colors.reset} ${issue.message}`
+        )
         if (issue.suggestion) {
           log(`                            ${colors.dim}→ ${issue.suggestion}${colors.reset}`)
         }
@@ -585,7 +620,8 @@ async function lintTemplates(sourcePath: string, isDirectory: boolean, options: 
     } else {
       const parts: string[] = []
       if (totalErrors > 0) parts.push(`${colors.red}${totalErrors} error(s)${colors.reset}`)
-      if (totalWarnings > 0) parts.push(`${colors.yellow}${totalWarnings} warning(s)${colors.reset}`)
+      if (totalWarnings > 0)
+        parts.push(`${colors.yellow}${totalWarnings} warning(s)${colors.reset}`)
       if (totalSuggestions > 0) parts.push(`${totalSuggestions} suggestion(s)`)
 
       log(`  ${files.length} template(s): ${parts.join(', ')}`)
@@ -675,7 +711,12 @@ async function main() {
         warn(`Compiled ${compiled} templates, ${failed} failed (${elapsed}ms)`)
       }
     } else {
-      const result = await compileFile(sourcePath, outputDir, path.dirname(sourcePath), compileOptions)
+      const result = await compileFile(
+        sourcePath,
+        outputDir,
+        path.dirname(sourcePath),
+        compileOptions
+      )
 
       if (result.success) {
         success(`Compiled to ${result.outputPath}`)
@@ -687,7 +728,7 @@ async function main() {
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   error(err.message)
   process.exit(1)
 })

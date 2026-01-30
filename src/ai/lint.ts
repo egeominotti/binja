@@ -24,10 +24,7 @@ import { buildPrompt } from './prompt'
  * // result.warnings = [{ type: 'security', message: 'XSS: unescaped in onclick' }]
  * ```
  */
-export async function lint(
-  template: string,
-  options: LintOptions = {}
-): Promise<LintResult> {
+export async function lint(template: string, options: LintOptions = {}): Promise<LintResult> {
   const startTime = Date.now()
 
   const result: LintResult = {
@@ -68,7 +65,11 @@ export async function lint(
 
     // Categorize issues
     for (const issue of issues) {
-      if (options.maxIssues && result.errors.length + result.warnings.length + result.suggestions.length >= options.maxIssues) {
+      if (
+        options.maxIssues &&
+        result.errors.length + result.warnings.length + result.suggestions.length >=
+          options.maxIssues
+      ) {
         break
       }
 

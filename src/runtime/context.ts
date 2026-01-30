@@ -6,20 +6,20 @@
  */
 
 export interface ForLoop {
-  counter: number      // 1-indexed (DTL)
-  counter0: number     // 0-indexed (DTL)
-  revcounter: number   // reverse counter (DTL)
-  revcounter0: number  // reverse counter 0-indexed (DTL)
+  counter: number // 1-indexed (DTL)
+  counter0: number // 0-indexed (DTL)
+  revcounter: number // reverse counter (DTL)
+  revcounter0: number // reverse counter 0-indexed (DTL)
   first: boolean
   last: boolean
   length: number
   // Jinja2 compatibility
-  index: number        // same as counter (Jinja2)
-  index0: number       // same as counter0 (Jinja2)
-  revindex: number     // same as revcounter (Jinja2)
-  revindex0: number    // same as revcounter0 (Jinja2)
-  depth: number        // nesting depth
-  depth0: number       // nesting depth 0-indexed
+  index: number // same as counter (Jinja2)
+  index0: number // same as counter0 (Jinja2)
+  revindex: number // same as revcounter (Jinja2)
+  revindex0: number // same as revcounter0 (Jinja2)
+  depth: number // nesting depth
+  depth0: number // nesting depth 0-indexed
   cycle: (...args: any[]) => any
   changed: (value: any) => boolean
   previtem?: any
@@ -62,10 +62,16 @@ function createForLoop(
     revindex: revCount,
     revindex0: revCount - 1,
     // Item references (lazy via getter - reads from internal state)
-    get previtem() { return this._idx > 0 ? this._items[this._idx - 1] : undefined },
-    get nextitem() { return this._idx < this._items.length - 1 ? this._items[this._idx + 1] : undefined },
+    get previtem() {
+      return this._idx > 0 ? this._items[this._idx - 1] : undefined
+    },
+    get nextitem() {
+      return this._idx < this._items.length - 1 ? this._items[this._idx + 1] : undefined
+    },
     // Optimized: cycle uses dynamic _idx, avoiding function recreation per iteration
-    cycle(...args: any[]) { return args[this._idx % args.length] },
+    cycle(...args: any[]) {
+      return args[this._idx % args.length]
+    },
     changed: (value: any) => {
       const changed = value !== lastCycleValue.value
       lastCycleValue.value = value
@@ -74,7 +80,7 @@ function createForLoop(
   } as ForLoopInternal
 
   if (parentloop) {
-    (forloop as any).parentloop = parentloop
+    ;(forloop as any).parentloop = parentloop
   }
 
   return forloop
@@ -148,9 +154,8 @@ export class Context {
   // ForLoop management - optimized with object reuse
   pushForLoop(items: any[], index: number): ForLoop {
     const depth = this._forloopStack.length + 1
-    const parentloop = this._forloopStack.length > 0
-      ? this._forloopStack[this._forloopStack.length - 1]
-      : undefined
+    const parentloop =
+      this._forloopStack.length > 0 ? this._forloopStack[this._forloopStack.length - 1] : undefined
 
     const forloop = createForLoop(items, index, depth, this._lastCycleValue, parentloop)
     this._forloopStack.push(forloop)
@@ -160,9 +165,8 @@ export class Context {
 
   popForLoop(): void {
     this._forloopStack.pop()
-    this._currentForloop = this._forloopStack.length > 0
-      ? this._forloopStack[this._forloopStack.length - 1]
-      : null
+    this._currentForloop =
+      this._forloopStack.length > 0 ? this._forloopStack[this._forloopStack.length - 1] : null
   }
 
   // Optimized: minimal property updates, reuse cycle function closure

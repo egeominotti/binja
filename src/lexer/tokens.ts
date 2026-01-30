@@ -7,55 +7,55 @@ export enum TokenType {
   EOF = 'EOF',
 
   // Delimiters
-  VARIABLE_START = 'VARIABLE_START',     // {{
-  VARIABLE_END = 'VARIABLE_END',         // }}
-  BLOCK_START = 'BLOCK_START',           // {%
-  BLOCK_END = 'BLOCK_END',               // %}
-  COMMENT_START = 'COMMENT_START',       // {#
-  COMMENT_END = 'COMMENT_END',           // #}
+  VARIABLE_START = 'VARIABLE_START', // {{
+  VARIABLE_END = 'VARIABLE_END', // }}
+  BLOCK_START = 'BLOCK_START', // {%
+  BLOCK_END = 'BLOCK_END', // %}
+  COMMENT_START = 'COMMENT_START', // {#
+  COMMENT_END = 'COMMENT_END', // #}
 
   // Literals
-  NAME = 'NAME',                         // identifiers
-  STRING = 'STRING',                     // "string" or 'string'
-  NUMBER = 'NUMBER',                     // 123, 123.45
+  NAME = 'NAME', // identifiers
+  STRING = 'STRING', // "string" or 'string'
+  NUMBER = 'NUMBER', // 123, 123.45
 
   // Operators
-  DOT = 'DOT',                           // .
-  COMMA = 'COMMA',                       // ,
-  COLON = 'COLON',                       // :
-  PIPE = 'PIPE',                         // |
-  LPAREN = 'LPAREN',                     // (
-  RPAREN = 'RPAREN',                     // )
-  LBRACKET = 'LBRACKET',                 // [
-  RBRACKET = 'RBRACKET',                 // ]
-  LBRACE = 'LBRACE',                     // {
-  RBRACE = 'RBRACE',                     // }
+  DOT = 'DOT', // .
+  COMMA = 'COMMA', // ,
+  COLON = 'COLON', // :
+  PIPE = 'PIPE', // |
+  LPAREN = 'LPAREN', // (
+  RPAREN = 'RPAREN', // )
+  LBRACKET = 'LBRACKET', // [
+  RBRACKET = 'RBRACKET', // ]
+  LBRACE = 'LBRACE', // {
+  RBRACE = 'RBRACE', // }
 
   // Comparison operators
-  EQ = 'EQ',                             // ==
-  NE = 'NE',                             // !=
-  LT = 'LT',                             // <
-  GT = 'GT',                             // >
-  LE = 'LE',                             // <=
-  GE = 'GE',                             // >=
+  EQ = 'EQ', // ==
+  NE = 'NE', // !=
+  LT = 'LT', // <
+  GT = 'GT', // >
+  LE = 'LE', // <=
+  GE = 'GE', // >=
 
   // Arithmetic operators
-  ADD = 'ADD',                           // +
-  SUB = 'SUB',                           // -
-  MUL = 'MUL',                           // *
-  DIV = 'DIV',                           // /
-  MOD = 'MOD',                           // %
+  ADD = 'ADD', // +
+  SUB = 'SUB', // -
+  MUL = 'MUL', // *
+  DIV = 'DIV', // /
+  MOD = 'MOD', // %
 
   // Logical operators
-  AND = 'AND',                           // and
-  OR = 'OR',                             // or
-  NOT = 'NOT',                           // not
+  AND = 'AND', // and
+  OR = 'OR', // or
+  NOT = 'NOT', // not
 
   // Special
-  ASSIGN = 'ASSIGN',                     // =
-  TILDE = 'TILDE',                       // ~
-  QUESTION = 'QUESTION',                 // ?
-  NULLCOALESCE = 'NULLCOALESCE',         // ??
+  ASSIGN = 'ASSIGN', // =
+  TILDE = 'TILDE', // ~
+  QUESTION = 'QUESTION', // ?
+  NULLCOALESCE = 'NULLCOALESCE', // ??
 }
 
 export interface Token {
@@ -75,15 +75,15 @@ export interface LexerState {
 
 // Keywords mapping
 export const KEYWORDS: Record<string, TokenType> = {
-  'and': TokenType.AND,
-  'or': TokenType.OR,
-  'not': TokenType.NOT,
-  'true': TokenType.NAME,
-  'false': TokenType.NAME,
-  'True': TokenType.NAME,
-  'False': TokenType.NAME,
-  'None': TokenType.NAME,
-  'none': TokenType.NAME,
-  'is': TokenType.NAME,
-  'in': TokenType.NAME,
+  and: TokenType.AND,
+  or: TokenType.OR,
+  not: TokenType.NOT,
+  true: TokenType.NAME,
+  false: TokenType.NAME,
+  True: TokenType.NAME,
+  False: TokenType.NAME,
+  None: TokenType.NAME,
+  none: TokenType.NAME,
+  is: TokenType.NAME,
+  in: TokenType.NAME,
 }

@@ -70,7 +70,9 @@ describe('Timezone Support', () => {
       const envRome = new Environment({ timezone: 'Europe/Rome' })
 
       const resultUtc = await envUtc.renderString('{{ date|date:"Y-m-d" }}', { date: lateUtcDate })
-      const resultRome = await envRome.renderString('{{ date|date:"Y-m-d" }}', { date: lateUtcDate })
+      const resultRome = await envRome.renderString('{{ date|date:"Y-m-d" }}', {
+        date: lateUtcDate,
+      })
 
       expect(resultUtc).toBe('2024-06-15')
       expect(resultRome).toBe('2024-06-16') // Next day in Rome!
@@ -84,7 +86,9 @@ describe('Timezone Support', () => {
       const envRome = new Environment({ timezone: 'Europe/Rome' })
 
       const resultUtc = await envUtc.renderString('{{ date|date:"F j" }}', { date: endOfMonthUtc })
-      const resultRome = await envRome.renderString('{{ date|date:"F j" }}', { date: endOfMonthUtc })
+      const resultRome = await envRome.renderString('{{ date|date:"F j" }}', {
+        date: endOfMonthUtc,
+      })
 
       expect(resultUtc).toBe('June 30')
       expect(resultRome).toBe('July 1') // Next month in Rome!
@@ -188,7 +192,9 @@ describe('Timezone Support', () => {
 
     test('should handle string date input', async () => {
       const env = new Environment({ timezone: 'UTC' })
-      const result = await env.renderString('{{ date|date:"Y-m-d" }}', { date: '2024-06-15T12:30:45Z' })
+      const result = await env.renderString('{{ date|date:"Y-m-d" }}', {
+        date: '2024-06-15T12:30:45Z',
+      })
       expect(result).toBe('2024-06-15')
     })
 

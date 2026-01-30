@@ -79,7 +79,7 @@ describe('Query Telemetry', () => {
       // Third query should be marked as N+1
       expect(data.queries[2].isN1).toBe(true)
       expect(stats.n1Count).toBe(1)
-      expect(data.warnings.some(w => w.includes('N+1'))).toBe(true)
+      expect(data.warnings.some((w) => w.includes('N+1'))).toBe(true)
     })
 
     test('normalizes queries for N+1 comparison', () => {
@@ -169,13 +169,10 @@ describe('Query Telemetry', () => {
     test('wrapQuery measures timing', async () => {
       startDebugCollection()
 
-      const result = await wrapQuery(
-        'SELECT * FROM orders',
-        async () => {
-          await new Promise(r => setTimeout(r, 10))
-          return [{ id: 1 }]
-        }
-      )
+      const result = await wrapQuery('SELECT * FROM orders', async () => {
+        await new Promise((r) => setTimeout(r, 10))
+        return [{ id: 1 }]
+      })
 
       expect(result).toEqual([{ id: 1 }])
 

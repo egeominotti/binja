@@ -150,7 +150,8 @@ export function binja(options: BinjaHonoOptions = {}): MiddlewareHandler {
         console.error(`[binja] Template error: ${err.message}`)
 
         if (debug) {
-          return c.html(`
+          return c.html(
+            `
             <html>
               <head><title>Template Error</title></head>
               <body style="font-family: monospace; padding: 20px;">
@@ -158,7 +159,9 @@ export function binja(options: BinjaHonoOptions = {}): MiddlewareHandler {
                 <pre style="background: #f5f5f5; padding: 15px; overflow: auto;">${err.stack || err.message}</pre>
               </body>
             </html>
-          `, 500)
+          `,
+            500
+          )
         }
 
         throw error

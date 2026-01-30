@@ -27,11 +27,4 @@ export {
   createGroqProvider,
 } from './providers'
 
-export type {
-  Issue,
-  IssueType,
-  IssueSeverity,
-  LintResult,
-  LintOptions,
-  AIProvider,
-} from './types'
+export type { Issue, IssueType, IssueSeverity, LintResult, LintOptions, AIProvider } from './types'

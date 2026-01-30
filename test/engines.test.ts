@@ -63,12 +63,16 @@ describe('Handlebars Engine', () => {
 
   describe('Each Block', () => {
     test('each array', async () => {
-      const result = await handlebars.render('{{#each items}}{{this}}{{/each}}', { items: ['a', 'b', 'c'] })
+      const result = await handlebars.render('{{#each items}}{{this}}{{/each}}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('abc')
     })
 
     test('each with else', async () => {
-      const result = await handlebars.render('{{#each items}}{{this}}{{else}}Empty{{/each}}', { items: [] })
+      const result = await handlebars.render('{{#each items}}{{this}}{{else}}Empty{{/each}}', {
+        items: [],
+      })
       expect(result).toBe('Empty')
     })
   })
@@ -88,7 +92,7 @@ describe('Handlebars Engine', () => {
   describe('Deep Paths', () => {
     test('deeply nested path', async () => {
       const result = await handlebars.render('{{user.address.city}}', {
-        user: { address: { city: 'Rome' } }
+        user: { address: { city: 'Rome' } },
       })
       expect(result).toBe('Rome')
     })
@@ -101,10 +105,9 @@ describe('Handlebars Engine', () => {
 
   describe('Each with Loop Variables', () => {
     test('each with @index', async () => {
-      const result = await handlebars.render(
-        '{{#each items}}{{@index}}:{{this}} {{/each}}',
-        { items: ['a', 'b'] }
-      )
+      const result = await handlebars.render('{{#each items}}{{@index}}:{{this}} {{/each}}', {
+        items: ['a', 'b'],
+      })
       expect(result).toBe('0:a 1:b ')
     })
 
@@ -187,7 +190,10 @@ describe('Liquid Engine', () => {
     })
 
     test('if elsif', async () => {
-      const result = await liquid.render('{% if a %}A{% elsif b %}B{% else %}C{% endif %}', { a: false, b: true })
+      const result = await liquid.render('{% if a %}A{% elsif b %}B{% else %}C{% endif %}', {
+        a: false,
+        b: true,
+      })
       expect(result).toBe('B')
     })
 
@@ -211,12 +217,17 @@ describe('Liquid Engine', () => {
 
   describe('For Tag', () => {
     test('for loop', async () => {
-      const result = await liquid.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await liquid.render('{% for item in items %}{{ item }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('abc')
     })
 
     test('for with else', async () => {
-      const result = await liquid.render('{% for item in items %}{{ item }}{% else %}Empty{% endfor %}', { items: [] })
+      const result = await liquid.render(
+        '{% for item in items %}{{ item }}{% else %}Empty{% endfor %}',
+        { items: [] }
+      )
       expect(result).toBe('Empty')
     })
   })
@@ -283,10 +294,9 @@ describe('Liquid Engine', () => {
 
   describe('Forloop Variables', () => {
     test('forloop.index', async () => {
-      const result = await liquid.render(
-        '{% for i in items %}{{ forloop.counter }}{% endfor %}',
-        { items: ['a', 'b', 'c'] }
-      )
+      const result = await liquid.render('{% for i in items %}{{ forloop.counter }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('123')
     })
 
@@ -301,7 +311,9 @@ describe('Liquid Engine', () => {
 
   describe('Multiple Filters', () => {
     test('chained filters', async () => {
-      const result = await liquid.render('{{ name | upper | truncatechars: 5 }}', { name: 'hello world' })
+      const result = await liquid.render('{{ name | upper | truncatechars: 5 }}', {
+        name: 'hello world',
+      })
       expect(result).toBe('HE...')
     })
   })
@@ -395,24 +407,34 @@ describe('Twig Engine', () => {
     })
 
     test('if elif', async () => {
-      const result = await twig.render('{% if a %}A{% elif b %}B{% else %}C{% endif %}', { a: false, b: true })
+      const result = await twig.render('{% if a %}A{% elif b %}B{% else %}C{% endif %}', {
+        a: false,
+        b: true,
+      })
       expect(result).toBe('B')
     })
   })
 
   describe('For Tag', () => {
     test('for loop', async () => {
-      const result = await twig.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await twig.render('{% for item in items %}{{ item }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('abc')
     })
 
     test('for with loop.index', async () => {
-      const result = await twig.render('{% for i in items %}{{ loop.index }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await twig.render('{% for i in items %}{{ loop.index }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('123')
     })
 
     test('for with empty', async () => {
-      const result = await twig.render('{% for item in items %}{{ item }}{% empty %}Empty{% endfor %}', { items: [] })
+      const result = await twig.render(
+        '{% for item in items %}{{ item }}{% empty %}Empty{% endfor %}',
+        { items: [] }
+      )
       expect(result).toBe('Empty')
     })
   })

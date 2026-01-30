@@ -20,7 +20,7 @@ describe('Lexer', () => {
       const lexer = new Lexer('{{ foo }}{% if bar %}{% endif %}')
       const tokens = lexer.tokenize()
 
-      const types = tokens.map(t => t.type)
+      const types = tokens.map((t) => t.type)
       expect(types).toContain(TokenType.VARIABLE_START)
       expect(types).toContain(TokenType.BLOCK_START)
       expect(types).toContain(TokenType.NAME)
@@ -40,7 +40,7 @@ describe('Lexer', () => {
       const lexer = new Lexer('{{ "foo\\"bar" }}')
       const tokens = lexer.tokenize()
 
-      const stringToken = tokens.find(t => t.type === TokenType.STRING)
+      const stringToken = tokens.find((t) => t.type === TokenType.STRING)
       expect(stringToken).toBeDefined()
       expect(stringToken?.value).toContain('\\')
     })
@@ -63,7 +63,7 @@ describe('Lexer', () => {
       for (const [template, expectedOp] of operators) {
         const lexer = new Lexer(template as string)
         const tokens = lexer.tokenize()
-        const opToken = tokens.find(t => t.type === expectedOp)
+        const opToken = tokens.find((t) => t.type === expectedOp)
         expect(opToken).toBeDefined()
       }
     })
@@ -86,7 +86,7 @@ describe('Lexer', () => {
       for (const name of validNames) {
         const lexer = new Lexer(`{{ ${name} }}`)
         const tokens = lexer.tokenize()
-        const nameToken = tokens.find(t => t.type === TokenType.NAME)
+        const nameToken = tokens.find((t) => t.type === TokenType.NAME)
         expect(nameToken?.value).toBe(name)
       }
     })
@@ -97,35 +97,35 @@ describe('Lexer', () => {
     test('tokenizes double-quoted strings', () => {
       const lexer = new Lexer('{{ "hello world" }}')
       const tokens = lexer.tokenize()
-      const stringToken = tokens.find(t => t.type === TokenType.STRING)
+      const stringToken = tokens.find((t) => t.type === TokenType.STRING)
       expect(stringToken?.value).toBe('hello world')
     })
 
     test('tokenizes single-quoted strings', () => {
       const lexer = new Lexer("{{ 'hello world' }}")
       const tokens = lexer.tokenize()
-      const stringToken = tokens.find(t => t.type === TokenType.STRING)
+      const stringToken = tokens.find((t) => t.type === TokenType.STRING)
       expect(stringToken?.value).toBe('hello world')
     })
 
     test('tokenizes empty strings', () => {
       const lexer = new Lexer('{{ "" }}')
       const tokens = lexer.tokenize()
-      const stringToken = tokens.find(t => t.type === TokenType.STRING)
+      const stringToken = tokens.find((t) => t.type === TokenType.STRING)
       expect(stringToken?.value).toBe('')
     })
 
     test('tokenizes strings with spaces', () => {
       const lexer = new Lexer('{{ "  spaces  " }}')
       const tokens = lexer.tokenize()
-      const stringToken = tokens.find(t => t.type === TokenType.STRING)
+      const stringToken = tokens.find((t) => t.type === TokenType.STRING)
       expect(stringToken?.value).toBe('  spaces  ')
     })
 
     test('tokenizes strings with special characters', () => {
       const lexer = new Lexer('{{ "hello\\nworld" }}')
       const tokens = lexer.tokenize()
-      const stringToken = tokens.find(t => t.type === TokenType.STRING)
+      const stringToken = tokens.find((t) => t.type === TokenType.STRING)
       expect(stringToken).toBeDefined()
     })
   })
@@ -135,35 +135,35 @@ describe('Lexer', () => {
     test('tokenizes integers', () => {
       const lexer = new Lexer('{{ 42 }}')
       const tokens = lexer.tokenize()
-      const numToken = tokens.find(t => t.type === TokenType.NUMBER)
+      const numToken = tokens.find((t) => t.type === TokenType.NUMBER)
       expect(numToken?.value).toBe('42')
     })
 
     test('tokenizes floats', () => {
       const lexer = new Lexer('{{ 3.14159 }}')
       const tokens = lexer.tokenize()
-      const numToken = tokens.find(t => t.type === TokenType.NUMBER)
+      const numToken = tokens.find((t) => t.type === TokenType.NUMBER)
       expect(numToken?.value).toBe('3.14159')
     })
 
     test('tokenizes zero', () => {
       const lexer = new Lexer('{{ 0 }}')
       const tokens = lexer.tokenize()
-      const numToken = tokens.find(t => t.type === TokenType.NUMBER)
+      const numToken = tokens.find((t) => t.type === TokenType.NUMBER)
       expect(numToken?.value).toBe('0')
     })
 
     test('tokenizes large numbers', () => {
       const lexer = new Lexer('{{ 1234567890 }}')
       const tokens = lexer.tokenize()
-      const numToken = tokens.find(t => t.type === TokenType.NUMBER)
+      const numToken = tokens.find((t) => t.type === TokenType.NUMBER)
       expect(numToken?.value).toBe('1234567890')
     })
 
     test('tokenizes float starting with zero', () => {
       const lexer = new Lexer('{{ 0.5 }}')
       const tokens = lexer.tokenize()
-      const numToken = tokens.find(t => t.type === TokenType.NUMBER)
+      const numToken = tokens.find((t) => t.type === TokenType.NUMBER)
       expect(numToken?.value).toBe('0.5')
     })
   })
@@ -183,7 +183,7 @@ describe('Lexer', () => {
       for (const [op, type] of ops) {
         const lexer = new Lexer(`{{ a ${op} b }}`)
         const tokens = lexer.tokenize()
-        expect(tokens.some(t => t.type === type)).toBe(true)
+        expect(tokens.some((t) => t.type === type)).toBe(true)
       }
     })
 
@@ -199,44 +199,44 @@ describe('Lexer', () => {
       for (const [op, type] of ops) {
         const lexer = new Lexer(`{{ a ${op} b }}`)
         const tokens = lexer.tokenize()
-        expect(tokens.some(t => t.type === type)).toBe(true)
+        expect(tokens.some((t) => t.type === type)).toBe(true)
       }
     })
 
     test('tokenizes pipe operator', () => {
       const lexer = new Lexer('{{ name|upper }}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.PIPE)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.PIPE)).toBe(true)
     })
 
     test('tokenizes dot operator', () => {
       const lexer = new Lexer('{{ obj.attr }}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.DOT)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.DOT)).toBe(true)
     })
 
     test('tokenizes comma operator', () => {
       const lexer = new Lexer('{{ func(a, b, c) }}')
       const tokens = lexer.tokenize()
-      expect(tokens.filter(t => t.type === TokenType.COMMA).length).toBe(2)
+      expect(tokens.filter((t) => t.type === TokenType.COMMA).length).toBe(2)
     })
 
     test('tokenizes colon operator', () => {
       const lexer = new Lexer('{{ {"key": "value"} }}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.COLON)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.COLON)).toBe(true)
     })
 
     test('tokenizes assignment operator', () => {
       const lexer = new Lexer('{% set x = 1 %}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.ASSIGN)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.ASSIGN)).toBe(true)
     })
 
     test('tokenizes tilde operator for string concat', () => {
       const lexer = new Lexer('{{ a ~ b }}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.TILDE)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.TILDE)).toBe(true)
     })
   })
 
@@ -245,19 +245,19 @@ describe('Lexer', () => {
     test('tokenizes and as keyword', () => {
       const lexer = new Lexer('{% if a and b %}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.AND)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.AND)).toBe(true)
     })
 
     test('tokenizes or as keyword', () => {
       const lexer = new Lexer('{% if a or b %}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.OR)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.OR)).toBe(true)
     })
 
     test('tokenizes not as keyword', () => {
       const lexer = new Lexer('{% if not a %}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.NOT)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.NOT)).toBe(true)
     })
 
     test('tokenizes true/false/none as names', () => {
@@ -266,7 +266,7 @@ describe('Lexer', () => {
       for (const kw of keywords) {
         const lexer = new Lexer(`{{ ${kw} }}`)
         const tokens = lexer.tokenize()
-        const nameToken = tokens.find(t => t.type === TokenType.NAME && t.value === kw)
+        const nameToken = tokens.find((t) => t.type === TokenType.NAME && t.value === kw)
         expect(nameToken).toBeDefined()
       }
     })
@@ -277,29 +277,29 @@ describe('Lexer', () => {
     test('tokenizes parentheses', () => {
       const lexer = new Lexer('{{ (a + b) }}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.LPAREN)).toBe(true)
-      expect(tokens.some(t => t.type === TokenType.RPAREN)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.LPAREN)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.RPAREN)).toBe(true)
     })
 
     test('tokenizes square brackets', () => {
       const lexer = new Lexer('{{ list[0] }}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.LBRACKET)).toBe(true)
-      expect(tokens.some(t => t.type === TokenType.RBRACKET)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.LBRACKET)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.RBRACKET)).toBe(true)
     })
 
     test('tokenizes curly braces in dict', () => {
       const lexer = new Lexer('{{ {"a": 1} }}')
       const tokens = lexer.tokenize()
-      expect(tokens.some(t => t.type === TokenType.LBRACE)).toBe(true)
-      expect(tokens.some(t => t.type === TokenType.RBRACE)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.LBRACE)).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.RBRACE)).toBe(true)
     })
 
     test('tokenizes nested brackets', () => {
       const lexer = new Lexer('{{ func((a + b), [1, 2]) }}')
       const tokens = lexer.tokenize()
-      expect(tokens.filter(t => t.type === TokenType.LPAREN).length).toBe(2)
-      expect(tokens.filter(t => t.type === TokenType.RPAREN).length).toBe(2)
+      expect(tokens.filter((t) => t.type === TokenType.LPAREN).length).toBe(2)
+      expect(tokens.filter((t) => t.type === TokenType.RPAREN).length).toBe(2)
     })
   })
 
@@ -366,7 +366,7 @@ describe('Lexer', () => {
     test('handles whitespace inside tags', () => {
       const lexer = new Lexer('{{   foo   }}')
       const tokens = lexer.tokenize()
-      const nameToken = tokens.find(t => t.type === TokenType.NAME)
+      const nameToken = tokens.find((t) => t.type === TokenType.NAME)
       expect(nameToken?.value).toBe('foo')
     })
 
@@ -395,7 +395,7 @@ describe('Lexer', () => {
       const tokens = lexer.tokenize()
 
       expect(tokens[0].type).toBe(TokenType.BLOCK_START)
-      expect(tokens.some(t => t.type === TokenType.TEXT && t.value === 'yes')).toBe(true)
+      expect(tokens.some((t) => t.type === TokenType.TEXT && t.value === 'yes')).toBe(true)
     })
 
     test('tokenizes complex template', () => {
@@ -407,8 +407,8 @@ describe('Lexer', () => {
       const lexer = new Lexer(template)
       const tokens = lexer.tokenize()
 
-      expect(tokens.filter(t => t.type === TokenType.BLOCK_START).length).toBe(2)
-      expect(tokens.filter(t => t.type === TokenType.VARIABLE_START).length).toBe(2)
+      expect(tokens.filter((t) => t.type === TokenType.BLOCK_START).length).toBe(2)
+      expect(tokens.filter((t) => t.type === TokenType.VARIABLE_START).length).toBe(2)
     })
   })
 
@@ -453,26 +453,26 @@ describe('Lexer', () => {
     test('handles adjacent tags', () => {
       const lexer = new Lexer('{{ a }}{{ b }}{% if c %}{% endif %}')
       const tokens = lexer.tokenize()
-      expect(tokens.filter(t => t.type === TokenType.VARIABLE_START).length).toBe(2)
-      expect(tokens.filter(t => t.type === TokenType.BLOCK_START).length).toBe(2)
+      expect(tokens.filter((t) => t.type === TokenType.VARIABLE_START).length).toBe(2)
+      expect(tokens.filter((t) => t.type === TokenType.BLOCK_START).length).toBe(2)
     })
 
     test('handles deeply nested expressions', () => {
       const lexer = new Lexer('{{ ((((a)))) }}')
       const tokens = lexer.tokenize()
-      expect(tokens.filter(t => t.type === TokenType.LPAREN).length).toBe(4)
+      expect(tokens.filter((t) => t.type === TokenType.LPAREN).length).toBe(4)
     })
 
     test('handles filter chain', () => {
       const lexer = new Lexer('{{ x|a|b|c|d|e }}')
       const tokens = lexer.tokenize()
-      expect(tokens.filter(t => t.type === TokenType.PIPE).length).toBe(5)
+      expect(tokens.filter((t) => t.type === TokenType.PIPE).length).toBe(5)
     })
 
     test('handles complex attribute chain', () => {
       const lexer = new Lexer('{{ a.b.c.d.e.f }}')
       const tokens = lexer.tokenize()
-      expect(tokens.filter(t => t.type === TokenType.DOT).length).toBe(5)
+      expect(tokens.filter((t) => t.type === TokenType.DOT).length).toBe(5)
     })
   })
 })

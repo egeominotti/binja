@@ -23,18 +23,12 @@ describe('Raw Block', () => {
     })
 
     test('works with surrounding content', async () => {
-      const result = await render(
-        'Before {% raw %}{{ raw }}{% endraw %} After',
-        {}
-      )
+      const result = await render('Before {% raw %}{{ raw }}{% endraw %} After', {})
       expect(result).toBe('Before {{ raw }} After')
     })
 
     test('preserves newlines', async () => {
-      const result = await render(
-        '{% raw %}\nline1\nline2\n{% endraw %}',
-        {}
-      )
+      const result = await render('{% raw %}\nline1\nline2\n{% endraw %}', {})
       expect(result).toBe('\nline1\nline2\n')
     })
 
@@ -47,26 +41,17 @@ describe('Raw Block', () => {
     })
 
     test('useful for Vue.js templates', async () => {
-      const result = await render(
-        '{% raw %}<div>{{ message }}</div>{% endraw %}',
-        {}
-      )
+      const result = await render('{% raw %}<div>{{ message }}</div>{% endraw %}', {})
       expect(result).toBe('<div>{{ message }}</div>')
     })
 
     test('handles multiple raw blocks', async () => {
-      const result = await render(
-        '{% raw %}{{ a }}{% endraw %} - {% raw %}{{ b }}{% endraw %}',
-        {}
-      )
+      const result = await render('{% raw %}{{ a }}{% endraw %} - {% raw %}{{ b }}{% endraw %}', {})
       expect(result).toBe('{{ a }} - {{ b }}')
     })
 
     test('works with whitespace control', async () => {
-      const result = await render(
-        '  {%- raw %}content{% endraw -%}  ',
-        {}
-      )
+      const result = await render('  {%- raw %}content{% endraw -%}  ', {})
       // Whitespace control should work on the tags
       expect(result).toContain('content')
     })

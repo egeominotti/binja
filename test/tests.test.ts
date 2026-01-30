@@ -36,8 +36,12 @@ describe('Test Functions', () => {
     })
 
     test('works in if condition', async () => {
-      expect(await render('{% if x is divisibleby(2) %}even{% else %}odd{% endif %}', { x: 4 })).toBe('even')
-      expect(await render('{% if x is divisibleby(2) %}even{% else %}odd{% endif %}', { x: 5 })).toBe('odd')
+      expect(
+        await render('{% if x is divisibleby(2) %}even{% else %}odd{% endif %}', { x: 4 })
+      ).toBe('even')
+      expect(
+        await render('{% if x is divisibleby(2) %}even{% else %}odd{% endif %}', { x: 5 })
+      ).toBe('odd')
     })
 
     test('negated with is not', async () => {
@@ -229,8 +233,12 @@ describe('Test Functions', () => {
     })
 
     test('works in if condition', async () => {
-      expect(await render('{% if x is defined %}exists{% else %}missing{% endif %}', { x: 1 })).toBe('exists')
-      expect(await render('{% if x is defined %}exists{% else %}missing{% endif %}', {})).toBe('missing')
+      expect(
+        await render('{% if x is defined %}exists{% else %}missing{% endif %}', { x: 1 })
+      ).toBe('exists')
+      expect(await render('{% if x is defined %}exists{% else %}missing{% endif %}', {})).toBe(
+        'missing'
+      )
     })
   })
 
@@ -686,12 +694,18 @@ describe('Test Functions', () => {
 
   describe('Combined Tests', () => {
     test('multiple tests with and', async () => {
-      expect(await render('{% if x is number and x is gt(0) %}positive{% endif %}', { x: 5 })).toBe('positive')
-      expect(await render('{% if x is number and x is gt(0) %}positive{% endif %}', { x: -5 })).toBe('')
+      expect(await render('{% if x is number and x is gt(0) %}positive{% endif %}', { x: 5 })).toBe(
+        'positive'
+      )
+      expect(
+        await render('{% if x is number and x is gt(0) %}positive{% endif %}', { x: -5 })
+      ).toBe('')
     })
 
     test('multiple tests with or', async () => {
-      expect(await render('{% if x is none or x is undefined %}empty{% endif %}', { x: null })).toBe('empty')
+      expect(
+        await render('{% if x is none or x is undefined %}empty{% endif %}', { x: null })
+      ).toBe('empty')
       expect(await render('{% if x is none or x is undefined %}empty{% endif %}', {})).toBe('empty')
     })
 
@@ -706,8 +720,14 @@ describe('Test Functions', () => {
     })
 
     test('nested test expressions', async () => {
-      expect(await render('{% if x is defined and x is number and x is gt(0) %}valid{% endif %}', { x: 10 })).toBe('valid')
-      expect(await render('{% if x is defined and x is number and x is gt(0) %}valid{% endif %}', {})).toBe('')
+      expect(
+        await render('{% if x is defined and x is number and x is gt(0) %}valid{% endif %}', {
+          x: 10,
+        })
+      ).toBe('valid')
+      expect(
+        await render('{% if x is defined and x is number and x is gt(0) %}valid{% endif %}', {})
+      ).toBe('')
     })
   })
 
@@ -766,13 +786,15 @@ describe('Test Functions', () => {
     })
 
     test('alternating rows pattern', async () => {
-      const tmpl = '{% for i in items %}<tr class="{% if loop.index is even %}even{% else %}odd{% endif %}">{{ i }}</tr>{% endfor %}'
+      const tmpl =
+        '{% for i in items %}<tr class="{% if loop.index is even %}even{% else %}odd{% endif %}">{{ i }}</tr>{% endfor %}'
       const result = await render(tmpl, { items: ['a', 'b', 'c'] })
       expect(result).toBe('<tr class="odd">a</tr><tr class="even">b</tr><tr class="odd">c</tr>')
     })
 
     test('type checking before operations', async () => {
-      const tmpl = '{% if data is mapping %}{{ data.name }}{% elif data is sequence %}{{ data|join:", " }}{% else %}{{ data }}{% endif %}'
+      const tmpl =
+        '{% if data is mapping %}{{ data.name }}{% elif data is sequence %}{{ data|join:", " }}{% else %}{{ data }}{% endif %}'
       expect(await render(tmpl, { data: { name: 'John' } })).toBe('John')
       expect(await render(tmpl, { data: ['a', 'b', 'c'] })).toBe('a, b, c')
       expect(await render(tmpl, { data: 'plain text' })).toBe('plain text')

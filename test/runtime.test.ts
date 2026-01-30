@@ -137,67 +137,108 @@ describe('Runtime', () => {
 
   describe('For Loop', () => {
     test('iterates over array', async () => {
-      expect(await render('{% for i in items %}{{ i }}{% endfor %}', { items: [1, 2, 3] })).toBe('123')
+      expect(await render('{% for i in items %}{{ i }}{% endfor %}', { items: [1, 2, 3] })).toBe(
+        '123'
+      )
     })
 
     test('provides forloop.counter (1-indexed)', async () => {
-      const result = await render('{% for i in items %}{{ forloop.counter }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await render('{% for i in items %}{{ forloop.counter }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('123')
     })
 
     test('provides forloop.counter0 (0-indexed)', async () => {
-      const result = await render('{% for i in items %}{{ forloop.counter0 }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await render('{% for i in items %}{{ forloop.counter0 }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('012')
     })
 
     test('provides loop.index (Jinja2 alias)', async () => {
-      const result = await render('{% for i in items %}{{ loop.index }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await render('{% for i in items %}{{ loop.index }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('123')
     })
 
     test('provides forloop.first', async () => {
-      const result = await render('{% for i in items %}{% if forloop.first %}F{% endif %}{{ i }}{% endfor %}', { items: [1, 2, 3] })
+      const result = await render(
+        '{% for i in items %}{% if forloop.first %}F{% endif %}{{ i }}{% endfor %}',
+        { items: [1, 2, 3] }
+      )
       expect(result).toBe('F123')
     })
 
     test('provides forloop.last', async () => {
-      const result = await render('{% for i in items %}{{ i }}{% if forloop.last %}L{% endif %}{% endfor %}', { items: [1, 2, 3] })
+      const result = await render(
+        '{% for i in items %}{{ i }}{% if forloop.last %}L{% endif %}{% endfor %}',
+        { items: [1, 2, 3] }
+      )
       expect(result).toBe('123L')
     })
 
     test('provides forloop.length', async () => {
-      const result = await render('{% for i in items %}{{ forloop.length }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await render('{% for i in items %}{{ forloop.length }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('333')
     })
 
     test('provides forloop.revcounter', async () => {
-      const result = await render('{% for i in items %}{{ forloop.revcounter }}{% endfor %}', { items: ['a', 'b', 'c'] })
+      const result = await render('{% for i in items %}{{ forloop.revcounter }}{% endfor %}', {
+        items: ['a', 'b', 'c'],
+      })
       expect(result).toBe('321')
     })
 
     test('supports tuple unpacking', async () => {
-      const ctx = { pairs: [['a', 1], ['b', 2]] }
+      const ctx = {
+        pairs: [
+          ['a', 1],
+          ['b', 2],
+        ],
+      }
       const result = await render('{% for k, v in pairs %}{{ k }}={{ v }},{% endfor %}', ctx)
       expect(result).toBe('a=1,b=2,')
     })
 
     test('renders empty block when empty', async () => {
-      expect(await render('{% for i in items %}{{ i }}{% empty %}none{% endfor %}', { items: [] })).toBe('none')
+      expect(
+        await render('{% for i in items %}{{ i }}{% empty %}none{% endfor %}', { items: [] })
+      ).toBe('none')
     })
 
     test('renders else block when empty (Jinja style)', async () => {
-      expect(await render('{% for i in items %}{{ i }}{% else %}none{% endfor %}', { items: [] })).toBe('none')
+      expect(
+        await render('{% for i in items %}{{ i }}{% else %}none{% endfor %}', { items: [] })
+      ).toBe('none')
     })
 
     test('handles nested loops', async () => {
-      const ctx = { outer: [[1, 2], [3, 4]] }
-      const result = await render('{% for row in outer %}{% for col in row %}{{ col }}{% endfor %}{% endfor %}', ctx)
+      const ctx = {
+        outer: [
+          [1, 2],
+          [3, 4],
+        ],
+      }
+      const result = await render(
+        '{% for row in outer %}{% for col in row %}{{ col }}{% endfor %}{% endfor %}',
+        ctx
+      )
       expect(result).toBe('1234')
     })
 
     test('supports forloop.parentloop', async () => {
-      const ctx = { outer: [[1, 2], [3, 4]] }
-      const tmpl = '{% for row in outer %}{% for col in row %}{{ forloop.parentloop.counter }}{% endfor %}{% endfor %}'
+      const ctx = {
+        outer: [
+          [1, 2],
+          [3, 4],
+        ],
+      }
+      const tmpl =
+        '{% for row in outer %}{% for col in row %}{{ forloop.parentloop.counter }}{% endfor %}{% endfor %}'
       const result = await render(tmpl, ctx)
       expect(result).toBe('1122')
     })
@@ -281,14 +322,18 @@ describe('Runtime', () => {
     })
 
     test('stores static URL in variable', async () => {
-      expect(await render('{% static "img/logo.png" as logo %}{{ logo }}', {})).toBe('/static/img/logo.png')
+      expect(await render('{% static "img/logo.png" as logo %}{{ logo }}', {})).toBe(
+        '/static/img/logo.png'
+      )
     })
 
     test('uses custom static resolver', async () => {
       const env = new Environment({
         staticResolver: (path) => `https://cdn.example.com/${path}`,
       })
-      expect(await env.renderString('{% static "js/app.js" %}', {})).toBe('https://cdn.example.com/js/app.js')
+      expect(await env.renderString('{% static "js/app.js" %}', {})).toBe(
+        'https://cdn.example.com/js/app.js'
+      )
     })
   })
 
@@ -332,19 +377,53 @@ describe('Runtime', () => {
 
     test('renders day name long', async () => {
       const result = await render('{% now "l" %}', {})
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      const dayNames = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ]
       expect(dayNames).toContain(result)
     })
 
     test('renders month name short', async () => {
       const result = await render('{% now "M" %}', {})
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      const monthNames = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ]
       expect(monthNames).toContain(result)
     })
 
     test('renders month name long', async () => {
       const result = await render('{% now "F" %}', {})
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      const monthNames = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ]
       expect(monthNames).toContain(result)
     })
 

@@ -25,8 +25,12 @@ describe('Regression Tests', () => {
     })
 
     test('empty array with else/empty block', async () => {
-      expect(await render('{% for i in items %}{{ i }}{% else %}none{% endfor %}', { items: [] })).toBe('none')
-      expect(await render('{% for i in items %}{{ i }}{% empty %}none{% endfor %}', { items: [] })).toBe('none')
+      expect(
+        await render('{% for i in items %}{{ i }}{% else %}none{% endfor %}', { items: [] })
+      ).toBe('none')
+      expect(
+        await render('{% for i in items %}{{ i }}{% empty %}none{% endfor %}', { items: [] })
+      ).toBe('none')
     })
 
     test('empty object', async () => {
@@ -76,9 +80,9 @@ describe('Regression Tests', () => {
         data: {
           items: [
             { name: 'first', tags: ['a', 'b'] },
-            { name: 'second', tags: ['c', 'd'] }
-          ]
-        }
+            { name: 'second', tags: ['c', 'd'] },
+          ],
+        },
       }
       expect(await render('{{ data.items.0.name }}', ctx)).toBe('first')
       expect(await render('{{ data.items.0.tags.1 }}', ctx)).toBe('b')
@@ -89,8 +93,8 @@ describe('Regression Tests', () => {
       const ctx = {
         matrix: [
           [{ val: 1 }, { val: 2 }],
-          [{ val: 3 }, { val: 4 }]
-        ]
+          [{ val: 3 }, { val: 4 }],
+        ],
       }
       // Using subscript notation for deeper array access
       expect(await render('{{ matrix[0][0].val }}', ctx)).toBe('1')
@@ -99,10 +103,7 @@ describe('Regression Tests', () => {
 
     test('accessing nested in for loop', async () => {
       const ctx = {
-        items: [
-          { inner: { value: 'a' } },
-          { inner: { value: 'b' } }
-        ]
+        items: [{ inner: { value: 'a' } }, { inner: { value: 'b' } }],
       }
       const result = await render('{% for item in items %}{{ item.inner.value }}{% endfor %}', ctx)
       expect(result).toBe('ab')
@@ -138,7 +139,9 @@ describe('Regression Tests', () => {
 
     test('multi-byte characters', async () => {
       expect(await render('{{ text }}', { text: 'Chinese characters' })).toBe('Chinese characters')
-      expect(await render('{{ text }}', { text: 'Japanese characters' })).toBe('Japanese characters')
+      expect(await render('{{ text }}', { text: 'Japanese characters' })).toBe(
+        'Japanese characters'
+      )
       expect(await render('{{ text }}', { text: 'Korean characters' })).toBe('Korean characters')
     })
 
@@ -153,7 +156,7 @@ describe('Regression Tests', () => {
       expect(await render('{{ s }}', { s: '<script>' })).toBe('&lt;script&gt;')
       expect(await render('{{ s }}', { s: '&amp;' })).toBe('&amp;amp;')
       expect(await render('{{ s }}', { s: '"quotes"' })).toBe('&quot;quotes&quot;')
-      expect(await render("{{ s }}", { s: "'apostrophe'" })).toBe("&#x27;apostrophe&#x27;")
+      expect(await render('{{ s }}', { s: "'apostrophe'" })).toBe('&#x27;apostrophe&#x27;')
     })
 
     test('newlines in variable values', async () => {
@@ -209,8 +212,12 @@ describe('Regression Tests', () => {
     })
 
     test('very large numbers', async () => {
-      expect(await render('{{ n }}', { n: Number.MAX_SAFE_INTEGER })).toBe(String(Number.MAX_SAFE_INTEGER))
-      expect(await render('{{ n }}', { n: Number.MIN_SAFE_INTEGER })).toBe(String(Number.MIN_SAFE_INTEGER))
+      expect(await render('{{ n }}', { n: Number.MAX_SAFE_INTEGER })).toBe(
+        String(Number.MAX_SAFE_INTEGER)
+      )
+      expect(await render('{{ n }}', { n: Number.MIN_SAFE_INTEGER })).toBe(
+        String(Number.MIN_SAFE_INTEGER)
+      )
     })
 
     test('floating point precision', async () => {
@@ -249,23 +256,23 @@ describe('Regression Tests', () => {
   // ==================== Complex Filter Chains ====================
   describe('Complex Filter Chains', () => {
     test('many filters chained', async () => {
-      const result = await render('{{ s|lower|trim|upper|truncatechars:5 }}', { s: '  HELLO WORLD  ' })
+      const result = await render('{{ s|lower|trim|upper|truncatechars:5 }}', {
+        s: '  HELLO WORLD  ',
+      })
       expect(result).toBe('HE...')
     })
 
     test('filter chain with array operations', async () => {
-      const result = await render(
-        '{{ items|sort|reverse|slice:":2"|join:", " }}',
-        { items: [3, 1, 4, 1, 5, 9, 2, 6] }
-      )
+      const result = await render('{{ items|sort|reverse|slice:":2"|join:", " }}', {
+        items: [3, 1, 4, 1, 5, 9, 2, 6],
+      })
       expect(result).toBe('9, 6')
     })
 
     test('filters with complex arguments', async () => {
-      const result = await render(
-        '{{ items|slice:"1:4"|join:", " }}',
-        { items: ['a', 'b', 'c', 'd', 'e', 'f'] }
-      )
+      const result = await render('{{ items|slice:"1:4"|join:", " }}', {
+        items: ['a', 'b', 'c', 'd', 'e', 'f'],
+      })
       expect(result).toBe('b, c, d')
     })
 
@@ -312,7 +319,9 @@ describe('Regression Tests', () => {
   // ==================== Loop Edge Cases ====================
   describe('Loop Edge Cases', () => {
     test('empty loop with else', async () => {
-      expect(await render('{% for i in items %}{{ i }}{% else %}empty{% endfor %}', { items: [] })).toBe('empty')
+      expect(
+        await render('{% for i in items %}{{ i }}{% else %}empty{% endfor %}', { items: [] })
+      ).toBe('empty')
     })
 
     test('single item loop', async () => {
@@ -324,7 +333,12 @@ describe('Regression Tests', () => {
     })
 
     test('nested loops with same variable name', async () => {
-      const ctx = { outer: [[1, 2], [3, 4]] }
+      const ctx = {
+        outer: [
+          [1, 2],
+          [3, 4],
+        ],
+      }
       const result = await render(
         '{% for i in outer %}[{% for i in i %}{{ i }}{% endfor %}]{% endfor %}',
         ctx
@@ -351,7 +365,9 @@ describe('Regression Tests', () => {
     test('loop.index vs forloop.counter', async () => {
       const items = ['a', 'b', 'c']
       const result1 = await render('{% for i in items %}{{ loop.index }}{% endfor %}', { items })
-      const result2 = await render('{% for i in items %}{{ forloop.counter }}{% endfor %}', { items })
+      const result2 = await render('{% for i in items %}{{ forloop.counter }}{% endfor %}', {
+        items,
+      })
       expect(result1).toBe('123')
       expect(result2).toBe('123')
     })
@@ -359,28 +375,42 @@ describe('Regression Tests', () => {
     test('loop.index0 vs forloop.counter0', async () => {
       const items = ['a', 'b', 'c']
       const result1 = await render('{% for i in items %}{{ loop.index0 }}{% endfor %}', { items })
-      const result2 = await render('{% for i in items %}{{ forloop.counter0 }}{% endfor %}', { items })
+      const result2 = await render('{% for i in items %}{{ forloop.counter0 }}{% endfor %}', {
+        items,
+      })
       expect(result1).toBe('012')
       expect(result2).toBe('012')
     })
 
     test('forloop.revcounter', async () => {
-      const result = await render('{% for i in items %}{{ forloop.revcounter }}{% endfor %}', { items: [1, 2, 3] })
+      const result = await render('{% for i in items %}{{ forloop.revcounter }}{% endfor %}', {
+        items: [1, 2, 3],
+      })
       expect(result).toBe('321')
     })
 
     test('forloop.revcounter0', async () => {
-      const result = await render('{% for i in items %}{{ forloop.revcounter0 }}{% endfor %}', { items: [1, 2, 3] })
+      const result = await render('{% for i in items %}{{ forloop.revcounter0 }}{% endfor %}', {
+        items: [1, 2, 3],
+      })
       expect(result).toBe('210')
     })
 
     test('forloop.length', async () => {
-      const result = await render('{% for i in items %}{{ forloop.length }}{% endfor %}', { items: [1, 2, 3] })
+      const result = await render('{% for i in items %}{{ forloop.length }}{% endfor %}', {
+        items: [1, 2, 3],
+      })
       expect(result).toBe('333')
     })
 
     test('tuple unpacking in for loop', async () => {
-      const ctx = { pairs: [['a', 1], ['b', 2], ['c', 3]] }
+      const ctx = {
+        pairs: [
+          ['a', 1],
+          ['b', 2],
+          ['c', 3],
+        ],
+      }
       const result = await render('{% for key, val in pairs %}{{ key }}{{ val }}{% endfor %}', ctx)
       expect(result).toBe('a1b2c3')
     })
@@ -493,10 +523,7 @@ describe('Regression Tests', () => {
       await fs.promises.mkdir(TEMPLATES_DIR, { recursive: true })
 
       // Simple include template
-      await fs.promises.writeFile(
-        path.join(TEMPLATES_DIR, 'simple.html'),
-        `Hello {{ name }}!`
-      )
+      await fs.promises.writeFile(path.join(TEMPLATES_DIR, 'simple.html'), `Hello {{ name }}!`)
 
       // Template with include
       await fs.promises.writeFile(
@@ -540,15 +567,13 @@ describe('Regression Tests', () => {
     })
 
     test('include missing template without ignore throws', async () => {
-      await expect(
-        env.renderString('{% include "nonexistent.html" %}', {})
-      ).rejects.toThrow()
+      await expect(env.renderString('{% include "nonexistent.html" %}', {})).rejects.toThrow()
     })
 
     test('dynamic include template name', async () => {
       const result = await env.renderString('{% include template %}', {
         template: 'simple.html',
-        name: 'Dynamic'
+        name: 'Dynamic',
       })
       expect(result).toContain('Hello Dynamic!')
     })
@@ -588,7 +613,9 @@ describe('Regression Tests', () => {
     })
 
     test('truthy edge case: object with falsy value is truthy', async () => {
-      expect(await render('{% if v %}yes{% else %}no{% endif %}', { v: { key: false } })).toBe('yes')
+      expect(await render('{% if v %}yes{% else %}no{% endif %}', { v: { key: false } })).toBe(
+        'yes'
+      )
     })
 
     test('nested conditionals', async () => {
@@ -624,19 +651,26 @@ describe('Regression Tests', () => {
     })
 
     test('in operator with object', async () => {
-      expect(await render('{% if "key" in obj %}yes{% endif %}', { obj: { key: 'value' } })).toBe('yes')
-      expect(await render('{% if "missing" in obj %}yes{% endif %}', { obj: { key: 'value' } })).toBe('')
+      expect(await render('{% if "key" in obj %}yes{% endif %}', { obj: { key: 'value' } })).toBe(
+        'yes'
+      )
+      expect(
+        await render('{% if "missing" in obj %}yes{% endif %}', { obj: { key: 'value' } })
+      ).toBe('')
     })
 
     test('not in operator with negation', async () => {
       // Note: 'not in' as combined operator may not be supported
       // Use 'not (x in items)' instead
-      expect(await render('{% if not (5 in items) %}yes{% endif %}', { items: [1, 2, 3] })).toBe('yes')
+      expect(await render('{% if not (5 in items) %}yes{% endif %}', { items: [1, 2, 3] })).toBe(
+        'yes'
+      )
       expect(await render('{% if not (2 in items) %}yes{% endif %}', { items: [1, 2, 3] })).toBe('')
     })
 
     test('multiple elif clauses', async () => {
-      const tmpl = '{% if x == 1 %}one{% elif x == 2 %}two{% elif x == 3 %}three{% elif x == 4 %}four{% else %}other{% endif %}'
+      const tmpl =
+        '{% if x == 1 %}one{% elif x == 2 %}two{% elif x == 3 %}three{% elif x == 4 %}four{% else %}other{% endif %}'
       expect(await render(tmpl, { x: 1 })).toBe('one')
       expect(await render(tmpl, { x: 2 })).toBe('two')
       expect(await render(tmpl, { x: 3 })).toBe('three')
@@ -659,14 +693,12 @@ describe('Regression Tests', () => {
   // ==================== Error Handling ====================
   describe('Error Handling', () => {
     test('unknown filter throws error', async () => {
-      await expect(render('{{ x|nonexistentfilter }}', { x: 1 }))
-        .rejects.toThrow('Unknown filter')
+      await expect(render('{{ x|nonexistentfilter }}', { x: 1 })).rejects.toThrow('Unknown filter')
     })
 
     test('template not found throws error', async () => {
       const env = new Environment({ templates: '/nonexistent/path' })
-      await expect(env.render('missing.html', {}))
-        .rejects.toThrow('Template not found')
+      await expect(env.render('missing.html', {})).rejects.toThrow('Template not found')
     })
 
     test('accessing method on undefined still works (returns empty)', async () => {
@@ -682,11 +714,15 @@ describe('Regression Tests', () => {
     })
 
     test('with multiple assignments', async () => {
-      expect(await render('{% with a=1 b=2 c=3 %}{{ a }}{{ b }}{{ c }}{% endwith %}', {})).toBe('123')
+      expect(await render('{% with a=1 b=2 c=3 %}{{ a }}{{ b }}{{ c }}{% endwith %}', {})).toBe(
+        '123'
+      )
     })
 
     test('with expression evaluation', async () => {
-      expect(await render('{% with total=a+b %}{{ total }}{% endwith %}', { a: 10, b: 20 })).toBe('30')
+      expect(await render('{% with total=a+b %}{{ total }}{% endwith %}', { a: 10, b: 20 })).toBe(
+        '30'
+      )
     })
 
     test('nested with blocks', async () => {
@@ -710,7 +746,9 @@ describe('Regression Tests', () => {
     })
 
     test('set with filter result', async () => {
-      expect(await render('{% set upper_name = name|upper %}{{ upper_name }}', { name: 'hello' })).toBe('HELLO')
+      expect(
+        await render('{% set upper_name = name|upper %}{{ upper_name }}', { name: 'hello' })
+      ).toBe('HELLO')
     })
   })
 
@@ -838,9 +876,11 @@ describe('Regression Tests', () => {
 
     test('static tag custom resolver', async () => {
       const env = new Environment({
-        staticResolver: (p) => `https://cdn.example.com/${p}`
+        staticResolver: (p) => `https://cdn.example.com/${p}`,
       })
-      expect(await env.renderString('{% static "img/logo.png" %}', {})).toBe('https://cdn.example.com/img/logo.png')
+      expect(await env.renderString('{% static "img/logo.png" %}', {})).toBe(
+        'https://cdn.example.com/img/logo.png'
+      )
     })
 
     test('static tag stores in variable', async () => {
@@ -870,8 +910,8 @@ describe('Regression Tests', () => {
       const env = new Environment({
         filters: {
           double: (v) => v * 2,
-          exclaim: (v) => `${v}!`
-        }
+          exclaim: (v) => `${v}!`,
+        },
       })
       expect(await env.renderString('{{ n|double }}', { n: 5 })).toBe('10')
       expect(await env.renderString('{{ s|exclaim }}', { s: 'Hello' })).toBe('Hello!')
@@ -880,8 +920,8 @@ describe('Regression Tests', () => {
     test('custom filter chains with builtin', async () => {
       const env = new Environment({
         filters: {
-          reverse_string: (v) => String(v).split('').reverse().join('')
-        }
+          reverse_string: (v) => String(v).split('').reverse().join(''),
+        },
       })
       expect(await env.renderString('{{ s|upper|reverse_string }}', { s: 'hello' })).toBe('OLLEH')
     })
@@ -890,15 +930,15 @@ describe('Regression Tests', () => {
       const env = new Environment({
         globals: {
           site_name: 'My Site',
-          version: '1.0.0'
-        }
+          version: '1.0.0',
+        },
       })
       expect(await env.renderString('{{ site_name }} v{{ version }}', {})).toBe('My Site v1.0.0')
     })
 
     test('globals can be overridden by context', async () => {
       const env = new Environment({
-        globals: { name: 'Global' }
+        globals: { name: 'Global' },
       })
       expect(await env.renderString('{{ name }}', {})).toBe('Global')
       expect(await env.renderString('{{ name }}', { name: 'Local' })).toBe('Local')
@@ -940,7 +980,9 @@ describe('Regression Tests', () => {
     })
 
     test('tilde with variables', async () => {
-      expect(await render('{{ first ~ " " ~ last }}', { first: 'John', last: 'Doe' })).toBe('John Doe')
+      expect(await render('{{ first ~ " " ~ last }}', { first: 'John', last: 'Doe' })).toBe(
+        'John Doe'
+      )
     })
 
     test('tilde coerces to string', async () => {
@@ -1047,15 +1089,22 @@ describe('Regression Tests', () => {
   // ==================== Parentloop in Nested Loops ====================
   describe('Parentloop', () => {
     test('forloop.parentloop in nested loops', async () => {
-      const ctx = { outer: [[1, 2], [3, 4]] }
-      const tmpl = '{% for row in outer %}{% for col in row %}{{ forloop.parentloop.counter }}:{{ forloop.counter }},{% endfor %}{% endfor %}'
+      const ctx = {
+        outer: [
+          [1, 2],
+          [3, 4],
+        ],
+      }
+      const tmpl =
+        '{% for row in outer %}{% for col in row %}{{ forloop.parentloop.counter }}:{{ forloop.counter }},{% endfor %}{% endfor %}'
       const result = await render(tmpl, ctx)
       expect(result).toBe('1:1,1:2,2:1,2:2,')
     })
 
     test('parentloop.first and parentloop.last', async () => {
       const ctx = { outer: [[1], [2]] }
-      const tmpl = '{% for row in outer %}{% for col in row %}{{ forloop.parentloop.first }}-{{ forloop.parentloop.last }};{% endfor %}{% endfor %}'
+      const tmpl =
+        '{% for row in outer %}{% for col in row %}{{ forloop.parentloop.first }}-{{ forloop.parentloop.last }};{% endfor %}{% endfor %}'
       const result = await render(tmpl, ctx)
       expect(result).toBe('True-False;False-True;')
     })

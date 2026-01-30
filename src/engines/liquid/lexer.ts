@@ -6,10 +6,10 @@
 
 export enum LiquidTokenType {
   TEXT = 'TEXT',
-  VAR_START = 'VAR_START',       // {{
-  VAR_END = 'VAR_END',           // }}
-  TAG_START = 'TAG_START',       // {%
-  TAG_END = 'TAG_END',           // %}
+  VAR_START = 'VAR_START', // {{
+  VAR_END = 'VAR_END', // }}
+  TAG_START = 'TAG_START', // {%
+  TAG_END = 'TAG_END', // %}
   ID = 'ID',
   STRING = 'STRING',
   NUMBER = 'NUMBER',
@@ -19,10 +19,10 @@ export enum LiquidTokenType {
   COMMA = 'COMMA',
   LBRACKET = 'LBRACKET',
   RBRACKET = 'RBRACKET',
-  RANGE = 'RANGE',               // ..
-  EQUALS = 'EQUALS',             // =
-  EQ = 'EQ',                     // ==
-  NE = 'NE',                     // != or <>
+  RANGE = 'RANGE', // ..
+  EQUALS = 'EQUALS', // =
+  EQ = 'EQ', // ==
+  NE = 'NE', // != or <>
   LT = 'LT',
   LE = 'LE',
   GT = 'GT',
@@ -405,7 +405,12 @@ export class LiquidLexer {
   }
 
   private skipWhitespace(): void {
-    while (this.peek() === ' ' || this.peek() === '\t' || this.peek() === '\n' || this.peek() === '\r') {
+    while (
+      this.peek() === ' ' ||
+      this.peek() === '\t' ||
+      this.peek() === '\n' ||
+      this.peek() === '\r'
+    ) {
       if (this.peek() === '\n') {
         this.line++
         this.column = 0

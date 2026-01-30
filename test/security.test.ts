@@ -79,10 +79,7 @@ describe('Security', () => {
       })
 
       test('prevents script with encoded characters - tags are escaped', async () => {
-        const vectors = [
-          '<scr&#105;pt>alert(1)</script>',
-          '<script>alert(&#39;xss&#39;)</script>',
-        ]
+        const vectors = ['<scr&#105;pt>alert(1)</script>', '<script>alert(&#39;xss&#39;)</script>']
 
         for (const vector of vectors) {
           const result = await render('{{ x }}', { x: vector })
@@ -140,7 +137,8 @@ describe('Security', () => {
       })
 
       test('escapes multiple event handlers - all angle brackets escaped', async () => {
-        const malicious = '<div onclick="alert(1)" onmouseover="alert(2)" onload="alert(3)">test</div>'
+        const malicious =
+          '<div onclick="alert(1)" onmouseover="alert(2)" onload="alert(3)">test</div>'
         const result = await render('{{ content }}', { content: malicious })
         // Both opening and closing tags must be escaped
         expect(result).not.toContain('<div')
@@ -196,18 +194,17 @@ describe('Security', () => {
       })
 
       test('escapes in for loops', async () => {
-        const result = await render(
-          '{% for item in items %}{{ item }}{% endfor %}',
-          { items: ['<a>', '<b>', '<c>'] }
-        )
+        const result = await render('{% for item in items %}{{ item }}{% endfor %}', {
+          items: ['<a>', '<b>', '<c>'],
+        })
         expect(result).toBe('&lt;a&gt;&lt;b&gt;&lt;c&gt;')
       })
 
       test('escapes in if blocks', async () => {
-        const result = await render(
-          '{% if show %}{{ content }}{% endif %}',
-          { show: true, content: '<script>evil()</script>' }
-        )
+        const result = await render('{% if show %}{{ content }}{% endif %}', {
+          show: true,
+          content: '<script>evil()</script>',
+        })
         expect(result).not.toContain('<script>')
         expect(result).toContain('&lt;script&gt;')
       })
@@ -437,7 +434,9 @@ describe('Security', () => {
       })
 
       test('json filter escapes HTML in string values', async () => {
-        const result = await render('{{ obj|json|safe }}', { obj: { html: '<script>alert(1)</script>' } })
+        const result = await render('{{ obj|json|safe }}', {
+          obj: { html: '<script>alert(1)</script>' },
+        })
         const parsed = JSON.parse(result)
         expect(parsed.html).toBe('<script>alert(1)</script>')
         // The JSON itself is safe because the script is inside a string
@@ -706,7 +705,8 @@ describe('Security', () => {
     })
 
     test('math tag XSS - tags are escaped', async () => {
-      const vector = '<math><maction actiontype="statusline#http://evil.com" xlink:href="javascript:alert(1)">click</maction></math>'
+      const vector =
+        '<math><maction actiontype="statusline#http://evil.com" xlink:href="javascript:alert(1)">click</maction></math>'
       const result = await render('{{ x }}', { x: vector })
       expect(result).not.toContain('<math')
       expect(result).toContain('&lt;math')

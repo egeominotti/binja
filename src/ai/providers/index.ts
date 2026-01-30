@@ -33,9 +33,7 @@ export function getProvider(
  * Auto-detect available provider
  * Priority: Anthropic > OpenAI > Groq > Ollama
  */
-export async function detectProvider(
-  options: LintOptions = {}
-): Promise<AIProvider> {
+export async function detectProvider(options: LintOptions = {}): Promise<AIProvider> {
   // Try in order of preference
   const providers: Array<{
     name: 'anthropic' | 'openai' | 'groq' | 'ollama'
@@ -73,9 +71,7 @@ export async function detectProvider(
 /**
  * Get provider based on options (auto or specific)
  */
-export async function resolveProvider(
-  options: LintOptions = {}
-): Promise<AIProvider> {
+export async function resolveProvider(options: LintOptions = {}): Promise<AIProvider> {
   const providerName = options.provider || 'auto'
 
   if (providerName === 'auto') {

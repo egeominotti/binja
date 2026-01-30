@@ -118,7 +118,7 @@ export class DebugCollector {
 
   // Timing
   startLexer(): void {
-    (this.data as any)._lexerStart = performance.now()
+    ;(this.data as any)._lexerStart = performance.now()
   }
 
   endLexer(): void {
@@ -128,7 +128,7 @@ export class DebugCollector {
   }
 
   startParser(): void {
-    (this.data as any)._parserStart = performance.now()
+    ;(this.data as any)._parserStart = performance.now()
   }
 
   endParser(): void {
@@ -138,7 +138,7 @@ export class DebugCollector {
   }
 
   startRender(): void {
-    (this.data as any)._renderStart = performance.now()
+    ;(this.data as any)._renderStart = performance.now()
   }
 
   endRender(): void {
@@ -226,7 +226,7 @@ export class DebugCollector {
     if (Array.isArray(value)) {
       if (value.length === 0) return '[]'
       if (value.length <= 3) {
-        const items = value.map(v => this.getPreview(v, 15)).join(', ')
+        const items = value.map((v) => this.getPreview(v, 15)).join(', ')
         return `[${items}]`
       }
       return `[${this.getPreview(value[0], 15)}, ... +${value.length - 1}]`
@@ -312,11 +312,11 @@ export class DebugCollector {
    */
   private normalizeQuery(sql: string): string {
     return sql
-      .replace(/\s+/g, ' ')           // Normalize whitespace
-      .replace(/= \?/g, '= ?')        // Normalize params
-      .replace(/= \$\d+/g, '= ?')     // Normalize Postgres params
-      .replace(/= '\w+'/g, "= '?'")   // Normalize string literals
-      .replace(/= \d+/g, '= ?')       // Normalize numbers
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/= \?/g, '= ?') // Normalize params
+      .replace(/= \$\d+/g, '= ?') // Normalize Postgres params
+      .replace(/= '\w+'/g, "= '?'") // Normalize string literals
+      .replace(/= \d+/g, '= ?') // Normalize numbers
       .replace(/IN \([^)]+\)/gi, 'IN (?)') // Normalize IN clauses
       .trim()
   }

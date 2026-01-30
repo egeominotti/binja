@@ -4,10 +4,7 @@
 
 import type { AIProvider } from '../types'
 
-export function createOllamaProvider(
-  model?: string,
-  baseUrl?: string
-): AIProvider {
+export function createOllamaProvider(model?: string, baseUrl?: string): AIProvider {
   const url = baseUrl || 'http://localhost:11434'
 
   return {

@@ -5,20 +5,20 @@
 
 export enum HbsTokenType {
   TEXT = 'TEXT',
-  OPEN = 'OPEN',           // {{
+  OPEN = 'OPEN', // {{
   OPEN_BLOCK = 'OPEN_BLOCK', // {{#
-  OPEN_END = 'OPEN_END',   // {{/
+  OPEN_END = 'OPEN_END', // {{/
   OPEN_PARTIAL = 'OPEN_PARTIAL', // {{>
   OPEN_UNESCAPED = 'OPEN_UNESCAPED', // {{{
   OPEN_COMMENT = 'OPEN_COMMENT', // {{!
-  CLOSE = 'CLOSE',         // }}
+  CLOSE = 'CLOSE', // }}
   CLOSE_UNESCAPED = 'CLOSE_UNESCAPED', // }}}
-  ID = 'ID',               // identifier
+  ID = 'ID', // identifier
   STRING = 'STRING',
   NUMBER = 'NUMBER',
   BOOLEAN = 'BOOLEAN',
   DOT = 'DOT',
-  DOTDOT = 'DOTDOT',       // ..
+  DOTDOT = 'DOTDOT', // ..
   SLASH = 'SLASH',
   EQUALS = 'EQUALS',
   PIPE = 'PIPE',
@@ -241,7 +241,12 @@ export class HandlebarsLexer {
   private scanIdentifier(): void {
     const start = this.pos
 
-    while (this.isAlphaNumeric(this.peek()) || this.peek() === '_' || this.peek() === '-' || this.peek() === '@') {
+    while (
+      this.isAlphaNumeric(this.peek()) ||
+      this.peek() === '_' ||
+      this.peek() === '-' ||
+      this.peek() === '@'
+    ) {
       this.advance()
     }
 
@@ -317,7 +322,12 @@ export class HandlebarsLexer {
   }
 
   private skipWhitespace(): void {
-    while (this.peek() === ' ' || this.peek() === '\t' || this.peek() === '\n' || this.peek() === '\r') {
+    while (
+      this.peek() === ' ' ||
+      this.peek() === '\t' ||
+      this.peek() === '\n' ||
+      this.peek() === '\r'
+    ) {
       if (this.peek() === '\n') {
         this.line++
         this.column = 0

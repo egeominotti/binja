@@ -67,7 +67,7 @@ describe('Autoescape', () => {
       // The entire string is escaped as text, so < becomes &lt;
       // The onclick attribute is part of the string and gets partially escaped
       expect(result).toContain('&lt;div')
-      expect(result).toContain('&quot;')  // quotes are escaped
+      expect(result).toContain('&quot;') // quotes are escaped
     })
 
     test('does not escape plain text', async () => {
@@ -152,10 +152,9 @@ describe('Autoescape', () => {
     })
 
     test('safe content in for loop', async () => {
-      const result = await render(
-        '{% for item in items %}{{ item|safe }}{% endfor %}',
-        { items: ['<b>1</b>', '<i>2</i>'] }
-      )
+      const result = await render('{% for item in items %}{{ item|safe }}{% endfor %}', {
+        items: ['<b>1</b>', '<i>2</i>'],
+      })
       expect(result).toBe('<b>1</b><i>2</i>')
     })
   })
@@ -165,7 +164,9 @@ describe('Autoescape', () => {
     test('escape filter forces escaping when autoescape is off', async () => {
       // escape filter works correctly when autoescape is disabled
       const env = new Environment({ autoescape: false })
-      const result = await env.renderString('{{ value|escape }}', { value: '<script>alert(1)</script>' })
+      const result = await env.renderString('{{ value|escape }}', {
+        value: '<script>alert(1)</script>',
+      })
       expect(result).toBe('&lt;script&gt;alert(1)&lt;/script&gt;')
     })
 
@@ -245,10 +246,9 @@ describe('Autoescape', () => {
     test('autoescape block does not throw errors', async () => {
       const env = new Environment({ autoescape: true })
       // Should not throw
-      const result = await env.renderString(
-        '{% autoescape true %}{{ value }}{% endautoescape %}',
-        { value: '<b>test</b>' }
-      )
+      const result = await env.renderString('{% autoescape true %}{{ value }}{% endautoescape %}', {
+        value: '<b>test</b>',
+      })
       expect(typeof result).toBe('string')
     })
   })
@@ -269,19 +269,21 @@ describe('Autoescape', () => {
 
     test('autoescape false with multiple outputs', async () => {
       const env = new Environment({ autoescape: false })
-      const result = await env.renderString(
-        '{{ a }}{{ b }}{{ c }}',
-        { a: '<div>', b: '&', c: '</div>' }
-      )
+      const result = await env.renderString('{{ a }}{{ b }}{{ c }}', {
+        a: '<div>',
+        b: '&',
+        c: '</div>',
+      })
       expect(result).toBe('<div>&</div>')
     })
 
     test('autoescape true with multiple outputs', async () => {
       const env = new Environment({ autoescape: true })
-      const result = await env.renderString(
-        '{{ a }}{{ b }}{{ c }}',
-        { a: '<div>', b: '&', c: '</div>' }
-      )
+      const result = await env.renderString('{{ a }}{{ b }}{{ c }}', {
+        a: '<div>',
+        b: '&',
+        c: '</div>',
+      })
       expect(result).toBe('&lt;div&gt;&amp;&lt;/div&gt;')
     })
 
@@ -364,7 +366,9 @@ describe('Autoescape', () => {
     })
 
     test('truncatechars with HTML', async () => {
-      const result = await render('{{ value|truncatechars:10 }}', { value: '<script>alert(1)</script>' })
+      const result = await render('{{ value|truncatechars:10 }}', {
+        value: '<script>alert(1)</script>',
+      })
       expect(result).not.toContain('<script>')
     })
 
@@ -441,18 +445,16 @@ describe('Autoescape', () => {
     })
 
     test('for loop item is escaped', async () => {
-      const result = await render(
-        '{% for item in items %}{{ item }}{% endfor %}',
-        { items: ['<a>', '<b>'] }
-      )
+      const result = await render('{% for item in items %}{{ item }}{% endfor %}', {
+        items: ['<a>', '<b>'],
+      })
       expect(result).toBe('&lt;a&gt;&lt;b&gt;')
     })
 
     test('with block values are escaped', async () => {
-      const result = await render(
-        '{% with value=html %}{{ value }}{% endwith %}',
-        { html: '<script>' }
-      )
+      const result = await render('{% with value=html %}{{ value }}{% endwith %}', {
+        html: '<script>',
+      })
       expect(result).toBe('&lt;script&gt;')
     })
 
@@ -550,7 +552,9 @@ describe('Autoescape', () => {
     })
 
     test('prevents basic XSS - anchor with javascript', async () => {
-      const result = await render('{{ value }}', { value: '<a href="javascript:alert(1)">click</a>' })
+      const result = await render('{{ value }}', {
+        value: '<a href="javascript:alert(1)">click</a>',
+      })
       expect(result).not.toContain('<a ')
       expect(result).toContain('&lt;a')
     })
@@ -561,11 +565,15 @@ describe('Autoescape', () => {
       // The quotes in the attack are escaped to &quot;
       expect(result).toContain('&quot;')
       // The resulting HTML is safe because " becomes &quot;
-      expect(result).toBe('<div title="&quot; onclick=&quot;alert(1)&quot; data-x=&quot;">test</div>')
+      expect(result).toBe(
+        '<div title="&quot; onclick=&quot;alert(1)&quot; data-x=&quot;">test</div>'
+      )
     })
 
     test('prevents HTML comment injection', async () => {
-      const result = await render('{{ value }}', { value: '<!-- comment --><script>alert(1)</script>' })
+      const result = await render('{{ value }}', {
+        value: '<!-- comment --><script>alert(1)</script>',
+      })
       expect(result).not.toContain('<!--')
       expect(result).not.toContain('<script>')
     })
@@ -578,8 +586,8 @@ describe('Autoescape', () => {
 
     test('prevents entity encoding bypass', async () => {
       const attacks = [
-        '&#60;script&#62;alert(1)&#60;/script&#62;',  // numeric entities
-        '&#x3c;script&#x3e;',  // hex entities
+        '&#60;script&#62;alert(1)&#60;/script&#62;', // numeric entities
+        '&#x3c;script&#x3e;', // hex entities
       ]
 
       for (const attack of attacks) {

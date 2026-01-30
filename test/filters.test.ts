@@ -340,7 +340,9 @@ describe('Filters', () => {
 
   describe('Filter Chaining', () => {
     test('chains multiple filters', async () => {
-      const result = await render('{{ s|lower|truncatechars:10|upper }}', { s: 'HELLO WORLD FOO BAR' })
+      const result = await render('{{ s|lower|truncatechars:10|upper }}', {
+        s: 'HELLO WORLD FOO BAR',
+      })
       expect(result).toBe('HELLO W...')
     })
 

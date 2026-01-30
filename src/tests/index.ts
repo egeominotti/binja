@@ -68,16 +68,17 @@ export const string: TestFunction = (value) => {
 
 export const mapping: TestFunction = (value) => {
   return (
-    value !== null &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    !(value instanceof Date)
+    value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)
   )
 }
 
 export const iterable: TestFunction = (value) => {
   if (value == null) return false
-  return typeof value === 'string' || Array.isArray(value) || typeof value[Symbol.iterator] === 'function'
+  return (
+    typeof value === 'string' ||
+    Array.isArray(value) ||
+    typeof value[Symbol.iterator] === 'function'
+  )
 }
 
 export const sequence: TestFunction = (value) => {

@@ -395,22 +395,54 @@ export class Lexer {
     const c = this.advance()
 
     switch (c) {
-      case '.': this.addToken(TokenType.DOT, c); break
-      case ',': this.addToken(TokenType.COMMA, c); break
-      case ':': this.addToken(TokenType.COLON, c); break
-      case '|': this.addToken(TokenType.PIPE, c); break
-      case '(': this.addToken(TokenType.LPAREN, c); break
-      case ')': this.addToken(TokenType.RPAREN, c); break
-      case '[': this.addToken(TokenType.LBRACKET, c); break
-      case ']': this.addToken(TokenType.RBRACKET, c); break
-      case '{': this.addToken(TokenType.LBRACE, c); break
-      case '}': this.addToken(TokenType.RBRACE, c); break
-      case '+': this.addToken(TokenType.ADD, c); break
-      case '-': this.addToken(TokenType.SUB, c); break
-      case '*': this.addToken(TokenType.MUL, c); break
-      case '/': this.addToken(TokenType.DIV, c); break
-      case '%': this.addToken(TokenType.MOD, c); break
-      case '~': this.addToken(TokenType.TILDE, c); break
+      case '.':
+        this.addToken(TokenType.DOT, c)
+        break
+      case ',':
+        this.addToken(TokenType.COMMA, c)
+        break
+      case ':':
+        this.addToken(TokenType.COLON, c)
+        break
+      case '|':
+        this.addToken(TokenType.PIPE, c)
+        break
+      case '(':
+        this.addToken(TokenType.LPAREN, c)
+        break
+      case ')':
+        this.addToken(TokenType.RPAREN, c)
+        break
+      case '[':
+        this.addToken(TokenType.LBRACKET, c)
+        break
+      case ']':
+        this.addToken(TokenType.RBRACKET, c)
+        break
+      case '{':
+        this.addToken(TokenType.LBRACE, c)
+        break
+      case '}':
+        this.addToken(TokenType.RBRACE, c)
+        break
+      case '+':
+        this.addToken(TokenType.ADD, c)
+        break
+      case '-':
+        this.addToken(TokenType.SUB, c)
+        break
+      case '*':
+        this.addToken(TokenType.MUL, c)
+        break
+      case '/':
+        this.addToken(TokenType.DIV, c)
+        break
+      case '%':
+        this.addToken(TokenType.MOD, c)
+        break
+      case '~':
+        this.addToken(TokenType.TILDE, c)
+        break
       case '=':
         if (this.match('=')) {
           this.addToken(TokenType.EQ, '==')
@@ -557,9 +589,11 @@ export class Lexer {
 
   private isAlphaNumeric(c: string): boolean {
     const code = c.charCodeAt(0)
-    return (code >= 48 && code <= 57) ||  // 0-9
-           (code >= 97 && code <= 122) || // a-z
-           (code >= 65 && code <= 90)     // A-Z
+    return (
+      (code >= 48 && code <= 57) || // 0-9
+      (code >= 97 && code <= 122) || // a-z
+      (code >= 65 && code <= 90)
+    ) // A-Z
   }
 
   private addToken(type: TokenType, value: string): void {

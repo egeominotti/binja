@@ -19,26 +19,23 @@ export function createGroqProvider(model?: string, apiKey?: string): AIProvider 
         throw new Error('Groq API key not provided')
       }
 
-      const response = await fetch(
-        'https://api.groq.com/openai/v1/chat/completions',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${key}`,
-          },
-          body: JSON.stringify({
-            model: model || 'llama-3.1-70b-versatile',
-            max_tokens: 1500,
-            messages: [
-              {
-                role: 'user',
-                content: prompt.replace('{{TEMPLATE}}', template),
-              },
-            ],
-          }),
-        }
-      )
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          model: model || 'llama-3.1-70b-versatile',
+          max_tokens: 1500,
+          messages: [
+            {
+              role: 'user',
+              content: prompt.replace('{{TEMPLATE}}', template),
+            },
+          ],
+        }),
+      })
 
       if (!response.ok) {
         const error = await response.text()

@@ -18,12 +18,14 @@ describe('Hono Adapter', () => {
   beforeAll(() => {
     honoClearCache()
     app = new Hono()
-    app.use(honoAdapter({
-      root: './test/views',
-      extension: '.html',
-      debug: true,
-      cache: false,
-    }))
+    app.use(
+      honoAdapter({
+        root: './test/views',
+        extension: '.html',
+        debug: true,
+        cache: false,
+      })
+    )
     app.get('/', (c) => c.render('index', { title: 'Test', name: 'World' }))
     app.get('/missing', (c) => c.render('nonexistent', {}))
   })
@@ -48,11 +50,13 @@ describe('Hono Adapter', () => {
   test('renders with different engines', async () => {
     // Handlebars
     const hbsApp = new Hono()
-    hbsApp.use(honoAdapter({
-      root: './test/views',
-      engine: 'handlebars',
-      cache: false,
-    }))
+    hbsApp.use(
+      honoAdapter({
+        root: './test/views',
+        engine: 'handlebars',
+        cache: false,
+      })
+    )
     hbsApp.get('/', (c) => c.render('index', { title: 'HBS', name: 'Handlebars' }))
 
     const res = await hbsApp.request('/')
@@ -63,11 +67,13 @@ describe('Hono Adapter', () => {
 
   test('supports global context', async () => {
     const globalApp = new Hono()
-    globalApp.use(honoAdapter({
-      root: './test/views',
-      cache: false,
-      globals: { siteName: 'MySite' },
-    }))
+    globalApp.use(
+      honoAdapter({
+        root: './test/views',
+        cache: false,
+        globals: { siteName: 'MySite' },
+      })
+    )
     globalApp.get('/', (c) => c.render('index', { title: 'Test', name: 'User' }))
 
     const res = await globalApp.request('/')
@@ -81,12 +87,14 @@ describe('Elysia Adapter', () => {
   beforeAll(() => {
     elysiaClearCache()
     app = new Elysia()
-      .use(elysiaAdapter({
-        root: './test/views',
-        extension: '.html',
-        debug: true,
-        cache: false,
-      }))
+      .use(
+        elysiaAdapter({
+          root: './test/views',
+          extension: '.html',
+          debug: true,
+          cache: false,
+        })
+      )
       .get('/', ({ render }) => render('index', { title: 'Test', name: 'World' }))
       .get('/missing', ({ render }) => render('nonexistent', {}))
   })
@@ -111,11 +119,13 @@ describe('Elysia Adapter', () => {
 
   test('renders with different engines', async () => {
     const twigApp = new Elysia()
-      .use(elysiaAdapter({
-        root: './test/views',
-        engine: 'twig',
-        cache: false,
-      }))
+      .use(
+        elysiaAdapter({
+          root: './test/views',
+          engine: 'twig',
+          cache: false,
+        })
+      )
       .get('/', ({ render }) => render('index', { title: 'Twig', name: 'TwigUser' }))
 
     const res = await twigApp.handle(new Request('http://localhost/'))
@@ -126,11 +136,13 @@ describe('Elysia Adapter', () => {
 
   test('supports global context', async () => {
     const globalApp = new Elysia()
-      .use(elysiaAdapter({
-        root: './test/views',
-        cache: false,
-        globals: { version: '1.0.0' },
-      }))
+      .use(
+        elysiaAdapter({
+          root: './test/views',
+          cache: false,
+          globals: { version: '1.0.0' },
+        })
+      )
       .get('/', ({ render }) => render('index', { title: 'Global', name: 'Test' }))
 
     const res = await globalApp.handle(new Request('http://localhost/'))

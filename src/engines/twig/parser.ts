@@ -14,15 +14,15 @@ import type { TemplateNode, ExpressionNode } from '../../parser/nodes'
 
 // Twig filter name mappings to Jinja2 equivalents
 export const TWIG_FILTER_MAP: Record<string, string> = {
-  'e': 'escape',
-  'raw': 'safe',
-  'nl2br': 'linebreaksbr',
-  'number_format': 'floatformat',
-  'striptags': 'striptags',
-  'json_encode': 'json',
-  'merge': 'concat',
-  'keys': 'list',
-  'column': 'map',
+  e: 'escape',
+  raw: 'safe',
+  nl2br: 'linebreaksbr',
+  number_format: 'floatformat',
+  striptags: 'striptags',
+  json_encode: 'json',
+  merge: 'concat',
+  keys: 'list',
+  column: 'map',
 }
 
 export class TwigParser extends Parser {
@@ -40,7 +40,7 @@ export class TwigParser extends Parser {
     // Transform the AST to handle Twig-specific constructs
     return {
       ...node,
-      body: node.body.map(n => this.transformNode(n))
+      body: node.body.map((n) => this.transformNode(n)),
     }
   }
 
@@ -54,7 +54,7 @@ export class TwigParser extends Parser {
         ...node,
         test: this.transformNode(node.test),
         body: this.transformNode(node.body),
-        else_: this.transformNode(node.else_)
+        else_: this.transformNode(node.else_),
       }
     }
 
@@ -65,14 +65,19 @@ export class TwigParser extends Parser {
         test: {
           type: 'Compare',
           left: this.transformNode(node.left),
-          ops: [{ operator: 'isnot', right: { type: 'Literal', value: null, line: node.line, column: node.column } }],
+          ops: [
+            {
+              operator: 'isnot',
+              right: { type: 'Literal', value: null, line: node.line, column: node.column },
+            },
+          ],
           line: node.line,
-          column: node.column
+          column: node.column,
         },
         body: this.transformNode(node.left),
         else_: this.transformNode(node.right),
         line: node.line,
-        column: node.column
+        column: node.column,
       }
     }
 
@@ -83,7 +88,7 @@ export class TwigParser extends Parser {
         ...node,
         filter: mappedFilter,
         node: this.transformNode(node.node),
-        args: node.args?.map((a: any) => this.transformNode(a)) || []
+        args: node.args?.map((a: any) => this.transformNode(a)) || [],
       }
     }
 
@@ -108,7 +113,7 @@ export class TwigParser extends Parser {
       node.elifs = node.elifs.map((elif: any) => ({
         ...elif,
         test: this.transformNode(elif.test),
-        body: elif.body.map((n: any) => this.transformNode(n))
+        body: elif.body.map((n: any) => this.transformNode(n)),
       }))
     }
     if (node.iter) {
