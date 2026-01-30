@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGrad)"/>
+
+  <!-- Decorative elements -->
+  <circle cx="1100" cy="100" r="200" fill="#10b981" opacity="0.1"/>
+  <circle cx="100" cy="530" r="150" fill="#10b981" opacity="0.1"/>
+
+  <!-- Logo container -->
+  <rect x="80" y="80" width="120" height="120" rx="28" fill="url(#accentGrad)"/>
+
+  <!-- Ninja head in logo -->
+  <ellipse cx="140" cy="140" rx="30" ry="32" fill="#1f2937"/>
+  <rect x="106" y="128" width="68" height="19" rx="4" fill="#111827"/>
+  <ellipse cx="125" cy="137" rx="7" ry="4.5" fill="#ffffff"/>
+  <ellipse cx="155" cy="137" rx="7" ry="4.5" fill="#ffffff"/>
+  <circle cx="127" cy="137" r="2.5" fill="#111827"/>
+  <circle cx="157" cy="137" r="2.5" fill="#111827"/>
+
+  <!-- Title -->
+  <text x="220" y="155" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#ffffff">binja</text>
+
+  <!-- Tagline -->
+  <text x="80" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="600" fill="#ffffff">High-Performance Template Engine</text>
+  <text x="80" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="600" fill="#ffffff">for Bun</text>
+
+  <!-- Features -->
+  <text x="80" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Jinja2/Django Compatible • 160x Faster with AOT</text>
+  <text x="80" y="460" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Multi-Engine: Handlebars, Liquid, Twig</text>
+
+  <!-- Stats badges -->
+  <rect x="80" y="500" width="140" height="50" rx="8" fill="#10b981" opacity="0.2"/>
+  <text x="150" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">2-4x Faster</text>
+
+  <rect x="240" y="500" width="140" height="50" rx="8" fill="#10b981" opacity="0.2"/>
+  <text x="310" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">84 Filters</text>
+
+  <rect x="400" y="500" width="160" height="50" rx="8" fill="#10b981" opacity="0.2"/>
+  <text x="480" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">TypeScript</text>
+
+  <!-- URL -->
+  <text x="80" y="600" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#64748b">github.com/egeominotti/binja</text>
+</svg>

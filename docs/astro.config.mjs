@@ -149,6 +149,7 @@ export default defineConfig({
       ],
       favicon: '/favicon.svg',
       head: [
+        // Favicon variations
         {
           tag: 'link',
           attrs: {
@@ -158,10 +159,48 @@ export default defineConfig({
           },
         },
         {
+          tag: 'link',
+          attrs: {
+            rel: 'icon',
+            href: '/binja/favicon.svg',
+            sizes: 'any',
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'apple-touch-icon',
+            href: '/binja/apple-touch-icon.svg',
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'mask-icon',
+            href: '/binja/favicon.svg',
+            color: '#10b981',
+          },
+        },
+        // Primary Meta Tags
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'title',
+            content: 'binja - High-Performance Jinja2/Django Template Engine for Bun',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'description',
+            content: 'The fastest Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT compilation. Multi-engine support: Handlebars, Liquid, Twig.',
+          },
+        },
+        {
           tag: 'meta',
           attrs: {
             name: 'keywords',
-            content: 'binja, jinja2, django, template engine, bun, typescript, handlebars, liquid, twig, nunjucks alternative, aot compilation, filters',
+            content: 'binja, jinja2, django, template engine, bun, typescript, javascript, handlebars, liquid, twig, nunjucks, nunjucks alternative, aot compilation, filters, hono, elysia, server-side rendering, ssr',
           },
         },
         {
@@ -181,17 +220,18 @@ export default defineConfig({
         {
           tag: 'meta',
           attrs: {
-            property: 'og:title',
-            content: 'binja - High-Performance Template Engine for Bun',
+            name: 'googlebot',
+            content: 'index, follow',
           },
         },
         {
           tag: 'meta',
           attrs: {
-            property: 'og:description',
-            content: 'Jinja2/Django compatible template engine. 2-4x faster than Nunjucks, 160x faster with AOT. Multi-engine support.',
+            name: 'bingbot',
+            content: 'index, follow',
           },
         },
+        // Open Graph / Facebook
         {
           tag: 'meta',
           attrs: {
@@ -202,15 +242,29 @@ export default defineConfig({
         {
           tag: 'meta',
           attrs: {
-            property: 'og:site_name',
-            content: 'binja',
+            property: 'og:url',
+            content: 'https://egeominotti.github.io/binja/',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:title',
+            content: 'binja - High-Performance Template Engine for Bun',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:description',
+            content: 'Jinja2/Django compatible template engine. 2-4x faster than Nunjucks, 160x faster with AOT. Multi-engine support for Handlebars, Liquid, Twig.',
           },
         },
         {
           tag: 'meta',
           attrs: {
             property: 'og:image',
-            content: 'https://egeominotti.github.io/binja/og-image.png',
+            content: 'https://egeominotti.github.io/binja/og-image.svg',
           },
         },
         {
@@ -230,22 +284,37 @@ export default defineConfig({
         {
           tag: 'meta',
           attrs: {
-            property: 'og:locale',
-            content: 'en_US',
+            property: 'og:image:alt',
+            content: 'binja - High-performance Jinja2/Django template engine for Bun',
           },
         },
         {
           tag: 'meta',
           attrs: {
-            property: 'og:url',
-            content: 'https://egeominotti.github.io/binja/',
+            property: 'og:site_name',
+            content: 'binja',
           },
         },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:locale',
+            content: 'en_US',
+          },
+        },
+        // Twitter
         {
           tag: 'meta',
           attrs: {
             name: 'twitter:card',
             content: 'summary_large_image',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:url',
+            content: 'https://egeominotti.github.io/binja/',
           },
         },
         {
@@ -259,16 +328,38 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'twitter:description',
-            content: 'Jinja2/Django compatible. 2-4x faster than Nunjucks, 160x with AOT.',
+            content: 'Jinja2/Django compatible. 2-4x faster than Nunjucks, 160x with AOT. Multi-engine: Handlebars, Liquid, Twig.',
           },
         },
         {
           tag: 'meta',
           attrs: {
             name: 'twitter:image',
-            content: 'https://egeominotti.github.io/binja/og-image.png',
+            content: 'https://egeominotti.github.io/binja/og-image.svg',
           },
         },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:image:alt',
+            content: 'binja - High-performance Jinja2/Django template engine for Bun',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:creator',
+            content: '@egeominotti',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:site',
+            content: '@egeominotti',
+          },
+        },
+        // JSON-LD Structured Data - SoftwareApplication
         {
           tag: 'script',
           attrs: {
@@ -278,7 +369,8 @@ export default defineConfig({
             '@context': 'https://schema.org',
             '@type': 'SoftwareApplication',
             name: 'binja',
-            description: 'High-performance Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT compilation.',
+            alternateName: 'Binja Template Engine',
+            description: 'High-performance Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT compilation. Multi-engine support.',
             applicationCategory: 'DeveloperApplication',
             operatingSystem: 'Cross-platform',
             softwareVersion: '0.9.1',
@@ -295,13 +387,46 @@ export default defineConfig({
               name: 'egeominotti',
               url: 'https://github.com/egeominotti',
             },
+            publisher: {
+              '@type': 'Person',
+              name: 'egeominotti',
+            },
             codeRepository: 'https://github.com/egeominotti/binja',
             downloadUrl: 'https://www.npmjs.com/package/binja',
+            installUrl: 'https://www.npmjs.com/package/binja',
             programmingLanguage: ['TypeScript', 'JavaScript'],
             runtimePlatform: 'Bun',
-            keywords: ['template engine', 'jinja2', 'django', 'bun', 'typescript', 'nunjucks alternative'],
+            keywords: ['template engine', 'jinja2', 'django', 'bun', 'typescript', 'nunjucks alternative', 'handlebars', 'liquid', 'twig'],
+            aggregateRating: {
+              '@type': 'AggregateRating',
+              ratingValue: '5',
+              ratingCount: '1',
+            },
           }),
         },
+        // JSON-LD Structured Data - WebSite
+        {
+          tag: 'script',
+          attrs: {
+            type: 'application/ld+json',
+          },
+          content: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'binja Documentation',
+            url: 'https://egeominotti.github.io/binja/',
+            description: 'Official documentation for binja - High-performance Jinja2/Django template engine for Bun',
+            potentialAction: {
+              '@type': 'SearchAction',
+              target: {
+                '@type': 'EntryPoint',
+                urlTemplate: 'https://egeominotti.github.io/binja/?search={search_term_string}',
+              },
+              'query-input': 'required name=search_term_string',
+            },
+          }),
+        },
+        // Theme and PWA
         {
           tag: 'meta',
           attrs: {
@@ -310,10 +435,60 @@ export default defineConfig({
           },
         },
         {
+          tag: 'meta',
+          attrs: {
+            name: 'msapplication-TileColor',
+            content: '#10b981',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'application-name',
+            content: 'binja',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'apple-mobile-web-app-title',
+            content: 'binja',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'apple-mobile-web-app-capable',
+            content: 'yes',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'apple-mobile-web-app-status-bar-style',
+            content: 'default',
+          },
+        },
+        // DNS prefetch
+        {
           tag: 'link',
           attrs: {
-            rel: 'apple-touch-icon',
-            href: '/binja/apple-touch-icon.png',
+            rel: 'dns-prefetch',
+            href: 'https://github.com',
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'preconnect',
+            href: 'https://github.com',
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'dns-prefetch',
+            href: 'https://www.npmjs.com',
           },
         },
       ],
