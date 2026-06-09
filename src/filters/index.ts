@@ -114,10 +114,30 @@ export const safe: FilterFunction = (value) => {
   return safeString
 }
 
+// Wrap a string as autoescape-safe (the `__safe__` boxed-String convention).
+function markSafe(html: string): any {
+  const safeString = new String(html) as any
+  safeString.__safe__ = true
+  return safeString
+}
+
+// HTML-escape user text before it is embedded into markup that will be marked
+// safe. Respects the `__safe__` flag (Django does not re-escape SafeData), so
+// content already escaped upstream is passed through unchanged. This is the
+// guard that keeps the HTML-producing filters (linebreaks, urlize, etc.) from
+// becoming XSS sinks.
+function escapeText(value: any): string {
+  if ((value as any)?.__safe__) return String(value)
+  return Bun.escapeHTML(String(value))
+}
+
 export const escapejs: FilterFunction = (value) => JSON.stringify(String(value)).slice(1, -1)
 
 export const linebreaks: FilterFunction = (value) => {
-  const str = String(value)
+  // Escape the text BEFORE inserting <p>/<br> markup, then mark safe. Escaping
+  // first is correct because Bun.escapeHTML does not touch newlines, so the
+  // paragraph/line splitting still works on the escaped text.
+  const str = escapeText(value)
   const paragraphs = str.split(DOUBLE_NEWLINE_REGEX)
   // Optimized: for loop instead of .map() - 15-20% faster
   let html = ''
@@ -126,17 +146,14 @@ export const linebreaks: FilterFunction = (value) => {
     html += `<p>${paragraphs[i].replace(NEWLINE_REGEX, '<br>')}</p>`
   }
   // Mark as safe - this produces HTML that should not be escaped
-  const safeString = new String(html) as any
-  safeString.__safe__ = true
-  return safeString
+  return markSafe(html)
 }
 
 export const linebreaksbr: FilterFunction = (value) => {
-  const html = String(value).replace(NEWLINE_REGEX, '<br>')
+  // Escape text before inserting <br> so user content cannot inject markup.
+  const html = escapeText(value).replace(NEWLINE_REGEX, '<br>')
   // Mark as safe - this produces HTML that should not be escaped
-  const safeString = new String(html) as any
-  safeString.__safe__ = true
-  return safeString
+  return markSafe(html)
 }
 
 export const truncatechars: FilterFunction = (value, length = 30) => {
@@ -483,11 +500,25 @@ export const pluralize: FilterFunction = (value, arg = 's') => {
 export const urlencode: FilterFunction = (value) => encodeURIComponent(String(value))
 
 export const urlize: FilterFunction = (value) => {
-  const html = String(value).replace(URLIZE_REGEX, '<a href="$1">$1</a>')
+  // Escape both the surrounding text and the URL (which `[^\s]+` can otherwise
+  // let `"` break out of the href attribute). The matched URL is escaped for
+  // use in the href and the display text alike.
+  const src = String(value)
+  const alreadySafe = !!(value as any)?.__safe__
+  const esc = (s: string): string => (alreadySafe ? s : Bun.escapeHTML(s))
+  let html = ''
+  let last = 0
+  for (const m of src.matchAll(URLIZE_REGEX)) {
+    const url = m[0]
+    const idx = m.index ?? 0
+    html += esc(src.slice(last, idx))
+    const safeUrl = Bun.escapeHTML(url)
+    html += `<a href="${safeUrl}">${safeUrl}</a>`
+    last = idx + url.length
+  }
+  html += esc(src.slice(last))
   // Mark as safe - this produces HTML that should not be escaped
-  const safeString = new String(html) as any
-  safeString.__safe__ = true
-  return safeString
+  return markSafe(html)
 }
 
 // ==================== JSON Filters ====================
@@ -885,7 +916,9 @@ export const unordered_list: FilterFunction = (value): any => {
         // Nested list
         html += `\n${indent}<ul>\n${renderList(item, depth + 1)}${indent}</ul>\n`
       } else {
-        html += `${indent}<li>${item}`
+        // Escape each leaf item so user content cannot inject markup into the
+        // safe-marked output (respects upstream __safe__ values).
+        html += `${indent}<li>${escapeText(item)}`
         // Check if next item is a nested array
         if (i + 1 < items.length && Array.isArray(items[i + 1])) {
           html += `\n${indent}<ul>\n${renderList(items[i + 1], depth + 1)}${indent}</ul>\n${indent}`
@@ -899,9 +932,7 @@ export const unordered_list: FilterFunction = (value): any => {
   }
 
   const html = renderList(value)
-  const safeString = new String(html) as any
-  safeString.__safe__ = true
-  return safeString
+  return markSafe(html)
 }
 
 // ==================== Additional Django Filters (DTL Complete) ====================
@@ -1117,13 +1148,23 @@ export const truncatewords_html: FilterFunction = (value, count = 15) => {
 // Django: urlizetrunc - Convert URLs to links with truncation
 export const urlizetrunc: FilterFunction = (value, limit = 15) => {
   const maxLen = Number(limit)
-  const html = String(value).replace(URLIZE_REGEX, (url) => {
+  // Escape surrounding text and the URL (href + truncated display) to prevent
+  // attribute breakout / HTML injection via the matched `[^\s]+`.
+  const src = String(value)
+  const alreadySafe = !!(value as any)?.__safe__
+  const esc = (s: string): string => (alreadySafe ? s : Bun.escapeHTML(s))
+  let html = ''
+  let last = 0
+  for (const m of src.matchAll(URLIZE_REGEX)) {
+    const url = m[0]
+    const idx = m.index ?? 0
+    html += esc(src.slice(last, idx))
     const displayUrl = url.length > maxLen ? url.slice(0, maxLen) + '...' : url
-    return `<a href="${url}">${displayUrl}</a>`
-  })
-  const safeString = new String(html) as any
-  safeString.__safe__ = true
-  return safeString
+    html += `<a href="${Bun.escapeHTML(url)}">${Bun.escapeHTML(displayUrl)}</a>`
+    last = idx + url.length
+  }
+  html += esc(src.slice(last))
+  return markSafe(html)
 }
 
 // ==================== Jinja2 Additional Filters ====================

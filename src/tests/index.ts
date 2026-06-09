@@ -50,7 +50,11 @@ export const defined: TestFunction = (value) => {
   return value !== undefined
 }
 
-export const undefined: TestFunction = (value) => {
+// Named `undefined_` to avoid shadowing the global `undefined` within this
+// module (which would silently break `defined` and the body below). Registered
+// under the key `undefined` in builtinTests, matching the `in_`/`true_`/`false_`
+// reserved-word idiom used elsewhere in this file.
+export const undefined_: TestFunction = (value) => {
   return value === undefined
 }
 
@@ -169,7 +173,7 @@ export const builtinTests: Record<string, TestFunction> = {
 
   // Type tests
   defined,
-  undefined,
+  undefined: undefined_,
   none,
   None: none, // Alias for Django compatibility
   boolean,

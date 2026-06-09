@@ -26,6 +26,7 @@ import type {
   TestExprNode,
   ConditionalNode,
   CommentNode,
+  FunctionCallNode,
 } from '../parser/nodes'
 import { builtinFilters } from '../filters'
 import { builtinTests } from '../tests'
@@ -118,12 +119,73 @@ const runtimeHelpers = {
   },
 }
 
+// JS reserved words / globals that cannot be used verbatim as a local binding
+// name. Template targets (set/with/for) that collide are emitted under a safe
+// alias so `new Function` does not throw at compile time.
+const RESERVED_JS = new Set([
+  'break',
+  'case',
+  'catch',
+  'class',
+  'const',
+  'continue',
+  'debugger',
+  'default',
+  'delete',
+  'do',
+  'else',
+  'enum',
+  'export',
+  'extends',
+  'false',
+  'finally',
+  'for',
+  'function',
+  'if',
+  'import',
+  'in',
+  'instanceof',
+  'new',
+  'null',
+  'return',
+  'super',
+  'switch',
+  'this',
+  'throw',
+  'true',
+  'try',
+  'typeof',
+  'var',
+  'void',
+  'while',
+  'with',
+  'yield',
+  'let',
+  'static',
+  'await',
+  'async',
+  'implements',
+  'interface',
+  'package',
+  'private',
+  'protected',
+  'public',
+  'arguments',
+  'eval',
+  'undefined',
+  'NaN',
+  'Infinity',
+])
+
 class Compiler {
   private options: Required<CompileOptions>
   private indent = 0
   private varCounter = 0
   private loopStack: string[] = [] // Track nested loop variable names for parentloop
-  private localVars: Set<string>[] = [] // Stack of local variable scopes
+  // Stack of local-variable scopes. Each scope maps a template variable name to
+  // the JS identifier it is emitted as (usually identical, aliased when the name
+  // is a reserved word).
+  private localVars: Map<string, string>[] = []
 
   constructor(options: CompileOptions = {}) {
     this.options = {
@@ -135,17 +197,23 @@ class Compiler {
   }
 
   private pushScope(): void {
-    this.localVars.push(new Set())
+    this.localVars.push(new Map())
   }
 
   private popScope(): void {
     this.localVars.pop()
   }
 
-  private addLocalVar(name: string): void {
-    if (this.localVars.length > 0) {
-      this.localVars[this.localVars.length - 1].add(name)
-    }
+  // Declare a local in the current scope. Returns the JS identifier to emit and
+  // whether this is a fresh declaration in the current scope (vs a re-assignment
+  // of an already-declared local, which must not re-emit `let`).
+  private declareLocal(name: string): { id: string; isNew: boolean } {
+    const scope = this.localVars[this.localVars.length - 1]
+    const existing = scope.get(name)
+    if (existing !== undefined) return { id: existing, isNew: false }
+    const id = RESERVED_JS.has(name) ? `__loc_${name}` : name
+    scope.set(name, id)
+    return { id, isNew: true }
   }
 
   private isLocalVar(name: string): boolean {
@@ -155,8 +223,20 @@ class Compiler {
     return false
   }
 
+  // Resolve the JS identifier for a local, searching inner scopes first.
+  private getLocalVar(name: string): string {
+    for (let i = this.localVars.length - 1; i >= 0; i--) {
+      const id = this.localVars[i].get(name)
+      if (id !== undefined) return id
+    }
+    return name
+  }
+
   compile(ast: TemplateNode): string {
+    // Root scope so top-level {% set %} variables register as locals.
+    this.pushScope()
     const body = this.compileNodes(ast.body)
+    this.popScope()
     const nl = this.options.minify ? '' : '\n'
 
     return (
@@ -223,22 +303,31 @@ class Compiler {
     let code = ''
     const test = this.compileExpr(node.test)
 
+    // Each branch gets its own scope: a {% set %} inside an if-branch is
+    // block-scoped in the emitted JS, so the compiler scope must match (its
+    // locals must not be referenced after the block, which would ReferenceError).
     code += `  if (isTruthy(${test})) {${this.nl()}`
+    this.pushScope()
     code += this.compileNodes(node.body)
+    this.popScope()
     code += `  }`
 
     // Handle elifs
     for (const elif of node.elifs) {
       const elifTest = this.compileExpr(elif.test)
       code += ` else if (isTruthy(${elifTest})) {${this.nl()}`
+      this.pushScope()
       code += this.compileNodes(elif.body)
+      this.popScope()
       code += `  }`
     }
 
     // Handle else
     if (node.else_.length > 0) {
       code += ` else {${this.nl()}`
+      this.pushScope()
       code += this.compileNodes(node.else_)
+      this.popScope()
       code += `  }`
     }
 
@@ -273,13 +362,20 @@ class Compiler {
 
     code += `  for (let ${indexVar} = 0; ${indexVar} < ${lenVar}; ${indexVar}++) {${this.nl()}`
 
+    // Open a scope and register the loop target(s) as locals so references in
+    // the body compile directly to these identifiers (no fragile source
+    // rewrite) and reserved-word targets get a safe alias.
+    this.pushScope()
+    const itemId = this.declareLocal(itemVar).id
+    const valueId = valueVar ? this.declareLocal(valueVar).id : null
+
     // Set loop variables
-    if (valueVar) {
+    if (valueId) {
       // Tuple unpacking: {% for key, value in dict.items() %}
-      code += `    const ${itemVar} = ${iterVar}[${indexVar}][0];${this.nl()}`
-      code += `    const ${valueVar} = ${iterVar}[${indexVar}][1];${this.nl()}`
+      code += `    const ${itemId} = ${iterVar}[${indexVar}][0];${this.nl()}`
+      code += `    const ${valueId} = ${iterVar}[${indexVar}][1];${this.nl()}`
     } else {
-      code += `    const ${itemVar} = ${iterVar}[${indexVar}];${this.nl()}`
+      code += `    const ${itemId} = ${iterVar}[${indexVar}];${this.nl()}`
     }
 
     // Create forloop/loop object with parentloop support
@@ -308,13 +404,12 @@ class Compiler {
     // Push current loop to stack before compiling body
     this.loopStack.push(loopVar)
 
-    // Compile body with item in scope
-    const bodyCode = this.compileNodes(node.body)
-    // Replace references to loop variable with local var
-    code += bodyCode.replace(new RegExp(`__ctx\\.${itemVar}`, 'g'), itemVar)
+    // Compile body with the loop target(s) in scope (resolved via compileName).
+    code += this.compileNodes(node.body)
 
-    // Pop from stack after compiling body
+    // Pop from stack/scope after compiling body
     this.loopStack.pop()
+    this.popScope()
 
     code += `  }${this.nl()}`
 
@@ -326,8 +421,14 @@ class Compiler {
   }
 
   private compileSet(node: SetNode): string {
+    // Compile the value BEFORE declaring the target so a self-reference
+    // ({% set x = x %}) resolves to the previous binding, and register the
+    // target as a local so later references resolve to it (not __ctx).
     const value = this.compileExpr(node.value)
-    return `  const ${node.target} = ${value};${this.nl()}`
+    const { id, isNew } = this.declareLocal(node.target)
+    // `let` (re-assignable): a template may set the same name twice. A repeat in
+    // the same scope emits a plain assignment to avoid a duplicate declaration.
+    return isNew ? `  let ${id} = ${value};${this.nl()}` : `  ${id} = ${value};${this.nl()}`
   }
 
   private compileWith(node: WithNode): string {
@@ -335,9 +436,10 @@ class Compiler {
 
     this.pushScope()
     for (const { target, value } of node.assignments) {
+      // Compile value before declaring target (same-name reference uses outer).
       const valueExpr = this.compileExpr(value)
-      code += `    const ${target} = ${valueExpr};${this.nl()}`
-      this.addLocalVar(target)
+      const { id } = this.declareLocal(target)
+      code += `    const ${id} = ${valueExpr};${this.nl()}`
     }
 
     code += this.compileNodes(node.body)
@@ -373,9 +475,29 @@ class Compiler {
         return this.compileTest(node as TestExprNode)
       case 'Conditional':
         return this.compileConditional(node as ConditionalNode)
+      case 'FunctionCall':
+        return this.compileFunctionCall(node as FunctionCallNode)
       default:
-        return 'undefined'
+        // Fail loudly rather than silently emitting `undefined` (which masked
+        // unsupported expressions and produced wrong output). The runtime
+        // interpreter supports these; use Environment.render() instead.
+        throw new Error(
+          `AOT compilation does not support expression type '${(node as ExpressionNode).type}' - use Environment.render()`
+        )
     }
+  }
+
+  private compileFunctionCall(node: FunctionCallNode): string {
+    const callee = this.compileExpr(node.callee)
+    const args = node.args.map((arg) => this.compileExpr(arg))
+    // Mirror the runtime: kwargs are always passed as a trailing object arg.
+    const kwargsPairs = Object.entries(node.kwargs)
+      .map(([k, v]) => `${JSON.stringify(k)}: ${this.compileExpr(v)}`)
+      .join(', ')
+    const callArgs = [...args, `{${kwargsPairs}}`].join(', ')
+    // Evaluate the callee once via an IIFE; call only if it is callable,
+    // otherwise undefined (matches evalFunctionCall).
+    return `((__fn) => typeof __fn === 'function' ? __fn(${callArgs}) : undefined)(${callee})`
   }
 
   private compileName(node: NameNode): string {
@@ -385,9 +507,10 @@ class Compiler {
     if (node.name === 'none' || node.name === 'None' || node.name === 'null') return 'null'
     if (node.name === 'forloop' || node.name === 'loop') return node.name
 
-    // Check if it's a local variable (from with/set)
+    // Check if it's a local variable (from with/set/for) and resolve to its
+    // emitted JS identifier (aliased for reserved words).
     if (this.isLocalVar(node.name)) {
-      return node.name
+      return this.getLocalVar(node.name)
     }
 
     return `__ctx.${node.name}`
@@ -428,12 +551,24 @@ class Compiler {
       case '~':
         return `(String(${left}) + String(${right}))`
       case 'in':
-        return `(Array.isArray(${right}) ? ${right}.includes(${left}) : String(${right}).includes(String(${left})))`
+        return this.compileIn(left, right, false)
       case 'not in':
-        return `!(Array.isArray(${right}) ? ${right}.includes(${left}) : String(${right}).includes(String(${left})))`
+        return this.compileIn(left, right, true)
       default:
         return `(${left} ${node.operator} ${right})`
     }
+  }
+
+  // Membership test mirroring the runtime `isIn`: array.includes, string
+  // substring, `key in object` for plain objects, else false. An IIFE evaluates
+  // each operand once and keeps the generated code self-contained (no new
+  // helper, so compileToCode output stays compatible).
+  private compileIn(left: string, right: string, negate: boolean): string {
+    const expr =
+      `((__n, __h) => Array.isArray(__h) ? __h.includes(__n)` +
+      ` : typeof __h === 'string' ? __h.includes(String(__n))` +
+      ` : (__h != null && typeof __h === 'object') ? __n in __h : false)(${left}, ${right})`
+    return negate ? `!${expr}` : expr
   }
 
   private compileUnaryOp(node: UnaryOpNode): string {
@@ -464,6 +599,20 @@ class Compiler {
           break
         case '!=':
         case '!==':
+          result = `(${result} !== ${rightExpr})`
+          break
+        case 'in':
+          // Membership, NOT the JS `in` operator (which checks object keys by
+          // index and throws on primitives). Mirror the runtime `isIn`.
+          result = this.compileIn(result, rightExpr, false)
+          break
+        case 'not in':
+          result = this.compileIn(result, rightExpr, true)
+          break
+        case 'is':
+          result = `(${result} === ${rightExpr})`
+          break
+        case 'is not':
           result = `(${result} !== ${rightExpr})`
           break
         default:
@@ -499,14 +648,8 @@ class Compiler {
         return `String(${value}).replace(/\\b\\w/g, c => c.toUpperCase())`
       case 'trim':
         return `String(${value}).trim()`
-      case 'length':
-        return `(${value}?.length ?? Object.keys(${value} ?? {}).length)`
       case 'first':
         return `(${value})?.[0]`
-      case 'last':
-        return `(${value})?.[(${value})?.length - 1]`
-      case 'default':
-        return `((${value}) ?? ${args[0] ?? '""'})`
       case 'safe':
         return `{ __safe: true, value: String(${value}) }`
       case 'escape':
@@ -515,17 +658,16 @@ class Compiler {
       case 'join':
         return `(${value} ?? []).join(${args[0] ?? '""'})`
       case 'abs':
-        return `Math.abs(${value})`
-      case 'round':
-        return args.length ? `Number(${value}).toFixed(${args[0]})` : `Math.round(${value})`
+        return `Math.abs(Number(${value}))`
       case 'int':
-        return `parseInt(${value}, 10)`
+        return `(parseInt(String(${value}), 10) || 0)`
       case 'float':
-        return `parseFloat(${value})`
-      case 'floatformat':
-        return `Number(${value}).toFixed(${args[0] ?? 1})`
-      case 'filesizeformat':
-        return `applyFilter('filesizeformat', ${value})`
+        return `(parseFloat(String(${value})) || 0)`
+      // length / last / default / round / floatformat / filesizeformat are
+      // delegated to the filter registry (default case) to guarantee parity with
+      // the runtime interpreter: the previous inline copies diverged (returned a
+      // string for round, ignored falsy values for default, double-evaluated the
+      // subexpression for last/length, mishandled negative precision).
       default:
         // Fall back to runtime filter application
         const argsStr = args.length ? ', ' + args.join(', ') : ''

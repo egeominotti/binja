@@ -33,6 +33,22 @@ import * as path from 'path'
 // Pre-compiled regex for URL parameter replacement (avoid per-call compilation)
 const URL_PARAM_REGEX = /<[^>]+>|:[a-zA-Z_]+|\(\?P<[^>]+>\[[^\]]+\]\)/g
 
+/**
+ * Resolve a template `name` against `root` and guarantee the result stays inside
+ * `root` (path-traversal containment). Returns the normalized absolute base path
+ * (without extension), or `null` if `name` escapes the root via `..`, an
+ * absolute path, etc. Validating the extension-less base is sufficient because
+ * appending a known extension suffix cannot move the path out of the root.
+ */
+function resolveContained(root: string, name: string): string | null {
+  const normalizedRoot = path.resolve(root)
+  const resolved = path.resolve(normalizedRoot, name)
+  if (resolved !== normalizedRoot && !resolved.startsWith(normalizedRoot + path.sep)) {
+    return null
+  }
+  return resolved
+}
+
 export interface EnvironmentOptions {
   /** Template directory path */
   templates?: string
@@ -310,7 +326,11 @@ export class Environment {
   // ==================== Private Methods ====================
 
   private async resolveTemplatePath(templateName: string): Promise<string | null> {
-    const basePath = path.resolve(this.options.templates, templateName)
+    // Containment: a template name that escapes the templates root (via `..`,
+    // an absolute path, etc.) is treated as not-found rather than read from
+    // disk — prevents arbitrary file read via attacker-controlled names.
+    const basePath = resolveContained(this.options.templates, templateName)
+    if (basePath === null) return null
 
     // Try with each extension - Bun.file().exists() is faster than fs.access
     for (const ext of this.options.extensions) {
@@ -453,7 +473,12 @@ export async function compileWithInheritance(
   // Create template loader
   const loader: TemplateLoader = {
     load(name: string): string {
-      const basePath = path.resolve(templatesDir, name)
+      // Containment: reject names (including extends/include targets) that
+      // escape the templates root — prevents arbitrary file read.
+      const basePath = resolveContained(templatesDir, name)
+      if (basePath === null) {
+        throw new Error(`Template name escapes the templates directory: ${name}`)
+      }
       for (const ext of extensions) {
         const fullPath = basePath + ext
         const file = Bun.file(fullPath)
@@ -508,7 +533,11 @@ export async function compileWithInheritanceToCode(
 
   const loader: TemplateLoader = {
     load(name: string): string {
-      const basePath = path.resolve(templatesDir, name)
+      // Containment: reject names that escape the templates root.
+      const basePath = resolveContained(templatesDir, name)
+      if (basePath === null) {
+        throw new Error(`Template name escapes the templates directory: ${name}`)
+      }
       for (const ext of extensions) {
         const fullPath = basePath + ext
         if (fs.existsSync(fullPath)) {
@@ -567,6 +596,8 @@ export { TemplateError, TemplateSyntaxError, TemplateRuntimeError } from './erro
 export type { CompileOptions } from './compiler'
 export { builtinTests } from './tests'
 export type { TestFunction } from './tests'
+// Path-traversal containment helper, shared with the framework adapters.
+export { resolveContained }
 export { flattenTemplate, canFlatten } from './compiler/flattener'
 export type { TemplateLoader } from './compiler/flattener'
 

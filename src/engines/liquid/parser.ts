@@ -588,11 +588,17 @@ export class LiquidParser {
     if (this.check(LiquidTokenType.CONTAINS)) {
       this.advance()
       const right = this.parseExpressionAtom()
+      // Liquid `haystack contains needle` means "needle is in haystack" (works
+      // for both arrays and strings). The runtime `in` test evaluates as
+      // `args[0].includes(node)`, so the needle is the node and the haystack is
+      // the argument. Node type must be 'TestExpr' (the runtime discriminant)
+      // and `negated` must be present.
       return {
-        type: 'Test',
-        node: left,
+        type: 'TestExpr',
+        node: right,
         test: 'in',
-        args: [right],
+        args: [left],
+        negated: false,
         line: (left as any).line,
         column: (left as any).column,
       } as any

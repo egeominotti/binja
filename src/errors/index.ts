@@ -172,8 +172,10 @@ function generateSnippet(source: string, errorLine: number, errorColumn: number)
         `${c('red', ' \u2192')} ${c('gray', lineNum)} ${c('dim', '\u2502')} ${lineContent}`
       )
 
-      // Caret line
-      const caretPadding = ' '.repeat(gutterWidth + 4 + Math.max(0, errorColumn - 1))
+      // Caret line. The error line prefix before content is:
+      //   ' →' (2) + ' ' (1) + lineNum (gutterWidth) + ' ' (1) + '│' (1) + ' ' (1)
+      // = gutterWidth + 6 visible columns, so the caret must pad to match.
+      const caretPadding = ' '.repeat(gutterWidth + 6 + Math.max(0, errorColumn - 1))
       const caret = c('red', '^')
       parts.push(`${caretPadding}${caret}`)
     } else {

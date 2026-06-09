@@ -15,8 +15,8 @@
  */
 
 import { readFile } from 'fs/promises'
-import { join, extname } from 'path'
-import { Environment, compile as binjaCompile } from '../index'
+import { extname } from 'path'
+import { Environment, compile as binjaCompile, resolveContained } from '../index'
 import type { Elysia } from 'elysia'
 
 export interface BinjaElysiaOptions {
@@ -73,10 +73,13 @@ export function binja(options: BinjaElysiaOptions = {}) {
 
   // Render function to be added to context
   const renderTemplate = async (template: string, context: Record<string, any> = {}) => {
-    // Resolve template path
-    const ext = extname(template) || extension
-    const templatePath = extname(template) ? template : `${template}${ext}`
-    const fullPath = join(root, templatePath)
+    // Resolve template path with traversal containment: a user-controlled
+    // template name must not escape the root dir.
+    const templatePath = extname(template) ? template : `${template}${extension}`
+    const fullPath = resolveContained(root, templatePath)
+    if (fullPath === null) {
+      throw new Error(`Template name escapes the root directory: ${template}`)
+    }
     const cacheKey = `${engine}:${fullPath}`
 
     let html: string
@@ -128,7 +131,10 @@ export function binja(options: BinjaElysiaOptions = {}) {
 
     // Apply layout if specified
     if (layout) {
-      const layoutPath = join(root, extname(layout) ? layout : `${layout}${extension}`)
+      const layoutPath = resolveContained(root, extname(layout) ? layout : `${layout}${extension}`)
+      if (layoutPath === null) {
+        throw new Error(`Layout name escapes the root directory: ${layout}`)
+      }
       const layoutSource = await readFile(layoutPath, 'utf-8')
       const render = await getRenderFn(engine)
       html = await render(layoutSource, { ...globals, ...context, [contentVar]: html })

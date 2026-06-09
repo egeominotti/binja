@@ -111,6 +111,12 @@ export class Runtime {
     const ctx = new Context({ ...this.options.globals, ...context })
     this.blocks.clear()
     this.parentTemplate = null
+    // Reset per-render stateful-tag bookkeeping. These Maps are keyed by source
+    // position and accumulate across calls; on a long-lived (shared) Runtime
+    // they would otherwise leak {% cycle %}/{% ifchanged %} state between
+    // independent renders (cross-request data confusion).
+    this.cycleState.clear()
+    this.ifchangedState.clear()
 
     // Check if template needs async (has Extends or Include)
     const needsAsync = this.templateNeedsAsync(ast)
@@ -357,15 +363,54 @@ export class Runtime {
   private renderBlockSync(node: BlockNode, ctx: Context): string {
     const blockToRender = this.blocks.get(node.name) || node
     ctx.push()
-    // Pre-render parent content for {{ block.super }} - must be a value, not function
-    const parentContent = this.renderNodesSync(node.body, ctx)
-    // Mark as safe to prevent double-escaping
-    const safeContent = new String(parentContent) as any
-    safeContent.__safe__ = true
-    ctx.set('block', { super: safeContent })
+    // Only pre-render the parent body for {{ block.super }} when the block being
+    // rendered actually references `block`. Rendering it unconditionally was a
+    // wasted second pass that also mutated stateful tags (cycle/ifchanged) in a
+    // discarded render, corrupting later output.
+    if (this.blockUsesSuper(blockToRender)) {
+      const parentContent = this.renderNodesSync(node.body, ctx)
+      // Mark as safe to prevent double-escaping
+      const safeContent = new String(parentContent) as any
+      safeContent.__safe__ = true
+      ctx.set('block', { super: safeContent })
+    }
     const result = this.renderNodesSync(blockToRender.body, ctx)
     ctx.pop()
     return result
+  }
+
+  // Memoized check: does this block's body reference the `block` variable
+  // (i.e. potentially {{ block.super }})? Used to avoid a wasteful, state-
+  // corrupting pre-render of the parent block body when super is never used.
+  private blockUsesSuper(blockNode: BlockNode): boolean {
+    const cached = (blockNode as any).__usesSuper
+    if (cached !== undefined) return cached as boolean
+    const used = Runtime.referencesBlockVar(blockNode.body, new Set())
+    ;(blockNode as any).__usesSuper = used
+    return used
+  }
+
+  // Generic deep AST scan for a Name node bound to `block`. Conservative: any
+  // reference to `block` triggers the pre-render. Cycle-safe via `seen`.
+  private static referencesBlockVar(node: any, seen: Set<any>): boolean {
+    if (node == null || typeof node !== 'object') return false
+    if (seen.has(node)) return false
+    seen.add(node)
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        if (Runtime.referencesBlockVar(item, seen)) return true
+      }
+      return false
+    }
+    if (node.type === 'Name' && node.name === 'block') return true
+    for (const key in node) {
+      if (key === 'line' || key === 'column' || key === 'type') continue
+      const value = node[key]
+      if (value && typeof value === 'object' && Runtime.referencesBlockVar(value, seen)) {
+        return true
+      }
+    }
+    return false
   }
 
   private renderWithSync(node: WithNode, ctx: Context): string {
@@ -1025,23 +1070,9 @@ export class Runtime {
         }
         case 'escapejs':
           return JSON.stringify(String(value ?? '')).slice(1, -1)
-        case 'linebreaksbr': {
-          const html = String(value ?? '').replace(Runtime.NEWLINE_REGEX, '<br>')
-          const safe = new String(html) as any
-          safe.__safe__ = true
-          return safe
-        }
-        case 'linebreaks': {
-          const paragraphs = String(value ?? '').split(Runtime.DOUBLE_NEWLINE_REGEX)
-          let html = ''
-          for (let i = 0; i < paragraphs.length; i++) {
-            if (i > 0) html += '\n'
-            html += `<p>${paragraphs[i].replace(Runtime.NEWLINE_REGEX, '<br>')}</p>`
-          }
-          const safe = new String(html) as any
-          safe.__safe__ = true
-          return safe
-        }
+        // linebreaks / linebreaksbr deliberately fall through to the filter
+        // registry: their inline copies did not HTML-escape user content before
+        // marking it safe (an XSS sink). The registry implementations escape.
         case 'urlencode':
           return encodeURIComponent(String(value ?? ''))
 
@@ -1150,13 +1181,9 @@ export class Runtime {
           }
         }
 
-        // URL
-        case 'urlize': {
-          const html = String(value ?? '').replace(Runtime.URLIZE_REGEX, '<a href="$1">$1</a>')
-          const safe = new String(html) as any
-          safe.__safe__ = true
-          return safe
-        }
+        // URL: `urlize` deliberately falls through to the filter registry,
+        // whose implementation HTML-escapes the URL and surrounding text. The
+        // inline copy did not, allowing attribute breakout / XSS.
       }
     }
 
@@ -1344,17 +1371,9 @@ export class Runtime {
           }
         }
 
-        // URL
-        case 'urlizetrunc': {
-          const maxLen = Number(arg) || 15
-          const html = String(value ?? '').replace(Runtime.URLIZE_REGEX, (url) => {
-            const displayUrl = url.length > maxLen ? url.slice(0, maxLen) + '...' : url
-            return `<a href="${url}">${displayUrl}</a>`
-          })
-          const safe = new String(html) as any
-          safe.__safe__ = true
-          return safe
-        }
+        // URL: `urlizetrunc` deliberately falls through to the filter registry,
+        // whose implementation HTML-escapes the URL (href + display) and the
+        // surrounding text. The inline copy did not, allowing XSS.
 
         // Misc
         case 'indent': {
@@ -2030,12 +2049,16 @@ export class Runtime {
   private async renderBlockAsync(node: BlockNode, ctx: Context): Promise<string> {
     const blockToRender = this.blocks.get(node.name) || node
     ctx.push()
-    // Pre-render parent content for {{ block.super }} - must be a value, not function
-    const parentContent = await this.renderNodesAsync(node.body, ctx)
-    // Mark as safe to prevent double-escaping
-    const safeContent = new String(parentContent) as any
-    safeContent.__safe__ = true
-    ctx.set('block', { super: safeContent })
+    // Only pre-render the parent body for {{ block.super }} when referenced (see
+    // renderBlockSync) — avoids a discarded second render that corrupts
+    // stateful-tag bookkeeping and wastes work.
+    if (this.blockUsesSuper(blockToRender)) {
+      const parentContent = await this.renderNodesAsync(node.body, ctx)
+      // Mark as safe to prevent double-escaping
+      const safeContent = new String(parentContent) as any
+      safeContent.__safe__ = true
+      ctx.set('block', { super: safeContent })
+    }
     const result = await this.renderNodesAsync(blockToRender.body, ctx)
     ctx.pop()
     return result

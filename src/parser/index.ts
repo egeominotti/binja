@@ -969,15 +969,19 @@ export class Parser {
       else if (this.match(TokenType.GT)) operator = '>'
       else if (this.match(TokenType.LE)) operator = '<='
       else if (this.match(TokenType.GE)) operator = '>='
-      else if (this.check(TokenType.NAME)) {
+      // `x not in y`: `not` lexes as the NOT token (not a NAME), so it must be
+      // matched here in operator position. (Leading `not` — e.g. `not x in y` —
+      // is consumed earlier as a unary operator, so this only fires for the
+      // binary `not in` form.)
+      else if (this.check(TokenType.NOT) && this.peekNext()?.value === 'in') {
+        this.advance() // not
+        this.advance() // in
+        operator = 'not in'
+      } else if (this.check(TokenType.NAME)) {
         const name = this.peek().value
         if (name === 'in') {
           this.advance()
           operator = 'in'
-        } else if (name === 'not' && this.peekNext()?.value === 'in') {
-          this.advance() // not
-          this.advance() // in
-          operator = 'not in'
         } else if (name === 'is') {
           // Handle Jinja2 test expressions: x is testname or x is testname(args)
           this.advance() // consume 'is'
