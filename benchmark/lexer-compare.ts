@@ -132,7 +132,7 @@ const templates = {
   `,
 }
 
-function benchmark(name: string, fn: () => void, iterations: number = 10000): number {
+function benchmark(_name: string, fn: () => void, iterations: number = 10000): number {
   // Warmup
   for (let i = 0; i < 100; i++) fn()
 
@@ -156,9 +156,10 @@ function verifyOutput(template: string): boolean {
   }
 
   for (let i = 0; i < original.length; i++) {
-    if (original[i].type !== optimized[i].type ||
-        original[i].value !== optimized[i].value) {
-      console.error(`Token mismatch at ${i}: ${JSON.stringify(original[i])} vs ${JSON.stringify(optimized[i])}`)
+    if (original[i].type !== optimized[i].type || original[i].value !== optimized[i].value) {
+      console.error(
+        `Token mismatch at ${i}: ${JSON.stringify(original[i])} vs ${JSON.stringify(optimized[i])}`
+      )
       return false
     }
   }
@@ -166,9 +167,9 @@ function verifyOutput(template: string): boolean {
   return true
 }
 
-console.log('=' .repeat(80))
+console.log('='.repeat(80))
 console.log('LEXER COMPARISON: Original vs Optimized (indexOf-based scanText)')
-console.log('=' .repeat(80))
+console.log('='.repeat(80))
 console.log()
 
 // Verify correctness first
@@ -209,9 +210,10 @@ for (const [name, template] of Object.entries(templates)) {
 
   results.push({ name, original: originalOps, optimized: optimizedOps, speedup })
 
-  const speedupStr = speedup >= 1
-    ? `+${((speedup - 1) * 100).toFixed(0)}%`.padStart(7)
-    : `${((speedup - 1) * 100).toFixed(0)}%`.padStart(7)
+  const speedupStr =
+    speedup >= 1
+      ? `+${((speedup - 1) * 100).toFixed(0)}%`.padStart(7)
+      : `${((speedup - 1) * 100).toFixed(0)}%`.padStart(7)
 
   const speedupColor = speedup >= 1.1 ? '🟢' : speedup >= 0.95 ? '🟡' : '🔴'
 
@@ -221,14 +223,14 @@ for (const [name, template] of Object.entries(templates)) {
 }
 
 console.log()
-console.log('=' .repeat(80))
+console.log('='.repeat(80))
 console.log('SUMMARY')
-console.log('=' .repeat(80))
+console.log('='.repeat(80))
 console.log()
 
 const avgSpeedup = results.reduce((sum, r) => sum + r.speedup, 0) / results.length
-const bestCase = results.reduce((best, r) => r.speedup > best.speedup ? r : best)
-const worstCase = results.reduce((worst, r) => r.speedup < worst.speedup ? r : worst)
+const bestCase = results.reduce((best, r) => (r.speedup > best.speedup ? r : best))
+const worstCase = results.reduce((worst, r) => (r.speedup < worst.speedup ? r : worst))
 
 console.log(`Average speedup: ${avgSpeedup >= 1 ? '+' : ''}${((avgSpeedup - 1) * 100).toFixed(1)}%`)
 console.log(`Best case: ${bestCase.name} (+${((bestCase.speedup - 1) * 100).toFixed(0)}%)`)

@@ -5,7 +5,8 @@ description: Detailed performance benchmarks comparing binja to other template e
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-All benchmarks run on Mac Studio M1 Max, Bun 1.3.5.
+The published comparison snapshot below was recorded on a Mac Studio M1 Max with Bun 1.3.5.
+Use the repository benchmark command to measure the current checkout and Bun version locally.
 
 ## Two Rendering Modes
 
@@ -100,6 +101,11 @@ bun install
 # Run benchmarks
 bun run benchmark
 ```
+
+The command reports warmed-up median results for cached runtime rendering, AOT rendering,
+Liquid loop modifiers, and algorithm-sensitive filters. It consumes every output to prevent
+the JavaScript engine from eliminating work. Results vary by hardware and Bun version, so use
+the same machine and runtime when comparing commits.
 
 ## Production Recommendations
 

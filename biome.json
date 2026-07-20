@@ -9,10 +9,10 @@
     "includes": [
       "src/**",
       "test/**",
+      "benchmark/**",
       "!test/views",
       "!dist",
       "!node_modules",
-      "!benchmark",
       "!examples",
       "!docs",
       "!website"

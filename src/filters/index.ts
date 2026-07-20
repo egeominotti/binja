@@ -737,33 +737,34 @@ export const reject: FilterFunction = (value, attribute) => {
   return value.filter((item) => !item?.[attribute])
 }
 
+function matchesAttribute(item: any, attribute: any, test: any, testValue: any): boolean {
+  const attrValue = item?.[attribute]
+  if (test === undefined) return !!attrValue
+  if (test === 'eq' || test === 'equalto') return attrValue === testValue
+  if (test === 'ne') return attrValue !== testValue
+  if (test === 'gt') return attrValue > testValue
+  if (test === 'lt') return attrValue < testValue
+  if (test === 'ge' || test === 'gte') return attrValue >= testValue
+  if (test === 'le' || test === 'lte') return attrValue <= testValue
+  if (test === 'in') return !!testValue?.includes?.(attrValue)
+  if (test === 'defined') return attrValue !== undefined
+  if (test === 'undefined') return attrValue === undefined
+  if (test === 'none') return attrValue === null
+  if (test === 'true') return attrValue === true
+  if (test === 'false') return attrValue === false
+  return !!attrValue
+}
+
 // Jinja2: selectattr - Filter by attribute value
 export const selectattr: FilterFunction = (value, attribute, test, testValue) => {
   if (!Array.isArray(value)) return []
-  return value.filter((item) => {
-    const attrValue = item?.[attribute]
-    if (test === undefined) return !!attrValue
-    if (test === 'eq' || test === 'equalto') return attrValue === testValue
-    if (test === 'ne') return attrValue !== testValue
-    if (test === 'gt') return attrValue > testValue
-    if (test === 'lt') return attrValue < testValue
-    if (test === 'ge' || test === 'gte') return attrValue >= testValue
-    if (test === 'le' || test === 'lte') return attrValue <= testValue
-    if (test === 'in') return testValue?.includes?.(attrValue)
-    if (test === 'defined') return attrValue !== undefined
-    if (test === 'undefined') return attrValue === undefined
-    if (test === 'none') return attrValue === null
-    if (test === 'true') return attrValue === true
-    if (test === 'false') return attrValue === false
-    return !!attrValue
-  })
+  return value.filter((item) => matchesAttribute(item, attribute, test, testValue))
 }
 
 // Jinja2: rejectattr - Reject by attribute value
 export const rejectattr: FilterFunction = (value, attribute, test, testValue) => {
   if (!Array.isArray(value)) return []
-  const selected = selectattr(value, attribute, test, testValue)
-  return value.filter((item) => !selected.includes(item))
+  return value.filter((item) => !matchesAttribute(item, attribute, test, testValue))
 }
 
 // Jinja2: attr - Get attribute from object

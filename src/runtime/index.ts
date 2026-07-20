@@ -72,6 +72,9 @@ export class Runtime {
   private filters: Record<string, FilterFunction>
   private tests: Record<string, TestFunction>
   private readonly renderState = new AsyncLocalStorage<RenderState>()
+  // Parsed ASTs are immutable during rendering. Cache their execution mode so
+  // repeated renders do not recursively scan the same tree.
+  private readonly templateAsyncCache = new WeakMap<TemplateNode, boolean>()
   private source?: string // Template source for error messages
 
   constructor(options: RuntimeOptions = {}) {
@@ -149,29 +152,12 @@ export class Runtime {
 
   // Check if template contains Include or Extends
   private templateNeedsAsync(ast: TemplateNode): boolean {
-    for (const node of ast.body) {
-      if (node.type === 'Extends' || node.type === 'Include') return true
-      if (node.type === 'If') {
-        const ifNode = node as IfNode
-        if (this.nodesNeedAsync(ifNode.body)) return true
-        for (const elif of ifNode.elifs) {
-          if (this.nodesNeedAsync(elif.body)) return true
-        }
-        if (this.nodesNeedAsync(ifNode.else_)) return true
-      }
-      if (node.type === 'For') {
-        const forNode = node as ForNode
-        if (this.nodesNeedAsync(forNode.body)) return true
-        if (this.nodesNeedAsync(forNode.else_)) return true
-      }
-      if (node.type === 'Block') {
-        if (this.nodesNeedAsync((node as BlockNode).body)) return true
-      }
-      if (node.type === 'With') {
-        if (this.nodesNeedAsync((node as WithNode).body)) return true
-      }
-    }
-    return false
+    const cached = this.templateAsyncCache.get(ast)
+    if (cached !== undefined) return cached
+
+    const needsAsync = this.nodesNeedAsync(ast.body)
+    this.templateAsyncCache.set(ast, needsAsync)
+    return needsAsync
   }
 
   private nodesNeedAsync(nodes: ASTNode[]): boolean {
@@ -544,8 +530,9 @@ export class Runtime {
       currentValue = this.renderNodesSync(node.body, ctx)
     }
 
+    const hasLastValue = this.activeState.ifchangedState.has(key)
     const lastValue = this.activeState.ifchangedState.get(key)
-    const changed = !this.deepEqual(currentValue, lastValue)
+    const changed = !hasLastValue || !this.deepEqual(currentValue, lastValue)
     this.activeState.ifchangedState.set(key, currentValue)
 
     if (changed) {
@@ -2184,8 +2171,14 @@ export class Runtime {
     return true
   }
 
-  // Optimized deep equality check - avoids JSON.stringify for primitives and simple arrays
-  private deepEqual(a: any, b: any): boolean {
+  // Structural equality with cycle detection. This avoids serializing both
+  // values and treats object key order as irrelevant.
+  private deepEqual(
+    a: any,
+    b: any,
+    seenA = new WeakMap<object, object>(),
+    seenB = new WeakMap<object, object>()
+  ): boolean {
     // Fast path: identical references or primitives
     if (a === b) return true
     // Null/undefined check
@@ -2196,16 +2189,84 @@ export class Runtime {
     if (typeA !== typeB) return false
     // Primitives already checked with ===
     if (typeA !== 'object') return false
+    const objectA = a as object
+    const objectB = b as object
+    const mappedB = seenA.get(objectA)
+    if (mappedB !== undefined) return mappedB === objectB
+    const mappedA = seenB.get(objectB)
+    if (mappedA !== undefined) return mappedA === objectA
+    seenA.set(objectA, objectB)
+    seenB.set(objectB, objectA)
+
+    if (a instanceof Date || b instanceof Date) {
+      return a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+    }
+    if (a instanceof RegExp || b instanceof RegExp) {
+      return (
+        a instanceof RegExp && b instanceof RegExp && a.source === b.source && a.flags === b.flags
+      )
+    }
+
     // Array comparison
     if (Array.isArray(a)) {
       if (!Array.isArray(b) || a.length !== b.length) return false
       for (let i = 0; i < a.length; i++) {
-        if (!this.deepEqual(a[i], b[i])) return false
+        if (!this.deepEqual(a[i], b[i], seenA, seenB)) return false
       }
       return true
     }
-    // Object comparison - fallback to JSON for complex objects
-    return JSON.stringify(a) === JSON.stringify(b)
+    if (Array.isArray(b)) return false
+
+    if (a instanceof Map || b instanceof Map) {
+      if (!(a instanceof Map) || !(b instanceof Map) || a.size !== b.size) return false
+      const left = a.entries()
+      const right = b.entries()
+      while (true) {
+        const leftEntry = left.next()
+        const rightEntry = right.next()
+        if (leftEntry.done || rightEntry.done) return leftEntry.done === rightEntry.done
+        if (
+          !this.deepEqual(leftEntry.value[0], rightEntry.value[0], seenA, seenB) ||
+          !this.deepEqual(leftEntry.value[1], rightEntry.value[1], seenA, seenB)
+        ) {
+          return false
+        }
+      }
+    }
+
+    if (a instanceof Set || b instanceof Set) {
+      if (!(a instanceof Set) || !(b instanceof Set) || a.size !== b.size) return false
+      const left = a.values()
+      const right = b.values()
+      while (true) {
+        const leftValue = left.next()
+        const rightValue = right.next()
+        if (leftValue.done || rightValue.done) return leftValue.done === rightValue.done
+        if (!this.deepEqual(leftValue.value, rightValue.value, seenA, seenB)) return false
+      }
+    }
+
+    if (ArrayBuffer.isView(a) || ArrayBuffer.isView(b)) {
+      if (!ArrayBuffer.isView(a) || !ArrayBuffer.isView(b) || a.byteLength !== b.byteLength) {
+        return false
+      }
+      const left = new Uint8Array(a.buffer, a.byteOffset, a.byteLength)
+      const right = new Uint8Array(b.buffer, b.byteOffset, b.byteLength)
+      for (let i = 0; i < left.length; i++) {
+        if (left[i] !== right[i]) return false
+      }
+      return true
+    }
+
+    const keysA = Object.keys(a)
+    const keysB = Object.keys(b)
+    if (keysA.length !== keysB.length) return false
+    for (const key of keysA) {
+      if (!Object.hasOwn(b, key) || !this.deepEqual(a[key], b[key], seenA, seenB)) {
+        return false
+      }
+    }
+    return true
   }
 
   private isIn(needle: any, haystack: any): boolean {
@@ -2248,17 +2309,18 @@ export class Runtime {
       return source
     }
 
-    let items = source
+    let offset = 0
     if (node.offset !== undefined) {
-      const offset = Math.max(0, Math.trunc(Number(this.eval(node.offset, ctx)) || 0))
-      items = items.slice(offset)
+      offset = Math.max(0, Math.trunc(Number(this.eval(node.offset, ctx)) || 0))
     }
+    let end: number | undefined
     if (node.limit !== undefined) {
       const limit = Math.max(0, Math.trunc(Number(this.eval(node.limit, ctx)) || 0))
-      items = items.slice(0, limit)
+      end = offset + limit
     }
+    const items = source.slice(offset, end)
     if (node.reversed) {
-      items = items.slice().reverse()
+      items.reverse()
     }
     return items
   }

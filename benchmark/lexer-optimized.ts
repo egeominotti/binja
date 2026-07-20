@@ -3,7 +3,7 @@
  * For benchmarking comparison
  */
 
-import { Token, TokenType, KEYWORDS, LexerState } from '../src/lexer/tokens'
+import { type Token, TokenType, KEYWORDS, type LexerState } from '../src/lexer/tokens'
 import { TemplateSyntaxError } from '../src/errors'
 
 export class LexerOptimized {
@@ -181,7 +181,7 @@ export class LexerOptimized {
     return !nextChar || !this.isAlphaNumeric(nextChar)
   }
 
-  private scanRawBlock(tagName: string, wsControl: boolean): void {
+  private scanRawBlock(tagName: string, _wsControl: boolean): void {
     const startLine = this.state.line
     const startColumn = this.state.column
 
@@ -376,22 +376,54 @@ export class LexerOptimized {
     const c = this.advance()
 
     switch (c) {
-      case '.': this.addToken(TokenType.DOT, c); break
-      case ',': this.addToken(TokenType.COMMA, c); break
-      case ':': this.addToken(TokenType.COLON, c); break
-      case '|': this.addToken(TokenType.PIPE, c); break
-      case '(': this.addToken(TokenType.LPAREN, c); break
-      case ')': this.addToken(TokenType.RPAREN, c); break
-      case '[': this.addToken(TokenType.LBRACKET, c); break
-      case ']': this.addToken(TokenType.RBRACKET, c); break
-      case '{': this.addToken(TokenType.LBRACE, c); break
-      case '}': this.addToken(TokenType.RBRACE, c); break
-      case '+': this.addToken(TokenType.ADD, c); break
-      case '-': this.addToken(TokenType.SUB, c); break
-      case '*': this.addToken(TokenType.MUL, c); break
-      case '/': this.addToken(TokenType.DIV, c); break
-      case '%': this.addToken(TokenType.MOD, c); break
-      case '~': this.addToken(TokenType.TILDE, c); break
+      case '.':
+        this.addToken(TokenType.DOT, c)
+        break
+      case ',':
+        this.addToken(TokenType.COMMA, c)
+        break
+      case ':':
+        this.addToken(TokenType.COLON, c)
+        break
+      case '|':
+        this.addToken(TokenType.PIPE, c)
+        break
+      case '(':
+        this.addToken(TokenType.LPAREN, c)
+        break
+      case ')':
+        this.addToken(TokenType.RPAREN, c)
+        break
+      case '[':
+        this.addToken(TokenType.LBRACKET, c)
+        break
+      case ']':
+        this.addToken(TokenType.RBRACKET, c)
+        break
+      case '{':
+        this.addToken(TokenType.LBRACE, c)
+        break
+      case '}':
+        this.addToken(TokenType.RBRACE, c)
+        break
+      case '+':
+        this.addToken(TokenType.ADD, c)
+        break
+      case '-':
+        this.addToken(TokenType.SUB, c)
+        break
+      case '*':
+        this.addToken(TokenType.MUL, c)
+        break
+      case '/':
+        this.addToken(TokenType.DIV, c)
+        break
+      case '%':
+        this.addToken(TokenType.MOD, c)
+        break
+      case '~':
+        this.addToken(TokenType.TILDE, c)
+        break
       case '=':
         if (this.match('=')) {
           this.addToken(TokenType.EQ, '==')
@@ -533,9 +565,7 @@ export class LexerOptimized {
 
   private isAlphaNumeric(c: string): boolean {
     const code = c.charCodeAt(0)
-    return (code >= 48 && code <= 57) ||
-           (code >= 97 && code <= 122) ||
-           (code >= 65 && code <= 90)
+    return (code >= 48 && code <= 57) || (code >= 97 && code <= 122) || (code >= 65 && code <= 90)
   }
 
   private addToken(type: TokenType, value: string): void {

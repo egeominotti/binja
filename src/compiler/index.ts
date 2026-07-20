@@ -351,16 +351,21 @@ class Compiler {
     const hasModifiers =
       node.offset !== undefined || node.limit !== undefined || node.reversed === true
     code += `  ${hasModifiers ? 'let' : 'const'} ${iterVar} = toArray(${iter});${this.nl()}`
-    if (node.offset !== undefined) {
-      const offset = this.compileExpr(node.offset)
-      code += `  ${iterVar} = ${iterVar}.slice(Math.max(0, Math.trunc(Number(${offset}) || 0)));${this.nl()}`
-    }
-    if (node.limit !== undefined) {
-      const limit = this.compileExpr(node.limit)
-      code += `  ${iterVar} = ${iterVar}.slice(0, Math.max(0, Math.trunc(Number(${limit}) || 0)));${this.nl()}`
-    }
-    if (node.reversed) {
-      code += `  ${iterVar} = ${iterVar}.slice().reverse();${this.nl()}`
+    if (hasModifiers) {
+      const startVar = this.genVar('start')
+      const start = node.offset !== undefined ? this.compileExpr(node.offset) : '0'
+      code += `  const ${startVar} = Math.max(0, Math.trunc(Number(${start}) || 0));${this.nl()}`
+      if (node.limit !== undefined) {
+        const limitVar = this.genVar('limit')
+        const limit = this.compileExpr(node.limit)
+        code += `  const ${limitVar} = Math.max(0, Math.trunc(Number(${limit}) || 0));${this.nl()}`
+        code += `  ${iterVar} = ${iterVar}.slice(${startVar}, ${startVar} + ${limitVar});${this.nl()}`
+      } else {
+        code += `  ${iterVar} = ${iterVar}.slice(${startVar});${this.nl()}`
+      }
+      if (node.reversed) {
+        code += `  ${iterVar}.reverse();${this.nl()}`
+      }
     }
     code += `  const ${lenVar} = ${iterVar}.length;${this.nl()}`
 
