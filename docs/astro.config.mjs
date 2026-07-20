@@ -28,8 +28,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            search: ['@pagefind/default-ui'],
+          manualChunks(id) {
+            if (id.includes('@pagefind/default-ui')) return 'search';
           },
         },
       },
@@ -44,9 +44,13 @@ export default defineConfig({
         src: './src/assets/logo.svg',
         replacesTitle: false,
       },
-      social: {
-        github: 'https://github.com/egeominotti/binja',
-      },
+      social: [
+        {
+          icon: 'github',
+          label: 'GitHub',
+          href: 'https://github.com/egeominotti/binja',
+        },
+      ],
       editLink: {
         baseUrl: 'https://github.com/egeominotti/binja/edit/main/docs/',
       },
