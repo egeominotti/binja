@@ -22,7 +22,7 @@ try {
     ['npm', 'pack', '--json', '--ignore-scripts', '--pack-destination', workspace],
     projectRoot
   )
-  const packedPackages = JSON.parse(packOutput) as PackedPackage[]
+  const packedPackages = parsePackedPackages(packOutput)
   const packedPackage = packedPackages[0]
   if (!packedPackage) throw new Error('npm pack did not produce a tarball')
 
@@ -100,4 +100,24 @@ async function run(command: string[], cwd: string): Promise<string> {
   }
 
   return stdout.trim()
+}
+
+function parsePackedPackages(output: string): PackedPackage[] {
+  const end = output.lastIndexOf(']')
+  if (end < 0) throw new Error(`npm pack did not emit JSON:\n${output}`)
+
+  for (
+    let start = output.indexOf('[');
+    start >= 0 && start < end;
+    start = output.indexOf('[', start + 1)
+  ) {
+    try {
+      const value = JSON.parse(output.slice(start, end + 1))
+      if (Array.isArray(value)) return value as PackedPackage[]
+    } catch {
+      // Lifecycle scripts can write to stdout before npm's JSON payload.
+    }
+  }
+
+  throw new Error(`Unable to parse npm pack JSON:\n${output}`)
 }
