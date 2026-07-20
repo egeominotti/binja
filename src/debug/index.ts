@@ -12,15 +12,15 @@
  */
 
 import type { Environment } from '../index'
-import { DebugCollector, startDebugCollection, endDebugCollection } from './collector'
-import { generateDebugPanel, PanelOptions } from './panel'
-import type { DebugData } from './collector'
+import { endDebugCollection, startDebugCollection, withDebugCollection } from './collector'
+import { generateDebugPanel, type PanelOptions } from './panel'
 
 export {
   DebugCollector,
   startDebugCollection,
   endDebugCollection,
   getDebugCollector,
+  withDebugCollection,
 } from './collector'
 export type { DebugData, ContextValue, QueryInfo, QueryStats } from './collector'
 export { generateDebugPanel } from './panel'
@@ -54,37 +54,30 @@ export async function renderWithDebug(
   context: Record<string, any> = {},
   options: DebugRenderOptions = {}
 ): Promise<string> {
-  const collector = startDebugCollection()
+  return withDebugCollection(async (collector) => {
+    collector.captureContext(context)
+    collector.addTemplate(templateName, 'root')
+    collector.setMode('runtime')
 
-  // Capture context
-  collector.captureContext(context)
-  collector.addTemplate(templateName, 'root')
-  collector.setMode('runtime')
+    collector.startRender()
+    const html = await env.render(templateName, context)
+    collector.endRender()
 
-  // Time the render
-  collector.startRender()
-  const html = await env.render(templateName, context)
-  collector.endRender()
-
-  const data = endDebugCollection()!
-
-  // Check if we should inject
-  if (options.htmlOnly !== false) {
-    const isHtml = html.includes('<html') || html.includes('<body') || html.includes('<!DOCTYPE')
-    if (!isHtml) {
-      return html
+    if (options.htmlOnly !== false) {
+      const isHtml = html.includes('<html') || html.includes('<body') || html.includes('<!DOCTYPE')
+      if (!isHtml) {
+        return html
+      }
     }
-  }
 
-  // Generate and inject panel
-  const panel = generateDebugPanel(data, options.panel)
+    const panel = generateDebugPanel(collector.getData(), options.panel)
 
-  // Inject before </body> or at end
-  if (html.includes('</body>')) {
-    return html.replace('</body>', `${panel}</body>`)
-  }
+    if (html.includes('</body>')) {
+      return html.replace('</body>', `${panel}</body>`)
+    }
 
-  return html + panel
+    return html + panel
+  })
 }
 
 /**
@@ -96,31 +89,29 @@ export async function renderStringWithDebug(
   context: Record<string, any> = {},
   options: DebugRenderOptions = {}
 ): Promise<string> {
-  const collector = startDebugCollection()
+  return withDebugCollection(async (collector) => {
+    collector.captureContext(context)
+    collector.setMode('runtime')
 
-  collector.captureContext(context)
-  collector.setMode('runtime')
+    collector.startRender()
+    const html = await env.renderString(source, context)
+    collector.endRender()
 
-  collector.startRender()
-  const html = await env.renderString(source, context)
-  collector.endRender()
-
-  const data = endDebugCollection()!
-
-  if (options.htmlOnly !== false) {
-    const isHtml = html.includes('<html') || html.includes('<body')
-    if (!isHtml) {
-      return html
+    if (options.htmlOnly !== false) {
+      const isHtml = html.includes('<html') || html.includes('<body')
+      if (!isHtml) {
+        return html
+      }
     }
-  }
 
-  const panel = generateDebugPanel(data, options.panel)
+    const panel = generateDebugPanel(collector.getData(), options.panel)
 
-  if (html.includes('</body>')) {
-    return html.replace('</body>', `${panel}</body>`)
-  }
+    if (html.includes('</body>')) {
+      return html.replace('</body>', `${panel}</body>`)
+    }
 
-  return html + panel
+    return html + panel
+  })
 }
 
 /**
@@ -141,7 +132,7 @@ export function createDebugRenderer(env: Environment, options: DebugRenderOption
  * Middleware factory for web frameworks
  * Injects debug panel into HTML responses
  */
-export function debugMiddleware(env: Environment, options: DebugRenderOptions = {}) {
+export function debugMiddleware(_env: Environment, options: DebugRenderOptions = {}) {
   return {
     /**
      * Hono middleware
@@ -176,7 +167,7 @@ export function debugMiddleware(env: Environment, options: DebugRenderOptions = 
      * Express-style middleware
      */
     express() {
-      return (req: any, res: any, next: () => void) => {
+      return (_req: any, res: any, next: () => void) => {
         const originalSend = res.send.bind(res)
 
         res.send = (body: string) => {

@@ -4,8 +4,8 @@
  */
 import { describe, test, expect, beforeAll } from 'bun:test'
 import { render, Environment, Template } from '../src'
-import * as fs from 'fs'
-import * as path from 'path'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 const TEMPLATES_DIR = '/tmp/jinja-bun-regression-tests'
 
@@ -305,7 +305,7 @@ describe('Regression Tests', () => {
     })
 
     test('numeric filters chain', async () => {
-      expect(await render('{{ n|abs|round:2 }}', { n: -3.14159 })).toBe('3.14')
+      expect(await render('{{ n|abs|round:2 }}', { n: -Math.PI })).toBe('3.14')
     })
 
     test('string filter on number', async () => {

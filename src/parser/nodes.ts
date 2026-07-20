@@ -87,6 +87,12 @@ export interface ForNode extends BaseNode {
   body: ASTNode[]
   else_: ASTNode[] // {% empty %} or {% else %}
   recursive: boolean
+  /** Liquid: maximum number of items rendered */
+  limit?: ExpressionNode
+  /** Liquid: number of items skipped before rendering */
+  offset?: ExpressionNode
+  /** Liquid: render the selected items in reverse order */
+  reversed?: boolean
 }
 
 // ==================== Template Inheritance ====================

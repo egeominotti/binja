@@ -40,7 +40,7 @@ export function getEngine(nameOrExt: string): TemplateEngine | undefined {
   }
 
   // Extension lookup
-  const ext = nameOrExt.startsWith('.') ? nameOrExt : '.' + nameOrExt
+  const ext = nameOrExt.startsWith('.') ? nameOrExt : `.${nameOrExt}`
   for (const engine of Object.values(engines)) {
     if (engine.extensions.includes(ext)) {
       return engine

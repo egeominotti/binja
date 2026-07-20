@@ -14,10 +14,6 @@ export { TokenType }
 export type { Token }
 
 export class TwigLexer extends Lexer {
-  constructor(source: string) {
-    super(source)
-  }
-
   // Twig uses the same tokenization as Jinja2
   // The ? and ?? operators are already handled by the base lexer
 }

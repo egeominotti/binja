@@ -13,14 +13,15 @@
  *   binja compile ./views/home.html -o ./compiled --name renderHome
  */
 
-import * as fs from 'fs'
-import * as path from 'path'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { Lexer } from './lexer'
 import { Parser } from './parser'
 import { compileToString } from './compiler'
-import { flattenTemplate, canFlatten, TemplateLoader } from './compiler/flattener'
+import { flattenTemplate, canFlatten, type TemplateLoader } from './compiler/flattener'
+import packageJson from '../package.json' with { type: 'json' }
 
-const VERSION = '0.9.0'
+const VERSION = packageJson.version
 
 interface CompileOptions {
   output: string
@@ -443,7 +444,7 @@ async function watchAndCompile(sourceDir: string, outputDir: string, options: Co
   log('')
 
   // Watch for changes
-  const watcher = fs.watch(sourceDir, { recursive: true }, async (eventType, filename) => {
+  const watcher = fs.watch(sourceDir, { recursive: true }, async (_eventType, filename) => {
     if (!filename) return
 
     const ext = path.extname(filename)
@@ -507,7 +508,7 @@ async function lintTemplates(sourcePath: string, isDirectory: boolean, options: 
       const aiModule = await import('./ai')
       lintFn = aiModule.lint
       syntaxCheckFn = aiModule.syntaxCheck
-    } catch (e: any) {
+    } catch (_e: any) {
       error('AI lint requires the AI module.')
       error('Make sure you have an AI provider configured:')
       error('  - ANTHROPIC_API_KEY + bun add @anthropic-ai/sdk')
@@ -594,10 +595,10 @@ async function lintTemplates(sourcePath: string, isDirectory: boolean, options: 
       for (const issue of issues) {
         const icon =
           issue.severity === 'error'
-            ? colors.red + '✗'
+            ? `${colors.red}✗`
             : issue.severity === 'warning'
-              ? colors.yellow + '⚠'
-              : colors.dim + '💡'
+              ? `${colors.yellow}⚠`
+              : `${colors.dim}💡`
         const typeColor =
           issue.type === 'security'
             ? colors.red

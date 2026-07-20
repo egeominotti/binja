@@ -467,7 +467,7 @@ describe('Autoescape', () => {
   // ==================== Edge Cases ====================
   describe('Edge Cases', () => {
     test('handles very long HTML strings', async () => {
-      const longScript = '<script>' + 'a'.repeat(10000) + '</script>'
+      const longScript = `<script>${'a'.repeat(10000)}</script>`
       const result = await render('{{ value }}', { value: longScript })
       expect(result).not.toContain('<script>')
       expect(result).toContain('&lt;script&gt;')
@@ -692,7 +692,7 @@ describe('Autoescape', () => {
 
     test('template inheritance preserves escaping', async () => {
       const env = new Environment({
-        templates: '/tmp/test-templates-' + Date.now(),
+        templates: `/tmp/test-templates-${Date.now()}`,
         autoescape: true,
       })
 

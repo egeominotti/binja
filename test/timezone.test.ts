@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect } from 'bun:test'
-import { Environment, render } from '../src'
+import { Environment } from '../src'
 
 describe('Timezone Support', () => {
   // Use a fixed UTC timestamp: 2024-06-15 12:30:45 UTC (Saturday)

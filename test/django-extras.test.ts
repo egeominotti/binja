@@ -104,7 +104,7 @@ describe('Django Extra Filters', () => {
     })
 
     test('formats float with precision', async () => {
-      const result = await render("{{ value|stringformat:'.2f' }}", { value: 3.14159 })
+      const result = await render("{{ value|stringformat:'.2f' }}", { value: Math.PI })
       expect(result).toBe('3.14')
     })
 

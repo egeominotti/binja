@@ -5,15 +5,15 @@
  * OPTIMIZED: Uses synchronous execution path for maximum performance.
  * Only Include/Extends tags require async (for template loading).
  */
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context } from './context'
-import { builtinFilters, FilterFunction } from '../filters'
-import { builtinTests, TestFunction } from '../tests'
+import { builtinFilters, type FilterFunction } from '../filters'
+import { builtinTests, type TestFunction } from '../tests'
 import { TemplateRuntimeError, findSimilar } from '../errors'
 import type {
   ASTNode,
   TemplateNode,
   TextNode,
-  OutputNode,
   IfNode,
   ForNode,
   BlockNode,
@@ -21,7 +21,6 @@ import type {
   IncludeNode,
   SetNode,
   WithNode,
-  LoadNode,
   UrlNode,
   StaticNode,
   NowNode,
@@ -46,8 +45,6 @@ import type {
   RegroupNode,
   WidthratioNode,
   LoremNode,
-  CsrfTokenNode,
-  DebugNode,
   TemplatetagNode,
 } from '../parser/nodes'
 
@@ -63,12 +60,18 @@ export interface RuntimeOptions {
   timezone?: string
 }
 
+interface RenderState {
+  blocks: Map<string, BlockNode[]>
+  parentTemplate: TemplateNode | null
+  cycleState: Map<string, number>
+  ifchangedState: Map<string, any>
+}
+
 export class Runtime {
   private options: Omit<Required<RuntimeOptions>, 'timezone'> & { timezone?: string }
   private filters: Record<string, FilterFunction>
   private tests: Record<string, TestFunction>
-  private blocks: Map<string, BlockNode> = new Map()
-  private parentTemplate: TemplateNode | null = null
+  private readonly renderState = new AsyncLocalStorage<RenderState>()
   private source?: string // Template source for error messages
 
   constructor(options: RuntimeOptions = {}) {
@@ -92,10 +95,10 @@ export class Runtime {
 
     // Override date filter with timezone support if timezone is configured
     if (this.options.timezone) {
-      const tz = this.options.timezone
+      const _tz = this.options.timezone
       this.filters.date = (value: any, format: string = 'N j, Y') => {
         const d = value instanceof Date ? value : new Date(value)
-        if (isNaN(d.getTime())) return ''
+        if (Number.isNaN(d.getTime())) return ''
         return this.formatDate(d, format)
       }
       this.filters.time = (value: any, format: string = 'H:i') => {
@@ -108,31 +111,40 @@ export class Runtime {
   }
 
   async render(ast: TemplateNode, context: Record<string, any> = {}): Promise<string> {
-    const ctx = new Context({ ...this.options.globals, ...context })
-    this.blocks.clear()
-    this.parentTemplate = null
-    // Reset per-render stateful-tag bookkeeping. These Maps are keyed by source
-    // position and accumulate across calls; on a long-lived (shared) Runtime
-    // they would otherwise leak {% cycle %}/{% ifchanged %} state between
-    // independent renders (cross-request data confusion).
-    this.cycleState.clear()
-    this.ifchangedState.clear()
-
-    // Check if template needs async (has Extends or Include)
-    const needsAsync = this.templateNeedsAsync(ast)
-
-    if (needsAsync) {
-      // Async path for templates with extends/include
-      await this.collectBlocks(ast, ctx)
-      if (this.parentTemplate) {
-        return this.renderTemplateAsync(this.parentTemplate, ctx)
-      }
-      return this.renderTemplateAsync(ast, ctx)
+    const state: RenderState = {
+      blocks: new Map(),
+      parentTemplate: null,
+      cycleState: new Map(),
+      ifchangedState: new Map(),
     }
 
-    // FAST SYNC PATH - no async overhead!
-    this.collectBlocksSync(ast)
-    return this.renderTemplateSync(ast, ctx)
+    return this.renderState.run(state, async () => {
+      const ctx = new Context({ ...this.options.globals, ...context })
+
+      // Check if template needs async (has Extends or Include)
+      const needsAsync = this.templateNeedsAsync(ast)
+
+      if (needsAsync) {
+        // Async path for templates with extends/include
+        await this.collectBlocks(ast, ctx)
+        if (state.parentTemplate) {
+          return this.renderTemplateAsync(state.parentTemplate, ctx)
+        }
+        return this.renderTemplateAsync(ast, ctx)
+      }
+
+      // FAST SYNC PATH - no async rendering overhead!
+      this.collectBlocksSync(ast)
+      return this.renderTemplateSync(ast, ctx)
+    })
+  }
+
+  private get activeState(): RenderState {
+    const state = this.renderState.getStore()
+    if (!state) {
+      throw new Error('Template rendering state is unavailable outside Runtime.render()')
+    }
+    return state
   }
 
   // Check if template contains Include or Extends
@@ -193,7 +205,10 @@ export class Runtime {
   private collectBlocksSync(ast: TemplateNode): void {
     for (const node of ast.body) {
       if (node.type === 'Block') {
-        this.blocks.set((node as BlockNode).name, node as BlockNode)
+        const block = node as BlockNode
+        const chain = this.activeState.blocks.get(block.name) ?? []
+        chain.push(block)
+        this.activeState.blocks.set(block.name, chain)
       }
     }
   }
@@ -277,7 +292,7 @@ export class Runtime {
 
   private renderForSync(node: ForNode, ctx: Context): string {
     const iterable = this.eval(node.iter, ctx)
-    const items = this.toIterable(iterable)
+    const items = this.applyForModifiers(node, ctx, this.toIterable(iterable))
     const len = items.length
 
     if (len === 0) {
@@ -361,14 +376,21 @@ export class Runtime {
   }
 
   private renderBlockSync(node: BlockNode, ctx: Context): string {
-    const blockToRender = this.blocks.get(node.name) || node
+    const chain = this.activeState.blocks.get(node.name) ?? [node]
+    return this.renderBlockChainSync(chain, chain.length - 1, ctx)
+  }
+
+  private renderBlockChainSync(chain: BlockNode[], index: number, ctx: Context): string {
+    const blockToRender = chain[index]
+    if (!blockToRender) return ''
+
     ctx.push()
     // Only pre-render the parent body for {{ block.super }} when the block being
     // rendered actually references `block`. Rendering it unconditionally was a
     // wasted second pass that also mutated stateful tags (cycle/ifchanged) in a
     // discarded render, corrupting later output.
     if (this.blockUsesSuper(blockToRender)) {
-      const parentContent = this.renderNodesSync(node.body, ctx)
+      const parentContent = index > 0 ? this.renderBlockChainSync(chain, index - 1, ctx) : ''
       // Mark as safe to prevent double-escaping
       const safeContent = new String(parentContent) as any
       safeContent.__safe__ = true
@@ -461,21 +483,19 @@ export class Runtime {
 
   // Django: {% cycle %} - cycles through values on each iteration
   // Optimized: use node position as key instead of JSON.stringify on values
-  private cycleState: Map<string, number> = new Map()
-
   private renderCycleSync(node: CycleNode, ctx: Context): string {
     // Use source position as unique key - avoids expensive JSON.stringify
     const key = `cycle_${node.line}_${node.column}`
 
     // Get current index and increment
-    const currentIndex = this.cycleState.get(key) ?? 0
+    const currentIndex = this.activeState.cycleState.get(key) ?? 0
     // Optimized: for loop instead of .map()
     const values: any[] = []
     for (let i = 0; i < node.values.length; i++) {
       values.push(this.eval(node.values[i], ctx))
     }
     const value = values[currentIndex % values.length]
-    this.cycleState.set(key, currentIndex + 1)
+    this.activeState.cycleState.set(key, currentIndex + 1)
 
     if (node.asVar) {
       ctx.set(node.asVar, value)
@@ -507,8 +527,6 @@ export class Runtime {
 
   // Django: {% ifchanged %} - outputs only if value changed
   // Optimized: smart comparison - uses === for primitives, JSON.stringify only for objects
-  private ifchangedState: Map<string, any> = new Map()
-
   private renderIfchangedSync(node: IfchangedNode, ctx: Context): string {
     // Generate key for this ifchanged block
     const key = `ifchanged_${node.line}_${node.column}`
@@ -526,9 +544,9 @@ export class Runtime {
       currentValue = this.renderNodesSync(node.body, ctx)
     }
 
-    const lastValue = this.ifchangedState.get(key)
+    const lastValue = this.activeState.ifchangedState.get(key)
     const changed = !this.deepEqual(currentValue, lastValue)
-    this.ifchangedState.set(key, currentValue)
+    this.activeState.ifchangedState.set(key, currentValue)
 
     if (changed) {
       if (node.values.length > 0) {
@@ -684,7 +702,7 @@ export class Runtime {
           }
           // Capitalize first word
           sentenceWords[0] = sentenceWords[0].charAt(0).toUpperCase() + sentenceWords[0].slice(1)
-          sentences.push(sentenceWords.join(' ') + '.')
+          sentences.push(`${sentenceWords.join(' ')}.`)
         }
         paragraphs.push(sentences.join(' '))
       }
@@ -1000,7 +1018,7 @@ export class Runtime {
       // Could be undefined property or array index - check array case
       if (Array.isArray(obj)) {
         const numIndex = parseInt(attr, 10)
-        if (!isNaN(numIndex)) return obj[numIndex]
+        if (!Number.isNaN(numIndex)) return obj[numIndex]
       }
       return undefined
     }
@@ -1027,9 +1045,6 @@ export class Runtime {
   private static readonly SLUGIFY_REGEX2 = /[\s_-]+/g
   private static readonly SLUGIFY_REGEX3 = /^-+|-+$/g
   private static readonly WHITESPACE_REGEX = /\s+/
-  private static readonly URLIZE_REGEX = /(https?:\/\/[^\s]+)/g
-  private static readonly NEWLINE_REGEX = /\n/g
-  private static readonly DOUBLE_NEWLINE_REGEX = /\n\n+/
 
   private evalFilter(node: FilterExprNode, ctx: Context): any {
     const value = this.eval(node.node, ctx)
@@ -1207,13 +1222,13 @@ export class Runtime {
           const str = String(value ?? '')
           const len = Number(arg) || 30
           if (str.length <= len) return str
-          return str.slice(0, len - 3) + '...'
+          return `${str.slice(0, len - 3)}...`
         }
         case 'truncatewords': {
           const words = String(value ?? '').split(Runtime.WHITESPACE_REGEX)
           const count = Number(arg) || 15
           if (words.length <= count) return value
-          return words.slice(0, count).join(' ') + '...'
+          return `${words.slice(0, count).join(' ')}...`
         }
         case 'center': {
           const str = String(value ?? '')
@@ -1235,7 +1250,7 @@ export class Runtime {
         case 'add': {
           const numVal = Number(value)
           const numArg = Number(arg)
-          if (!isNaN(numVal) && !isNaN(numArg)) return numVal + numArg
+          if (!Number.isNaN(numVal) && !Number.isNaN(numArg)) return numVal + numArg
           return String(value) + String(arg)
         }
         case 'divisibleby':
@@ -1244,7 +1259,7 @@ export class Runtime {
           return Number(Number(value).toFixed(Number(arg) || 0))
         case 'floatformat': {
           const num = parseFloat(String(value))
-          if (isNaN(num)) return ''
+          if (Number.isNaN(num)) return ''
           const decimals = Number(arg)
           if (decimals === -1) {
             const formatted = num.toFixed(1)
@@ -1254,7 +1269,7 @@ export class Runtime {
         }
         case 'get_digit': {
           const num = parseInt(String(value), 10)
-          if (isNaN(num)) return value
+          if (Number.isNaN(num)) return value
           const str = String(Math.abs(num))
           const pos = Number(arg) || 1
           if (pos < 1 || pos > str.length) return value
@@ -1342,7 +1357,7 @@ export class Runtime {
         case 'date':
         case 'time': {
           const d = value instanceof Date ? value : new Date(value)
-          if (isNaN(d.getTime())) return ''
+          if (Number.isNaN(d.getTime())) return ''
           return this.formatDate(d, String(arg || (filterName === 'time' ? 'H:i' : 'N j, Y')))
         }
 
@@ -1382,7 +1397,7 @@ export class Runtime {
           const lines = str.split('\n')
           let result = lines[0] // First line not indented by default
           for (let i = 1; i < lines.length; i++) {
-            result += '\n' + (lines[i].trim() === '' ? lines[i] : indentStr + lines[i])
+            result += `\n${lines[i].trim() === '' ? lines[i] : indentStr + lines[i]}`
           }
           return result
         }
@@ -1734,13 +1749,13 @@ export class Runtime {
           break
         }
         case 'number':
-          result = typeof value === 'number' && !isNaN(value)
+          result = typeof value === 'number' && !Number.isNaN(value)
           break
         case 'integer':
           result = Number.isInteger(value)
           break
         case 'float':
-          result = typeof value === 'number' && !Number.isInteger(value) && !isNaN(value)
+          result = typeof value === 'number' && !Number.isInteger(value) && !Number.isNaN(value)
           break
 
         // Type tests
@@ -1925,10 +1940,14 @@ export class Runtime {
     for (const node of ast.body) {
       if (node.type === 'Extends') {
         const templateName = this.eval((node as ExtendsNode).template, ctx)
-        this.parentTemplate = await this.options.templateLoader(String(templateName))
-        await this.collectBlocks(this.parentTemplate, ctx)
+        const parentTemplate = await this.options.templateLoader(String(templateName))
+        this.activeState.parentTemplate = parentTemplate
+        await this.collectBlocks(parentTemplate, ctx)
       } else if (node.type === 'Block') {
-        this.blocks.set((node as BlockNode).name, node as BlockNode)
+        const block = node as BlockNode
+        const chain = this.activeState.blocks.get(block.name) ?? []
+        chain.push(block)
+        this.activeState.blocks.set(block.name, chain)
       }
     }
   }
@@ -2009,7 +2028,7 @@ export class Runtime {
 
   private async renderForAsync(node: ForNode, ctx: Context): Promise<string> {
     const iterable = this.eval(node.iter, ctx)
-    const items = this.toIterable(iterable)
+    const items = this.applyForModifiers(node, ctx, this.toIterable(iterable))
     const len = items.length
 
     if (len === 0) {
@@ -2047,13 +2066,24 @@ export class Runtime {
   }
 
   private async renderBlockAsync(node: BlockNode, ctx: Context): Promise<string> {
-    const blockToRender = this.blocks.get(node.name) || node
+    const chain = this.activeState.blocks.get(node.name) ?? [node]
+    return this.renderBlockChainAsync(chain, chain.length - 1, ctx)
+  }
+
+  private async renderBlockChainAsync(
+    chain: BlockNode[],
+    index: number,
+    ctx: Context
+  ): Promise<string> {
+    const blockToRender = chain[index]
+    if (!blockToRender) return ''
+
     ctx.push()
     // Only pre-render the parent body for {{ block.super }} when referenced (see
     // renderBlockSync) — avoids a discarded second render that corrupts
     // stateful-tag bookkeeping and wastes work.
     if (this.blockUsesSuper(blockToRender)) {
-      const parentContent = await this.renderNodesAsync(node.body, ctx)
+      const parentContent = index > 0 ? await this.renderBlockChainAsync(chain, index - 1, ctx) : ''
       // Mark as safe to prevent double-escaping
       const safeContent = new String(parentContent) as any
       safeContent.__safe__ = true
@@ -2211,6 +2241,26 @@ export class Runtime {
       return result
     }
     return [value]
+  }
+
+  private applyForModifiers(node: ForNode, ctx: Context, source: any[]): any[] {
+    if (node.offset === undefined && node.limit === undefined && !node.reversed) {
+      return source
+    }
+
+    let items = source
+    if (node.offset !== undefined) {
+      const offset = Math.max(0, Math.trunc(Number(this.eval(node.offset, ctx)) || 0))
+      items = items.slice(offset)
+    }
+    if (node.limit !== undefined) {
+      const limit = Math.max(0, Math.trunc(Number(this.eval(node.limit, ctx)) || 0))
+      items = items.slice(0, limit)
+    }
+    if (node.reversed) {
+      items = items.slice().reverse()
+    }
+    return items
   }
 
   // Add custom filter

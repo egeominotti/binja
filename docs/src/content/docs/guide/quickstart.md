@@ -59,7 +59,7 @@ const html = renderUser({ name: 'john' })
 
 ### Variables
 
-```django
+```jinja
 {{ user.name }}
 {{ user.email|lower }}
 {{ items.0 }}
@@ -68,7 +68,7 @@ const html = renderUser({ name: 'john' })
 
 ### Conditionals
 
-```django
+```jinja
 {% if user.is_admin %}
   <span class="badge">Admin</span>
 {% elif user.is_staff %}
@@ -80,7 +80,7 @@ const html = renderUser({ name: 'john' })
 
 ### Loops
 
-```django
+```jinja
 {% for item in items %}
   <div class="{{ loop.first ? 'first' : '' }}">
     {{ loop.index }}. {{ item.name }}
@@ -93,7 +93,7 @@ const html = renderUser({ name: 'john' })
 ### Template Inheritance
 
 **base.html**
-```django
+```jinja
 <!DOCTYPE html>
 <html>
 <head>
@@ -106,7 +106,7 @@ const html = renderUser({ name: 'john' })
 ```
 
 **page.html**
-```django
+```jinja
 {% extends "base.html" %}
 
 {% block title %}My Page{% endblock %}

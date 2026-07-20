@@ -4,17 +4,15 @@
  * Shopify-compatible implementation
  */
 
-import { LiquidToken, LiquidTokenType } from './lexer'
+import { type LiquidToken, LiquidTokenType } from './lexer'
 import type { TemplateNode, ASTNode, ExpressionNode } from '../../parser/nodes'
 
 export class LiquidParser {
   private tokens: LiquidToken[]
   private current: number = 0
-  private source: string
 
-  constructor(tokens: LiquidToken[], source: string = '') {
+  constructor(tokens: LiquidToken[], _source: string = '') {
     this.tokens = tokens
-    this.source = source
   }
 
   parse(): TemplateNode {
@@ -344,9 +342,13 @@ export class LiquidParser {
       iter: iterable,
       body,
       else_,
+      recursive: false,
+      limit,
+      offset,
+      reversed,
       line,
       column,
-    } as any
+    }
   }
 
   private parseForIterable(): ExpressionNode {
@@ -456,7 +458,7 @@ export class LiquidParser {
       this.advance()
       const value = this.parseExpressionAtom()
       // with value becomes the context
-      context['_'] = value
+      context._ = value
     }
 
     // Parse var: value pairs
@@ -764,7 +766,7 @@ export class LiquidParser {
     return next?.type === LiquidTokenType.ID && next.value === name
   }
 
-  private consumeTag(name: string): void {
+  private consumeTag(_name: string): void {
     this.expect(LiquidTokenType.TAG_START)
     this.expect(LiquidTokenType.ID) // tag name
   }

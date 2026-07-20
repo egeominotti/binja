@@ -9,7 +9,7 @@ Include renders another template within the current template.
 
 ### Basic Include
 
-```django
+```jinja
 {% include "components/header.html" %}
 
 <main>
@@ -23,12 +23,12 @@ Include renders another template within the current template.
 
 Pass variables to included template:
 
-```django
+```jinja
 {% include "components/card.html" with title="Hello" description="World" %}
 ```
 
 **components/card.html**
-```django
+```jinja
 <div class="card">
   <h3>{{ title }}</h3>
   <p>{{ description }}</p>
@@ -37,7 +37,7 @@ Pass variables to included template:
 
 ### Include with Object
 
-```django
+```jinja
 {% include "components/user-card.html" with user=current_user %}
 ```
 
@@ -45,7 +45,7 @@ Pass variables to included template:
 
 Use `only` to restrict context to passed variables:
 
-```django
+```jinja
 {% include "components/widget.html" with title="Widget" only %}
 ```
 
@@ -56,7 +56,7 @@ The included template won't have access to parent context.
 ### Card Component
 
 **components/card.html**
-```django
+```jinja
 <div class="card {% if class %}{{ class }}{% endif %}">
   {% if title %}
     <div class="card-header">
@@ -75,7 +75,7 @@ The included template won't have access to parent context.
 ```
 
 **Usage:**
-```django
+```jinja
 {% include "components/card.html" with
    title="Welcome"
    content="<p>Hello, World!</p>"
@@ -86,7 +86,7 @@ The included template won't have access to parent context.
 ### Alert Component
 
 **components/alert.html**
-```django
+```jinja
 <div class="alert alert-{{ type|default:'info' }}" role="alert">
   {% if dismissible %}
     <button type="button" class="close" data-dismiss="alert">&times;</button>
@@ -96,7 +96,7 @@ The included template won't have access to parent context.
 ```
 
 **Usage:**
-```django
+```jinja
 {% include "components/alert.html" with
    type="success"
    message="Operation completed!"
@@ -107,7 +107,7 @@ The included template won't have access to parent context.
 ### Button Component
 
 **components/button.html**
-```django
+```jinja
 <button
   type="{{ type|default:'button' }}"
   class="btn btn-{{ variant|default:'primary' }} {% if size %}btn-{{ size }}{% endif %}"
@@ -119,7 +119,7 @@ The included template won't have access to parent context.
 ```
 
 **Usage:**
-```django
+```jinja
 {% include "components/button.html" with
    label="Submit"
    variant="success"
@@ -130,7 +130,7 @@ The included template won't have access to parent context.
 
 ## Loops with Include
 
-```django
+```jinja
 {% for product in products %}
   {% include "components/product-card.html" with product=product %}
 {% endfor %}
@@ -138,7 +138,7 @@ The included template won't have access to parent context.
 
 ## Conditional Include
 
-```django
+```jinja
 {% if user.is_admin %}
   {% include "partials/admin-nav.html" %}
 {% else %}
@@ -150,7 +150,7 @@ The included template won't have access to parent context.
 
 Include template based on variable:
 
-```django
+```jinja
 {% include "themes/" ~ theme ~ "/header.html" %}
 ```
 

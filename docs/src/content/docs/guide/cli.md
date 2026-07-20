@@ -176,7 +176,7 @@ jobs:
 When using `compile`, templates are converted to JavaScript:
 
 **Input:** `views/user.html`
-```django
+```jinja
 <h1>{{ name|upper }}</h1>
 <p>Email: {{ email }}</p>
 ```

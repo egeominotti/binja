@@ -77,7 +77,7 @@ app.get('/', (c) => c.render('pages/home', { title: 'Home' }))
 ```
 
 **layouts/base.html**
-```django
+```jinja
 <!DOCTYPE html>
 <html>
 <head>
@@ -90,7 +90,7 @@ app.get('/', (c) => c.render('pages/home', { title: 'Home' }))
 ```
 
 **pages/home.html**
-```django
+```jinja
 <h1>Welcome to {{ siteName }}!</h1>
 <p>This is the home page.</p>
 ```

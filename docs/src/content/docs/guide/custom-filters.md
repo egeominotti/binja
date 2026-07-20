@@ -57,7 +57,7 @@ const html = await render('{{ price|currency }}',
 
 ## Usage in Templates
 
-```django
+```jinja
 {{ 5|double }}           {# Output: 10 #}
 {{ "hi"|repeat:3 }}      {# Output: hihihi #}
 {{ price|currency }}     {# Output: $42.50 #}
@@ -92,7 +92,7 @@ env.addFilter('mask_email', (email: string) => {
 })
 ```
 
-```django
+```jinja
 {{ "John Doe"|initials }}        {# JD #}
 {{ "john@example.com"|mask_email }} {# j***@example.com #}
 ```
@@ -111,7 +111,7 @@ env.addFilter('ordinal', (n: number) => {
 })
 ```
 
-```django
+```jinja
 {{ 0.75|percentage }}      {# 75% #}
 {{ 0.756|percentage:1 }}   {# 75.6% #}
 {{ 1|ordinal }}            {# 1st #}
@@ -135,7 +135,7 @@ env.addFilter('pluck', (arr: object[], key: string) => {
 })
 ```
 
-```django
+```jinja
 {{ items|shuffle|first }}
 {{ users|pluck:"name"|join:", " }}
 ```
@@ -158,7 +158,7 @@ env.addFilter('relative_time', (date: Date) => {
 })
 ```
 
-```django
+```jinja
 {{ post.created_at|relative_time }}  {# 2 hours ago #}
 ```
 
@@ -172,7 +172,7 @@ env.addFilter('translate', async (text: string, lang: string) => {
 })
 ```
 
-```django
+```jinja
 {{ "Hello"|translate:"es" }}  {# Hola #}
 ```
 

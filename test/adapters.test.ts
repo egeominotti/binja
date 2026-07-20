@@ -3,14 +3,28 @@
  * Tests for Hono and Elysia integrations
  */
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { describe, test, expect, beforeAll } from 'bun:test'
 import { Hono } from 'hono'
 import { Elysia } from 'elysia'
 import { binja as honoAdapter, clearCache as honoClearCache } from '../src/adapters/hono'
 import { binja as elysiaAdapter, clearCache as elysiaClearCache } from '../src/adapters/elysia'
 
-const TEST_PORT_HONO = 4001
-const TEST_PORT_ELYSIA = 4002
+const _TEST_PORT_HONO = 4001
+const _TEST_PORT_ELYSIA = 4002
+
+function createElysiaTestApp() {
+  return new Elysia()
+    .use(
+      elysiaAdapter({
+        root: './test/views',
+        extension: '.html',
+        debug: true,
+        cache: false,
+      })
+    )
+    .get('/', ({ render }) => render('index', { title: 'Test', name: 'World' }))
+    .get('/missing', ({ render }) => render('nonexistent', {}))
+}
 
 describe('Hono Adapter', () => {
   let app: Hono
@@ -82,21 +96,11 @@ describe('Hono Adapter', () => {
 })
 
 describe('Elysia Adapter', () => {
-  let app: Elysia
+  let app: ReturnType<typeof createElysiaTestApp>
 
   beforeAll(() => {
     elysiaClearCache()
-    app = new Elysia()
-      .use(
-        elysiaAdapter({
-          root: './test/views',
-          extension: '.html',
-          debug: true,
-          cache: false,
-        })
-      )
-      .get('/', ({ render }) => render('index', { title: 'Test', name: 'World' }))
-      .get('/missing', ({ render }) => render('nonexistent', {}))
+    app = createElysiaTestApp()
   })
 
   test('renders template with context', async () => {

@@ -7,7 +7,7 @@ description: Frequently asked questions about binja
 
 ### What is binja?
 
-binja is a high-performance Jinja2/Django Template Language engine built for the Bun runtime. It provides 100% compatibility with Django templates while being significantly faster than alternatives like Nunjucks.
+binja is a high-performance Jinja2/Django Template Language engine built for the Bun runtime. It implements a broad compatible subset and is optimized for Bun.
 
 ### Why "binja"?
 
@@ -19,7 +19,7 @@ No, binja requires the [Bun](https://bun.sh) runtime. It uses Bun-specific APIs 
 
 ### Is binja production-ready?
 
-Yes. binja is thoroughly tested with comprehensive test coverage for all features, filters, and edge cases.
+binja has a large automated suite, including example-based, regression, concurrency, property-based, and model-based tests. As with any template migration, validate your own templates before deploying.
 
 ## Performance
 
@@ -57,9 +57,10 @@ const env = new Environment({
 
 ### Is binja compatible with Django templates?
 
-Yes, binja aims for 100% Django Template Language (DTL) compatibility:
-- All tags: `{% if %}`, `{% for %}`, `{% block %}`, `{% extends %}`, etc.
-- All filters: `upper`, `lower`, `date`, `truncatechars`, etc.
+binja supports a broad Django Template Language (DTL) subset:
+
+- Common tags: `{% if %}`, `{% for %}`, `{% block %}`, `{% extends %}`, etc.
+- A large filter set including `upper`, `lower`, `date`, and `truncatechars`
 - Loop variables: `forloop.counter`, `forloop.first`, `forloop.last`
 - Template inheritance
 
@@ -107,7 +108,7 @@ const env = new Environment({
 
 Yes, full support for Django-style template inheritance:
 
-```django
+```jinja
 {% extends "base.html" %}
 {% block content %}...{% endblock %}
 ```
@@ -116,7 +117,7 @@ Yes, full support for Django-style template inheritance:
 
 Yes:
 
-```django
+```jinja
 {% include "header.html" %}
 {% include "card.html" with title="Hello" %}
 ```
@@ -165,7 +166,7 @@ await render('{{ script }}', {
 
 Use the `|safe` filter:
 
-```django
+```jinja
 {{ trusted_html|safe }}
 ```
 
@@ -187,13 +188,13 @@ const env = new Environment({
 
 Check filter syntax. Django-style uses colons:
 
-```django
+```jinja
 {{ text|truncatechars:20 }}
 ```
 
 Jinja2-style uses parentheses:
 
-```django
+```jinja
 {{ text|truncate(20) }}
 ```
 
@@ -203,6 +204,6 @@ Both work in binja.
 
 If you see `&amp;lt;` instead of `&lt;`, you're escaping twice. Use `|safe` on pre-escaped content:
 
-```django
+```jinja
 {{ already_escaped_html|safe }}
 ```

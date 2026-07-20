@@ -10,8 +10,8 @@ import {
   createDebugRenderer,
 } from '../src/debug'
 import { DebugCollector } from '../src/debug/collector'
-import * as fs from 'fs'
-import * as path from 'path'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 const TEMPLATES_DIR = '/tmp/binja-debug-test'
 
@@ -143,6 +143,7 @@ describe('Debug Panel', () => {
       expect(html).toContain('binja-dbg-')
       expect(html).toContain('<style>')
       expect(html).toContain('<script>')
+      expect(html).not.toContain(['$', '{icons.arrow}'].join(''))
     })
 
     test('respects dark mode option', () => {
@@ -237,6 +238,18 @@ describe('Debug Panel', () => {
 
       expect(result).toBe('World')
       expect(result).not.toContain('Binja Debug Panel')
+    })
+
+    test('isolates collectors across concurrent renders', async () => {
+      const [first, second] = await Promise.all([
+        renderStringWithDebug(env, '<html><body>{{ name }}</body></html>', { name: 'First' }),
+        renderStringWithDebug(env, '<html><body>{{ name }}</body></html>', { name: 'Second' }),
+      ])
+
+      expect(first).toContain('First')
+      expect(second).toContain('Second')
+      expect(first).toContain('Binja Debug Panel')
+      expect(second).toContain('Binja Debug Panel')
     })
   })
 

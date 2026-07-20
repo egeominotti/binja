@@ -36,8 +36,8 @@
 | **AOT Compilation** | ✅ 160x faster | ❌ |
 | **Multi-Engine** | ✅ Jinja2, Handlebars, Liquid, Twig | ❌ |
 | **Framework Adapters** | ✅ Hono, Elysia | ❌ |
-| Django DTL Compatible | ✅ 100% | ❌ Partial |
-| Jinja2 Compatible | ✅ Full | ⚠️ Limited |
+| Django DTL Compatible | ✅ Broad support | ❌ Partial |
+| Jinja2 Compatible | ✅ Extensive subset | ⚠️ Limited |
 | Template Inheritance | ✅ | ⚠️ |
 | 84 Built-in Filters | ✅ | ❌ |
 | 28 Built-in Tests | ✅ | ❌ |
@@ -590,7 +590,7 @@ console.log(stats) // { size: 10, keys: ['jinja2:./views/index.html', ...] }
 
 ## Django Compatibility
 
-binja is designed to be a drop-in replacement for Django templates:
+binja supports a broad Django-compatible template subset:
 
 ```django
 {# Django-style comments #}

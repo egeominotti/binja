@@ -3,7 +3,7 @@ title: Introduction
 description: What is binja and why should you use it?
 ---
 
-**binja** is a high-performance Jinja2/Django Template Language engine built specifically for the [Bun](https://bun.sh) runtime. It provides 100% compatibility with Django templates while being 2-4x faster than Nunjucks in runtime mode and up to **160x faster** with AOT (Ahead-of-Time) compilation.
+**binja** is a high-performance Jinja2/Django Template Language engine built specifically for the [Bun](https://bun.sh) runtime. It supports a broad Django/Jinja-compatible subset while being 2-4x faster than Nunjucks in the published runtime benchmarks and up to **160x faster** with AOT (Ahead-of-Time) compilation.
 
 ## Key Features
 
@@ -16,9 +16,9 @@ description: What is binja and why should you use it?
 
 ### Compatibility
 
-- **100% Django Template Language (DTL)** compatible
-- **Full Jinja2** syntax support
-- Drop-in replacement for Django templates in JavaScript
+- Broad **Django Template Language (DTL)** support
+- Extensive Jinja2 syntax support
+- Familiar migration path for Django templates in JavaScript
 
 ### Multi-Engine Support
 

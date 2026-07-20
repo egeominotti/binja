@@ -1,6 +1,7 @@
 /**
  * Debug Collector - Tracks rendering information for the debug panel
  */
+import { AsyncLocalStorage } from 'node:async_hooks'
 
 export interface TemplateInfo {
   name: string
@@ -349,23 +350,30 @@ export class DebugCollector {
   }
 }
 
-// Global debug collector for current render
-let currentCollector: DebugCollector | null = null
+// Per-async-request collector. AsyncLocalStorage prevents concurrent renders
+// from overwriting each other's telemetry in long-lived server processes.
+const collectorStorage = new AsyncLocalStorage<DebugCollector | null>()
+
+export function withDebugCollection<T>(callback: (collector: DebugCollector) => T): T {
+  const collector = new DebugCollector()
+  return collectorStorage.run(collector, () => callback(collector))
+}
 
 export function startDebugCollection(): DebugCollector {
-  currentCollector = new DebugCollector()
-  return currentCollector
+  const collector = new DebugCollector()
+  collectorStorage.enterWith(collector)
+  return collector
 }
 
 export function getDebugCollector(): DebugCollector | null {
-  return currentCollector
+  return collectorStorage.getStore() ?? null
 }
 
 export function endDebugCollection(): DebugData | null {
-  if (currentCollector) {
-    const data = currentCollector.getData()
-    currentCollector = null
-    return data
-  }
-  return null
+  const collector = getDebugCollector()
+  if (!collector) return null
+
+  const data = collector.getData()
+  collectorStorage.enterWith(null)
+  return data
 }

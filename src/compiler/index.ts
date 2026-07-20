@@ -25,7 +25,6 @@ import type {
   FilterExprNode,
   TestExprNode,
   ConditionalNode,
-  CommentNode,
   FunctionCallNode,
 } from '../parser/nodes'
 import { builtinFilters } from '../filters'
@@ -179,7 +178,6 @@ const RESERVED_JS = new Set([
 
 class Compiler {
   private options: Required<CompileOptions>
-  private indent = 0
   private varCounter = 0
   private loopStack: string[] = [] // Track nested loop variable names for parentloop
   // Stack of local-variable scopes. Each scope maps a template variable name to
@@ -350,7 +348,20 @@ class Compiler {
     const iter = this.compileExpr(node.iter)
     let code = ''
 
-    code += `  const ${iterVar} = toArray(${iter});${this.nl()}`
+    const hasModifiers =
+      node.offset !== undefined || node.limit !== undefined || node.reversed === true
+    code += `  ${hasModifiers ? 'let' : 'const'} ${iterVar} = toArray(${iter});${this.nl()}`
+    if (node.offset !== undefined) {
+      const offset = this.compileExpr(node.offset)
+      code += `  ${iterVar} = ${iterVar}.slice(Math.max(0, Math.trunc(Number(${offset}) || 0)));${this.nl()}`
+    }
+    if (node.limit !== undefined) {
+      const limit = this.compileExpr(node.limit)
+      code += `  ${iterVar} = ${iterVar}.slice(0, Math.max(0, Math.trunc(Number(${limit}) || 0)));${this.nl()}`
+    }
+    if (node.reversed) {
+      code += `  ${iterVar} = ${iterVar}.slice().reverse();${this.nl()}`
+    }
     code += `  const ${lenVar} = ${iterVar}.length;${this.nl()}`
 
     // Handle empty case
@@ -670,7 +681,7 @@ class Compiler {
       // subexpression for last/length, mishandled negative precision).
       default:
         // Fall back to runtime filter application
-        const argsStr = args.length ? ', ' + args.join(', ') : ''
+        const argsStr = args.length ? `, ${args.join(', ')}` : ''
         return `applyFilter('${node.filter}', ${value}${argsStr})`
     }
   }
@@ -703,7 +714,7 @@ class Compiler {
       case 'string':
         return `${negation}(typeof ${value} === 'string')`
       default:
-        const argsStr = args.length ? ', ' + args.join(', ') : ''
+        const argsStr = args.length ? `, ${args.join(', ')}` : ''
         return `${negation}applyTest('${node.test}', ${value}${argsStr})`
     }
   }

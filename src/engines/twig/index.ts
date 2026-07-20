@@ -9,7 +9,7 @@
  */
 
 import { TwigLexer } from './lexer'
-import { TwigParser, TWIG_FILTER_MAP } from './parser'
+import { TwigParser } from './parser'
 import { Runtime } from '../../runtime'
 import type { TemplateNode } from '../../parser/nodes'
 

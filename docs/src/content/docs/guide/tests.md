@@ -7,7 +7,7 @@ Tests check values using the `is` operator (Jinja2 syntax).
 
 ## Usage
 
-```django
+```jinja
 {% if value is defined %}...{% endif %}
 {% if num is even %}...{% endif %}
 {% if num is divisibleby(3) %}...{% endif %}
@@ -17,7 +17,7 @@ Tests check values using the `is` operator (Jinja2 syntax).
 
 Use `is not` for negative tests:
 
-```django
+```jinja
 {% if value is not none %}...{% endif %}
 {% if num is not even %}...{% endif %}
 ```
@@ -88,7 +88,7 @@ Use `is not` for negative tests:
 
 ### Check if variable exists
 
-```django
+```jinja
 {% if user is defined %}
   Hello, {{ user.name }}!
 {% else %}
@@ -98,7 +98,7 @@ Use `is not` for negative tests:
 
 ### Alternate row colors
 
-```django
+```jinja
 {% for item in items %}
   <tr class="{% if loop.index is even %}even{% else %}odd{% endif %}">
     <td>{{ item.name }}</td>
@@ -108,7 +108,7 @@ Use `is not` for negative tests:
 
 ### Group items by divisibility
 
-```django
+```jinja
 {% for n in numbers %}
   {% if n is divisibleby(3) %}
     <span class="divisible-3">{{ n }}</span>
@@ -122,7 +122,7 @@ Use `is not` for negative tests:
 
 ### Handle empty collections
 
-```django
+```jinja
 {% if items is empty %}
   <p>No items found.</p>
 {% else %}
@@ -136,7 +136,7 @@ Use `is not` for negative tests:
 
 ### Type checking
 
-```django
+```jinja
 {% if value is string %}
   String: {{ value }}
 {% elif value is number %}

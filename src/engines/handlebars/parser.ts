@@ -3,17 +3,15 @@
  * Converts Handlebars tokens to a common AST format
  */
 
-import { HbsToken, HbsTokenType } from './lexer'
+import { type HbsToken, HbsTokenType } from './lexer'
 import type { TemplateNode, ASTNode, ExpressionNode } from '../../parser/nodes'
 
 export class HandlebarsParser {
   private tokens: HbsToken[]
   private current: number = 0
-  private source: string
 
-  constructor(tokens: HbsToken[], source: string = '') {
+  constructor(tokens: HbsToken[], _source: string = '') {
     this.tokens = tokens
-    this.source = source
   }
 
   parse(): TemplateNode {
@@ -272,7 +270,7 @@ export class HandlebarsParser {
     line: number,
     column: number
   ): ASTNode {
-    const body = this.parseNodes([name])
+    const _body = this.parseNodes([name])
     this.consumeEndBlock()
 
     // Store as a macro call

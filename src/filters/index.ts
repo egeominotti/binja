@@ -159,13 +159,13 @@ export const linebreaksbr: FilterFunction = (value) => {
 export const truncatechars: FilterFunction = (value, length = 30) => {
   const str = String(value)
   if (str.length <= length) return str
-  return str.slice(0, length - 3) + '...'
+  return `${str.slice(0, length - 3)}...`
 }
 
 export const truncatewords: FilterFunction = (value, count = 15) => {
   const words = String(value).split(WHITESPACE_REGEX)
   if (words.length <= count) return value
-  return words.slice(0, count).join(' ') + '...'
+  return `${words.slice(0, count).join(' ')}...`
 }
 
 export const wordcount: FilterFunction = (value) =>
@@ -206,7 +206,7 @@ export const float: FilterFunction = (value) => parseFloat(String(value)) || 0.0
 // DTL: floatformat
 export const floatformat: FilterFunction = (value, decimals = -1) => {
   const num = parseFloat(String(value))
-  if (isNaN(num)) return ''
+  if (Number.isNaN(num)) return ''
 
   if (decimals === -1) {
     // Remove trailing zeros
@@ -222,7 +222,7 @@ export const add: FilterFunction = (value, arg) => {
   const numValue = Number(value)
   const numArg = Number(arg)
 
-  if (!isNaN(numValue) && !isNaN(numArg)) {
+  if (!Number.isNaN(numValue) && !Number.isNaN(numArg)) {
     return numValue + numArg
   }
 
@@ -412,7 +412,7 @@ const formatDateChar = (d: Date, char: string): string => {
 
 export const date: FilterFunction = (value, format = 'N j, Y') => {
   const d = value instanceof Date ? value : new Date(value)
-  if (isNaN(d.getTime())) return ''
+  if (Number.isNaN(d.getTime())) return ''
 
   return format.replace(DATE_CHAR_REGEX, (char: string) => formatDateChar(d, char))
 }
@@ -949,7 +949,7 @@ export const addslashes: FilterFunction = (value) => {
 // Django: get_digit - Get nth digit from right (1=rightmost)
 export const get_digit: FilterFunction = (value, digit) => {
   const num = parseInt(String(value), 10)
-  if (isNaN(num)) return value // Return original for non-integers
+  if (Number.isNaN(num)) return value // Return original for non-integers
   const str = String(Math.abs(num))
   const pos = Number(digit) || 1
   if (pos < 1 || pos > str.length) return value
@@ -1132,7 +1132,7 @@ export const truncatewords_html: FilterFunction = (value, count = 15) => {
 
   // Add ellipsis if truncated
   if (wordCount >= maxWords) {
-    result = result.trimEnd() + '...'
+    result = `${result.trimEnd()}...`
   }
 
   // Close any open tags
@@ -1159,7 +1159,7 @@ export const urlizetrunc: FilterFunction = (value, limit = 15) => {
     const url = m[0]
     const idx = m.index ?? 0
     html += esc(src.slice(last, idx))
-    const displayUrl = url.length > maxLen ? url.slice(0, maxLen) + '...' : url
+    const displayUrl = url.length > maxLen ? `${url.slice(0, maxLen)}...` : url
     html += `<a href="${Bun.escapeHTML(url)}">${Bun.escapeHTML(displayUrl)}</a>`
     last = idx + url.length
   }
@@ -1192,7 +1192,7 @@ export const xmlattr: FilterFunction = (value, autospace = true) => {
   }
 
   const result = attrs.join(' ')
-  const output = autospace && result ? ' ' + result : result
+  const output = autospace && result ? ` ${result}` : result
 
   const safeString = new String(output) as any
   safeString.__safe__ = true

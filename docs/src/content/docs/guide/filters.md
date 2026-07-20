@@ -141,7 +141,7 @@ const env = new Environment({
 
 Filters can be chained together:
 
-```django
+```jinja
 {{ name|lower|capitalize|truncatechars:20 }}
 {{ items|sort|reverse|join:", " }}
 {{ price|floatformat:2|default:"N/A" }}

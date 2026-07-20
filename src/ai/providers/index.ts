@@ -48,7 +48,7 @@ export async function detectProvider(options: LintOptions = {}): Promise<AIProvi
     },
   ]
 
-  for (const { name, create } of providers) {
+  for (const { create } of providers) {
     const provider = create()
     if (await provider.available()) {
       return provider

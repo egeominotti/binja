@@ -9,10 +9,6 @@ build/
 out/
 *.tsbuildinfo
 
-# Bun
-bun.lockb
-bun.lock
-
 # IDE & Editors
 .idea/
 .vscode/
@@ -60,7 +56,6 @@ coverage/
 # Cache
 .cache/
 .parcel-cache/
-.eslintcache
 .stylelintcache
 *.tscache
 
@@ -77,6 +72,7 @@ pnpm-lock.yaml
 
 # Documentation build
 docs/_build/
+docs/.astro/
 .docusaurus/
 
 # Benchmark results

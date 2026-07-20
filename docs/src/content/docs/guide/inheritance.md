@@ -10,7 +10,7 @@ Template inheritance lets you create a base template with common structure and o
 ### Base Template
 
 **templates/base.html**
-```django
+```jinja
 <!DOCTYPE html>
 <html>
 <head>
@@ -40,7 +40,7 @@ Template inheritance lets you create a base template with common structure and o
 ### Child Template
 
 **templates/pages/home.html**
-```django
+```jinja
 {% extends "base.html" %}
 
 {% block title %}Home | My Site{% endblock %}
@@ -57,7 +57,7 @@ Template inheritance lets you create a base template with common structure and o
 
 Blocks can have default content:
 
-```django
+```jinja
 {% block sidebar %}
   <nav>Default sidebar content</nav>
 {% endblock %}
@@ -69,7 +69,7 @@ Child templates can override or use the default by not defining the block.
 
 Include parent block content:
 
-```django
+```jinja
 {% block header %}
   {{ super() }}
   <div class="breadcrumb">Home / About</div>
@@ -78,7 +78,7 @@ Include parent block content:
 
 ### Nested Blocks
 
-```django
+```jinja
 {% block content %}
   <div class="container">
     {% block inner_content %}{% endblock %}
@@ -91,7 +91,7 @@ Include parent block content:
 ### Three-Level Example
 
 **base.html**
-```django
+```jinja
 <!DOCTYPE html>
 <html>
 <head>
@@ -104,7 +104,7 @@ Include parent block content:
 ```
 
 **layouts/two-column.html**
-```django
+```jinja
 {% extends "base.html" %}
 
 {% block body %}
@@ -116,7 +116,7 @@ Include parent block content:
 ```
 
 **pages/dashboard.html**
-```django
+```jinja
 {% extends "layouts/two-column.html" %}
 
 {% block title %}Dashboard{% endblock %}
@@ -134,7 +134,7 @@ Include parent block content:
 
 ### 1. Create Semantic Blocks
 
-```django
+```jinja
 {# Good - semantic block names #}
 {% block page_title %}{% endblock %}
 {% block main_content %}{% endblock %}
@@ -147,7 +147,7 @@ Include parent block content:
 
 ### 2. Keep Base Templates Minimal
 
-```django
+```jinja
 {# base.html - structure only #}
 <!DOCTYPE html>
 <html>
@@ -172,7 +172,7 @@ templates/
 
 ### 4. Document Block Purpose
 
-```django
+```jinja
 {# Block for page-specific CSS #}
 {% block styles %}{% endblock %}
 

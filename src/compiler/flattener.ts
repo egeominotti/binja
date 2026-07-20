@@ -17,6 +17,9 @@ import type {
   IncludeNode,
   ExpressionNode,
   LiteralNode,
+  OutputNode,
+  GetAttrNode,
+  NameNode,
   IfNode,
   ForNode,
   WithNode,
@@ -56,7 +59,7 @@ export function canFlatten(ast: TemplateNode): { canFlatten: boolean; reason?: s
 class TemplateFlattener {
   private loader: TemplateLoader
   private maxDepth: number
-  private blocks: Map<string, BlockNode> = new Map()
+  private blocks: Map<string, BlockNode[]> = new Map()
   private depth = 0
 
   constructor(options: FlattenOptions) {
@@ -70,14 +73,14 @@ class TemplateFlattener {
     return this.processTemplate(ast)
   }
 
-  private processTemplate(ast: TemplateNode, isChild = true): TemplateNode {
+  private processTemplate(ast: TemplateNode): TemplateNode {
     if (this.depth > this.maxDepth) {
       throw new Error(`Maximum template inheritance depth (${this.maxDepth}) exceeded`)
     }
 
-    // First pass: collect blocks from this template
-    // Child blocks (override=true) take precedence over parent blocks (override=false)
-    this.collectBlocks(ast.body, isChild)
+    // Templates are visited from the most-derived child towards the base.
+    // Preserve every implementation so block.super can expand the next one.
+    this.collectBlocks(ast.body)
 
     // Check for extends
     const extendsNode = this.findExtends(ast.body)
@@ -89,8 +92,7 @@ class TemplateFlattener {
       const parentAst = this.loader.parse(parentSource)
 
       this.depth++
-      // Process parent with isChild=false so its blocks don't override child blocks
-      const flattenedParent = this.processTemplate(parentAst, false)
+      const flattenedParent = this.processTemplate(parentAst)
       this.depth--
 
       // Replace blocks in parent with child blocks
@@ -111,46 +113,46 @@ class TemplateFlattener {
     }
   }
 
-  private collectBlocks(nodes: ASTNode[], override = true): void {
+  private collectBlocks(nodes: ASTNode[]): void {
     for (const node of nodes) {
       if (node.type === 'Block') {
         const block = node as BlockNode
-        // Only set if override=true OR block doesn't exist yet
-        // Child blocks (collected first) should NOT be overwritten by parent
-        if (override || !this.blocks.has(block.name)) {
-          this.blocks.set(block.name, block)
+        const chain = this.blocks.get(block.name) ?? []
+        if (!chain.includes(block)) {
+          chain.push(block)
+          this.blocks.set(block.name, chain)
         }
       }
       // Also collect from nested structures
-      this.collectBlocksFromNode(node, override)
+      this.collectBlocksFromNode(node)
     }
   }
 
-  private collectBlocksFromNode(node: ASTNode, override = true): void {
+  private collectBlocksFromNode(node: ASTNode): void {
     switch (node.type) {
       case 'If': {
         const ifNode = node as IfNode
-        this.collectBlocks(ifNode.body, override)
+        this.collectBlocks(ifNode.body)
         for (const elif of ifNode.elifs) {
-          this.collectBlocks(elif.body, override)
+          this.collectBlocks(elif.body)
         }
-        this.collectBlocks(ifNode.else_, override)
+        this.collectBlocks(ifNode.else_)
         break
       }
       case 'For': {
         const forNode = node as ForNode
-        this.collectBlocks(forNode.body, override)
-        this.collectBlocks(forNode.else_, override)
+        this.collectBlocks(forNode.body)
+        this.collectBlocks(forNode.else_)
         break
       }
       case 'With': {
         const withNode = node as WithNode
-        this.collectBlocks(withNode.body, override)
+        this.collectBlocks(withNode.body)
         break
       }
       case 'Block': {
         const blockNode = node as BlockNode
-        this.collectBlocks(blockNode.body, override)
+        this.collectBlocks(blockNode.body)
         break
       }
     }
@@ -183,16 +185,9 @@ class TemplateFlattener {
       }
 
       if (node.type === 'Block') {
-        // Use child block if available, otherwise use this block's content
         const block = node as BlockNode
-        const childBlock = this.blocks.get(block.name)
-        if (childBlock && childBlock !== block) {
-          // Child block overrides parent - process its body
-          result.push(...this.processNodes(childBlock.body))
-        } else {
-          // Use this block's content
-          result.push(...this.processNodes(block.body))
-        }
+        const chain = this.blocks.get(block.name) ?? [block]
+        result.push(...this.renderBlockChain(chain, 0))
         continue
       }
 
@@ -242,6 +237,74 @@ class TemplateFlattener {
 
   private replaceBlocks(nodes: ASTNode[]): ASTNode[] {
     return this.processNodes(nodes)
+  }
+
+  private renderBlockChain(chain: BlockNode[], index: number): ASTNode[] {
+    const block = chain[index]
+    if (!block) return []
+
+    const parentBody = index + 1 < chain.length ? this.renderBlockChain(chain, index + 1) : []
+    return this.processNodes(this.replaceBlockSuper(block.body, parentBody))
+  }
+
+  private replaceBlockSuper(nodes: ASTNode[], parentBody: ASTNode[]): ASTNode[] {
+    const result: ASTNode[] = []
+
+    for (const node of nodes) {
+      if (this.isBlockSuperOutput(node)) {
+        result.push(...parentBody)
+        continue
+      }
+
+      switch (node.type) {
+        case 'If': {
+          const ifNode = node as IfNode
+          result.push({
+            ...ifNode,
+            body: this.replaceBlockSuper(ifNode.body, parentBody),
+            elifs: ifNode.elifs.map((elif) => ({
+              test: elif.test,
+              body: this.replaceBlockSuper(elif.body, parentBody),
+            })),
+            else_: this.replaceBlockSuper(ifNode.else_, parentBody),
+          })
+          break
+        }
+        case 'For': {
+          const forNode = node as ForNode
+          result.push({
+            ...forNode,
+            body: this.replaceBlockSuper(forNode.body, parentBody),
+            else_: this.replaceBlockSuper(forNode.else_, parentBody),
+          })
+          break
+        }
+        case 'With': {
+          const withNode = node as WithNode
+          result.push({
+            ...withNode,
+            body: this.replaceBlockSuper(withNode.body, parentBody),
+          })
+          break
+        }
+        default:
+          result.push(node)
+      }
+    }
+
+    return result
+  }
+
+  private isBlockSuperOutput(node: ASTNode): boolean {
+    if (node.type !== 'Output') return false
+    const expression = (node as OutputNode).expression
+    if (expression.type !== 'GetAttr') return false
+    const attribute = expression as GetAttrNode
+    return (
+      attribute.attribute === 'super' &&
+      attribute.object.type === 'Name' &&
+      (attribute.object as NameNode).name === 'block'
+    )
   }
 
   private inlineInclude(node: IncludeNode): ASTNode[] {

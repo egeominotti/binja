@@ -9,8 +9,8 @@
  */
 
 import { Parser } from '../../parser'
-import { Token, TokenType } from '../../lexer/tokens'
-import type { TemplateNode, ExpressionNode } from '../../parser/nodes'
+import type { Token } from '../../lexer/tokens'
+import type { TemplateNode } from '../../parser/nodes'
 
 // Twig filter name mappings to Jinja2 equivalents
 export const TWIG_FILTER_MAP: Record<string, string> = {

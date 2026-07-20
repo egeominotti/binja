@@ -4,11 +4,11 @@
  */
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
 import { Environment } from '../src'
-import * as fs from 'fs'
-import * as path from 'path'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 describe('LRU Template Cache', () => {
-  const testDir = '/tmp/binja-cache-test-' + Date.now()
+  const testDir = `/tmp/binja-cache-test-${Date.now()}`
 
   beforeEach(() => {
     // Create test directory with templates
@@ -193,6 +193,12 @@ describe('LRU Template Cache', () => {
     test('can set custom cacheMaxSize', () => {
       const env = new Environment({ templates: testDir, cacheMaxSize: 500 })
       expect(env.cacheStats().maxSize).toBe(500)
+    })
+
+    test.each([0, -1, 1.5, Number.NaN])('rejects invalid cacheMaxSize value %p', (cacheMaxSize) => {
+      expect(() => new Environment({ templates: testDir, cacheMaxSize })).toThrow(
+        'cacheMaxSize must be a positive integer'
+      )
     })
   })
 

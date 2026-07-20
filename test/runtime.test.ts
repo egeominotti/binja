@@ -3,6 +3,9 @@
  */
 import { describe, test, expect } from 'bun:test'
 import { Environment, render, Template } from '../src'
+import { Lexer } from '../src/lexer'
+import { Parser } from '../src/parser'
+import { Runtime } from '../src/runtime'
 
 describe('Runtime', () => {
   describe('Variable Output', () => {
@@ -500,6 +503,27 @@ describe('Runtime', () => {
       const tmpl = Template('Hello {{ name }}!')
       expect(await tmpl.render({ name: 'World' })).toBe('Hello World!')
       expect(await tmpl.render({ name: 'Bun' })).toBe('Hello Bun!')
+    })
+  })
+
+  describe('Concurrent rendering', () => {
+    test('isolates stateful tags across async renders', async () => {
+      const parse = (source: string) => {
+        const tokens = new Lexer(source).tokenize()
+        return new Parser(tokens, source).parse()
+      }
+      const template = parse('{% include "slow" %}{% cycle "A" "B" %}')
+      const emptyTemplate = parse('')
+      const runtime = new Runtime({
+        templateLoader: async () => {
+          await Bun.sleep(10)
+          return emptyTemplate
+        },
+      })
+
+      const results = await Promise.all([runtime.render(template), runtime.render(template)])
+
+      expect(results).toEqual(['A', 'A'])
     })
   })
 })

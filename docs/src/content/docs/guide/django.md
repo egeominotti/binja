@@ -1,9 +1,9 @@
 ---
 title: Django Compatibility
-description: 100% Django Template Language compatibility
+description: Django Template Language compatibility
 ---
 
-binja is designed to be a drop-in replacement for Django templates in JavaScript/TypeScript projects.
+binja implements a broad Django-compatible template subset for JavaScript/TypeScript projects. Validate advanced or custom Django templates during migration.
 
 ## Supported Tags
 
@@ -56,7 +56,7 @@ Django's `forloop` variables are fully supported:
 | `forloop.last` | True if last iteration |
 | `forloop.parentloop` | Parent loop context |
 
-```django
+```jinja
 {% for item in items %}
   <tr class="{% cycle 'odd' 'even' %}">
     <td>{{ forloop.counter }}</td>
@@ -73,7 +73,7 @@ All Django built-in filters are supported. See [Built-in Filters](/binja/guide/f
 
 Django-style (colon for arguments):
 
-```django
+```jinja
 {{ text|truncatechars:20 }}
 {{ list|join:", " }}
 {{ date|date:"Y-m-d" }}
@@ -113,14 +113,14 @@ const env = new Environment({
 
 Usage:
 
-```django
+```jinja
 <a href="{% url 'user_profile' id=user.id %}">Profile</a>
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
 ```
 
 ## CSRF Token
 
-```django
+```jinja
 <form method="POST">
   {% csrf_token %}
   <input type="text" name="username">
@@ -153,7 +153,7 @@ cp -r django_project/templates ./templates
 
 `{% load %}` tags are accepted but ignored (no-op):
 
-```django
+```jinja
 {% load static %}  {# Works, but doesn't load anything #}
 {% load i18n %}    {# Same #}
 ```

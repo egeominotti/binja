@@ -75,7 +75,7 @@ const app = new Elysia()
 ```
 
 **layouts/base.html**
-```django
+```jinja
 <!DOCTYPE html>
 <html>
 <head>

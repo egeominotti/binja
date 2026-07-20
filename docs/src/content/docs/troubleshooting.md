@@ -31,7 +31,7 @@ console.log(await Bun.file('./views/pages/home.html').exists())
 
 **Common issues:**
 
-```django
+```jinja
 {# Wrong - missing closing tag #}
 {% if user %}
   Hello {{ user.name }}
@@ -42,7 +42,7 @@ console.log(await Bun.file('./views/pages/home.html').exists())
 {% endif %}
 ```
 
-```django
+```jinja
 {# Wrong - missing endif #}
 {% if a %}{% if b %}...{% endif %}
 
@@ -58,7 +58,7 @@ console.log(await Bun.file('./views/pages/home.html').exists())
 
 **Solution:** Use `default` filter or check with `if`:
 
-```django
+```jinja
 {{ user.name|default:"Guest" }}
 
 {% if user %}
@@ -87,12 +87,12 @@ const env = new Environment({
 ### Filter argument syntax
 
 **Django style (colon):**
-```django
+```jinja
 {{ text|truncatechars:20 }}
 ```
 
 **Jinja2 style (parentheses):**
-```django
+```jinja
 {{ text|truncate(20) }}
 ```
 
@@ -106,7 +106,7 @@ Both work in binja.
 
 **Solution:** Use `|safe` on already-escaped content:
 
-```django
+```jinja
 {{ already_escaped_html|safe }}
 ```
 

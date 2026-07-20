@@ -235,8 +235,8 @@ const icons = {
 function generateHTML(
   id: string,
   data: DebugData,
-  c: typeof darkTheme,
-  opts: Required<PanelOptions>
+  _c: typeof darkTheme,
+  _opts: Required<PanelOptions>
 ): string {
   const time = (data.totalTime || 0).toFixed(1)
   const queryCount = data.queries?.length || 0
@@ -379,7 +379,7 @@ function renderTreeItem(key: string, ctx: ContextValue): string {
   const hasChildren = ctx.expandable && ctx.children && Object.keys(ctx.children).length > 0
   const arrowHtml = hasChildren
     ? `<span class="tree-arrow">${icons.arrow}</span>`
-    : '<span class="tree-arrow" style="visibility:hidden">${icons.arrow}</span>'
+    : `<span class="tree-arrow" style="visibility:hidden">${icons.arrow}</span>`
   const expandableClass = hasChildren ? 'expandable' : ''
   const valueClass = getValueClass(ctx.type)
 
@@ -545,7 +545,7 @@ function generateWarningsPane(data: DebugData): string {
   return `<div class="devtools-pane" data-pane="warnings"><div class="warning-list">${items}</div></div>`
 }
 
-function generateScript(id: string, data: DebugData, opts: Required<PanelOptions>): string {
+function generateScript(id: string, _data: DebugData, _opts: Required<PanelOptions>): string {
   return `
 (function() {
   var root = document.getElementById('${id}');

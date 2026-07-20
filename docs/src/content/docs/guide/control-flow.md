@@ -7,7 +7,7 @@ description: Conditionals, loops, and control statements
 
 ### if / elif / else
 
-```django
+```jinja
 {% if user.is_admin %}
   <span class="badge">Admin</span>
 {% elif user.is_staff %}
@@ -19,7 +19,7 @@ description: Conditionals, loops, and control statements
 
 ### Comparison Operators
 
-```django
+```jinja
 {% if age >= 18 %}Adult{% endif %}
 {% if status == "active" %}Active{% endif %}
 {% if count != 0 %}Has items{% endif %}
@@ -28,7 +28,7 @@ description: Conditionals, loops, and control statements
 
 ### Logical Operators
 
-```django
+```jinja
 {% if user and user.is_active %}
   Welcome back!
 {% endif %}
@@ -44,7 +44,7 @@ description: Conditionals, loops, and control statements
 
 ### Membership Test
 
-```django
+```jinja
 {% if "admin" in user.roles %}
   Admin panel link
 {% endif %}
@@ -58,7 +58,7 @@ description: Conditionals, loops, and control statements
 
 Empty values are falsy:
 
-```django
+```jinja
 {% if items %}     {# True if not empty #}
 {% if user %}      {# True if not null/undefined #}
 {% if count %}     {# True if not 0 #}
@@ -69,7 +69,7 @@ Empty values are falsy:
 
 ### Basic For Loop
 
-```django
+```jinja
 {% for item in items %}
   <li>{{ item }}</li>
 {% endfor %}
@@ -79,7 +79,7 @@ Empty values are falsy:
 
 Handle empty lists:
 
-```django
+```jinja
 {% for item in items %}
   <li>{{ item.name }}</li>
 {% empty %}
@@ -109,7 +109,7 @@ Handle empty lists:
 
 ### Using Loop Variables
 
-```django
+```jinja
 {% for item in items %}
   <li class="{% if loop.first %}first{% endif %} {% if loop.last %}last{% endif %}">
     {{ loop.index }}. {{ item.name }}
@@ -119,7 +119,7 @@ Handle empty lists:
 
 ### Nested Loops
 
-```django
+```jinja
 {% for category in categories %}
   <h2>{{ category.name }}</h2>
   <ul>
@@ -132,7 +132,7 @@ Handle empty lists:
 
 ### Loop with Condition
 
-```django
+```jinja
 {% for item in items if item.is_active %}
   <li>{{ item.name }}</li>
 {% endfor %}
@@ -140,7 +140,7 @@ Handle empty lists:
 
 ### Dictionary Iteration
 
-```django
+```jinja
 {% for key, value in data.items() %}
   <dt>{{ key }}</dt>
   <dd>{{ value }}</dd>
@@ -156,7 +156,7 @@ Handle empty lists:
 
 ### set
 
-```django
+```jinja
 {% set greeting = "Hello" %}
 {% set full_name = first_name ~ " " ~ last_name %}
 {{ greeting }}, {{ full_name }}!
@@ -166,7 +166,7 @@ Handle empty lists:
 
 Scoped variables (available only within block):
 
-```django
+```jinja
 {% with total = price * quantity %}
   Total: ${{ total|floatformat:2 }}
 {% endwith %}
@@ -175,7 +175,7 @@ Scoped variables (available only within block):
 
 ### Multiple Variables
 
-```django
+```jinja
 {% with a = 1, b = 2, c = 3 %}
   Sum: {{ a + b + c }}
 {% endwith %}
@@ -185,7 +185,7 @@ Scoped variables (available only within block):
 
 Output template syntax without processing:
 
-```django
+```jinja
 {% raw %}
   {{ this will not be processed }}
   {% neither will this %}
@@ -194,7 +194,7 @@ Output template syntax without processing:
 
 Django-style:
 
-```django
+```jinja
 {% verbatim %}
   {{ raw output }}
 {% endverbatim %}
@@ -202,7 +202,7 @@ Django-style:
 
 ## Comments
 
-```django
+```jinja
 {# This is a comment #}
 
 {#

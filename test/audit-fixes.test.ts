@@ -3,7 +3,7 @@
  * Grouped by cluster: quick-wins, security, per-render state, AOT.
  */
 import { describe, test, expect } from 'bun:test'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import { render, Environment, compile } from '../src'
 import { builtinTests } from '../src/tests'
 import * as liquid from '../src/engines/liquid'
@@ -141,6 +141,19 @@ describe('audit: security', () => {
       }
       expect(leaked).toBe(false)
     })
+
+    test('rejects a template symlink that escapes the root', async () => {
+      const outside = '/tmp/binja-audit-tt/symlink-secret.html'
+      const link = `${root}/linked.html`
+      writeFileSync(outside, 'SYMLINK SECRET')
+      try {
+        symlinkSync(outside, link)
+      } catch {
+        // The link may already exist from a previous interrupted run.
+      }
+
+      await expect(env.render('linked', {})).rejects.toThrow()
+    })
   })
 })
 
@@ -210,7 +223,7 @@ describe('audit: AOT compiler', () => {
   })
 
   test('function calls compile (were silently undefined)', () => {
-    expect(compile('{{ greet(name) }}')({ greet: (n: string) => 'Hi ' + n, name: 'A' })).toBe(
+    expect(compile('{{ greet(name) }}')({ greet: (n: string) => `Hi ${n}`, name: 'A' })).toBe(
       'Hi A'
     )
   })
@@ -239,7 +252,7 @@ describe('audit: AOT compiler', () => {
     const cases: Array<[string, Record<string, any>]> = [
       ['{% set x = 2 %}{{ x }}{{ x * 3 }}', {}],
       ['{% for i in xs %}{{ i }}-{{ loop.index }};{% endfor %}', { xs: ['a', 'b'] }],
-      ['{{ n|round(2) }}', { n: 3.14159 }],
+      ['{{ n|round(2) }}', { n: Math.PI }],
       ['{{ s|default("X") }}', { s: '' }],
       ['{{ items|length }}', { items: [1, 2, 3] }],
       ['{{ items|last }}', { items: [1, 2, 3] }],

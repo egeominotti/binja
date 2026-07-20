@@ -7,7 +7,7 @@ description: Template variables, expressions, and operators
 
 Output variables using double curly braces:
 
-```django
+```jinja
 {{ name }}
 {{ user.email }}
 {{ items[0] }}
@@ -17,7 +17,7 @@ Output variables using double curly braces:
 
 ### Dot Notation
 
-```django
+```jinja
 {{ user.name }}
 {{ user.profile.avatar }}
 {{ user.settings.theme }}
@@ -25,7 +25,7 @@ Output variables using double curly braces:
 
 ### Bracket Notation
 
-```django
+```jinja
 {{ data['key'] }}
 {{ data["key with spaces"] }}
 {{ items[0] }}
@@ -33,7 +33,7 @@ Output variables using double curly braces:
 
 ### Array Index (Django-style)
 
-```django
+```jinja
 {{ items.0 }}
 {{ items.1 }}
 {{ matrix.0.0 }}
@@ -43,7 +43,7 @@ Output variables using double curly braces:
 
 Apply filters with the pipe character:
 
-```django
+```jinja
 {{ name|upper }}
 {{ text|truncatechars:20 }}
 {{ price|floatformat:2 }}
@@ -51,7 +51,7 @@ Apply filters with the pipe character:
 
 ### Filter Chaining
 
-```django
+```jinja
 {{ name|lower|capitalize|truncatechars:30 }}
 {{ items|sort|reverse|join:", " }}
 ```
@@ -59,13 +59,13 @@ Apply filters with the pipe character:
 ### Filter Arguments
 
 **Django-style (colon):**
-```django
+```jinja
 {{ text|truncatechars:20 }}
 {{ text|replace:"old","new" }}
 ```
 
 **Jinja2-style (parentheses):**
-```django
+```jinja
 {{ text|truncate(20) }}
 {{ text|replace("old", "new") }}
 ```
@@ -83,7 +83,7 @@ Apply filters with the pipe character:
 | `<=` | Less than or equal |
 | `>=` | Greater than or equal |
 
-```django
+```jinja
 {% if age >= 18 %}Adult{% endif %}
 {% if status == "active" %}Active{% endif %}
 {% if count != 0 %}Has items{% endif %}
@@ -97,7 +97,7 @@ Apply filters with the pipe character:
 | `or` | Logical OR |
 | `not` | Logical NOT |
 
-```django
+```jinja
 {% if user and user.is_admin %}Admin{% endif %}
 {% if is_staff or is_admin %}Has access{% endif %}
 {% if not is_banned %}Welcome{% endif %}
@@ -105,21 +105,21 @@ Apply filters with the pipe character:
 
 ### Membership
 
-```django
+```jinja
 {% if "admin" in user.roles %}Admin{% endif %}
 {% if key in data %}Key exists{% endif %}
 ```
 
 ### String Concatenation
 
-```django
+```jinja
 {{ "Hello, " ~ name ~ "!" }}
 {{ first_name ~ " " ~ last_name }}
 ```
 
 ### Math
 
-```django
+```jinja
 {{ price * quantity }}
 {{ total + tax }}
 {{ count / 2 }}
@@ -130,7 +130,7 @@ Apply filters with the pipe character:
 
 Jinja2-style conditional expressions:
 
-```django
+```jinja
 {{ "Active" if is_active else "Inactive" }}
 {{ user.name if user else "Guest" }}
 {{ count if count > 0 else "None" }}
@@ -140,7 +140,7 @@ Jinja2-style conditional expressions:
 
 Check values with the `is` operator:
 
-```django
+```jinja
 {% if value is defined %}Defined{% endif %}
 {% if num is even %}Even{% endif %}
 {% if items is empty %}No items{% endif %}
@@ -153,13 +153,13 @@ See [Built-in Tests](/binja/guide/tests/) for all available tests.
 
 Undefined variables output empty string by default:
 
-```django
+```jinja
 {{ undefined_var }}  {# Outputs nothing #}
 ```
 
 Use `default` filter for fallback:
 
-```django
+```jinja
 {{ name|default:"Anonymous" }}
 {{ count|default:0 }}
 ```
@@ -173,7 +173,7 @@ Variables are resolved in this order:
 3. Template context
 4. Global variables
 
-```django
+```jinja
 {% set name = "Local" %}
 {% for name in names %}
   {{ name }}  {# Loop variable #}

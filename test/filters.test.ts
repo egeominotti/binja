@@ -104,7 +104,7 @@ describe('Filters', () => {
     })
 
     test('round', async () => {
-      expect(await render('{{ n|round:2 }}', { n: 3.14159 })).toBe('3.14')
+      expect(await render('{{ n|round:2 }}', { n: Math.PI })).toBe('3.14')
     })
 
     test('int', async () => {
@@ -116,7 +116,7 @@ describe('Filters', () => {
     })
 
     test('floatformat with decimals', async () => {
-      expect(await render('{{ n|floatformat:2 }}', { n: 3.14159 })).toBe('3.14')
+      expect(await render('{{ n|floatformat:2 }}', { n: Math.PI })).toBe('3.14')
     })
 
     test('floatformat without decimals', async () => {

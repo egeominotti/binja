@@ -167,7 +167,7 @@ export function wrapBunSQL<T extends object>(db: T): T {
       if (typeof value === 'function') {
         // Wrap query methods
         if (prop === 'query' || prop === 'run' || prop === 'prepare') {
-          return function (...args: any[]) {
+          return (...args: any[]) => {
             const collector = getDebugCollector()
             const sql = typeof args[0] === 'string' ? args[0] : 'SQL Query'
             const start = performance.now()
@@ -212,7 +212,7 @@ function wrapPreparedStatement(stmt: any, sql: string): any {
       const value = target[prop]
 
       if (typeof value === 'function' && (prop === 'all' || prop === 'get' || prop === 'run')) {
-        return function (...args: any[]) {
+        return (...args: any[]) => {
           const collector = getDebugCollector()
           const start = performance.now()
 

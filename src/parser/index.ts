@@ -51,6 +51,7 @@ export class Parser {
   private tokens: Token[]
   private current: number = 0
   private source?: string
+  private blockNames = new Set<string>()
 
   constructor(tokens: Token[], source?: string) {
     this.tokens = tokens
@@ -190,7 +191,7 @@ export class Parser {
 
     const body: ASTNode[] = []
     const elifs: Array<{ test: ExpressionNode; body: ASTNode[] }> = []
-    let else_: ASTNode[] = []
+    const else_: ASTNode[] = []
 
     // Parse body until elif/else/endif
     while (!this.isAtEnd()) {
@@ -282,7 +283,7 @@ export class Parser {
 
     // Parse body
     const body: ASTNode[] = []
-    let else_: ASTNode[] = []
+    const else_: ASTNode[] = []
 
     while (!this.isAtEnd()) {
       // DTL uses {% empty %}, Jinja uses {% else %}
@@ -328,6 +329,11 @@ export class Parser {
 
   private parseBlockTag(start: Token): BlockNode {
     const name = this.expect(TokenType.NAME).value
+    if (this.blockNames.has(name)) {
+      throw this.error(`Block '${name}' is defined more than once`)
+    }
+    this.blockNames.add(name)
+
     const scoped = this.check(TokenType.NAME) && this.peek().value === 'scoped'
     if (scoped) this.advance()
 
@@ -344,7 +350,12 @@ export class Parser {
     this.advance() // {%
     this.advance() // endblock
     // Optional block name after endblock
-    if (this.check(TokenType.NAME)) this.advance()
+    if (this.check(TokenType.NAME)) {
+      const endName = this.advance().value
+      if (endName !== name) {
+        throw this.error(`Expected endblock '${name}', got '${endName}'`)
+      }
+    }
     this.expect(TokenType.BLOCK_END)
 
     return {
@@ -671,7 +682,7 @@ export class Parser {
     this.expect(TokenType.BLOCK_END)
 
     const body: ASTNode[] = []
-    let else_: ASTNode[] = []
+    const else_: ASTNode[] = []
 
     while (!this.isAtEnd()) {
       if (this.checkBlockTag('else') || this.checkBlockTag('endifchanged')) break
@@ -835,7 +846,7 @@ export class Parser {
     }
 
     const body: ASTNode[] = []
-    let else_: ASTNode[] = []
+    const else_: ASTNode[] = []
     const endTag = negated ? 'endifnotequal' : 'endifequal'
 
     while (!this.isAtEnd()) {

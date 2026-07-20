@@ -2,7 +2,7 @@
  * Jinja2/DTL Lexer - Tokenizes template source into tokens
  * Compatible with both Jinja2 and Django Template Language
  */
-import { Token, TokenType, KEYWORDS, LexerState } from './tokens'
+import { type Token, TokenType, KEYWORDS, type LexerState } from './tokens'
 import { TemplateSyntaxError } from '../errors'
 
 export class Lexer {
@@ -13,6 +13,7 @@ export class Lexer {
   private blockEnd: string
   private commentStart: string
   private commentEnd: string
+  private trimNextWhitespace = false
 
   constructor(
     source: string,
@@ -52,9 +53,20 @@ export class Lexer {
   }
 
   private scanToken(): void {
+    if (this.trimNextWhitespace) {
+      this.skipWhitespace()
+      this.trimNextWhitespace = false
+      if (this.isAtEnd()) return
+    }
+
     // Check for template delimiters
     if (this.match(this.variableStart)) {
-      this.addToken(TokenType.VARIABLE_START, this.variableStart)
+      const wsControl = this.peek() === '-'
+      if (wsControl) {
+        this.trimPreviousText()
+        this.advance()
+      }
+      this.addToken(TokenType.VARIABLE_START, this.variableStart + (wsControl ? '-' : ''))
       this.scanExpression(this.variableEnd, TokenType.VARIABLE_END)
       return
     }
@@ -62,14 +74,17 @@ export class Lexer {
     if (this.match(this.blockStart)) {
       // Check for special block tags with whitespace control
       const wsControl = this.peek() === '-'
-      if (wsControl) this.advance()
+      if (wsControl) {
+        this.trimPreviousText()
+        this.advance()
+      }
 
       // Check for raw/verbatim block - capture content as-is until endraw/endverbatim
       const savedPos = this.state.pos
       this.skipWhitespace()
       if (this.checkWord('raw') || this.checkWord('verbatim')) {
         const tagName = this.checkWord('raw') ? 'raw' : 'verbatim'
-        this.scanRawBlock(tagName, wsControl)
+        this.scanRawBlock(tagName)
         return
       }
       // Reset position if not raw/verbatim
@@ -81,6 +96,10 @@ export class Lexer {
     }
 
     if (this.match(this.commentStart)) {
+      if (this.peek() === '-') {
+        this.trimPreviousText()
+        this.advance()
+      }
       this.scanComment()
       return
     }
@@ -101,7 +120,7 @@ export class Lexer {
     return !nextChar || !this.isAlphaNumeric(nextChar)
   }
 
-  private scanRawBlock(tagName: string, wsControl: boolean): void {
+  private scanRawBlock(tagName: string): void {
     const startLine = this.state.line
     const startColumn = this.state.column
 
@@ -112,7 +131,8 @@ export class Lexer {
     this.skipWhitespace()
 
     // Skip optional whitespace control before closing
-    if (this.peek() === '-') this.advance()
+    const trimContentStart = this.peek() === '-'
+    if (trimContentStart) this.advance()
 
     // Expect block end
     if (!this.match(this.blockEnd)) {
@@ -122,6 +142,7 @@ export class Lexer {
         source: this.state.source,
       })
     }
+    if (trimContentStart) this.skipWhitespace()
 
     // Now capture everything until {% endraw %} or {% endverbatim %}
     const endTag = `end${tagName}`
@@ -135,12 +156,14 @@ export class Lexer {
         const savedColumn = this.state.column
 
         this.match(this.blockStart)
-        if (this.peek() === '-') this.advance()
+        const trimContentEnd = this.peek() === '-'
+        if (trimContentEnd) this.advance()
         this.skipWhitespace()
 
         if (this.checkWord(endTag)) {
           // Found end tag - emit content as TEXT
-          const content = this.state.source.slice(contentStart, savedPos)
+          const rawContent = this.state.source.slice(contentStart, savedPos)
+          const content = trimContentEnd ? rawContent.replace(/[ \t\r\n]+$/, '') : rawContent
           if (content.length > 0) {
             this.state.tokens.push({
               type: TokenType.TEXT,
@@ -155,7 +178,8 @@ export class Lexer {
             this.advance()
           }
           this.skipWhitespace()
-          if (this.peek() === '-') this.advance()
+          const trimAfterRaw = this.peek() === '-'
+          if (trimAfterRaw) this.advance()
 
           if (!this.match(this.blockEnd)) {
             throw new TemplateSyntaxError(`Expected '${this.blockEnd}' after '${endTag}'`, {
@@ -164,6 +188,7 @@ export class Lexer {
               source: this.state.source,
             })
           }
+          this.trimNextWhitespace = trimAfterRaw
           return
         }
 
@@ -278,13 +303,16 @@ export class Lexer {
       this.skipWhitespace()
 
       // Check for whitespace control before end delimiter
+      let trimRight = false
       if (this.peek() === '-' && this.check(endDelimiter, 1)) {
         this.advance() // skip -
+        trimRight = true
       }
 
       // Check for end delimiter
       if (this.match(endDelimiter)) {
-        this.addToken(endTokenType, endDelimiter)
+        this.addToken(endTokenType, (trimRight ? '-' : '') + endDelimiter)
+        this.trimNextWhitespace = trimRight
         return
       }
 
@@ -496,7 +524,11 @@ export class Lexer {
 
   private scanComment(): void {
     // Skip until comment end
-    while (!this.isAtEnd() && !this.check(this.commentEnd)) {
+    while (
+      !this.isAtEnd() &&
+      !this.check(this.commentEnd) &&
+      !(this.peek() === '-' && this.check(this.commentEnd, 1))
+    ) {
       if (this.peek() === '\n') {
         this.state.line++
         this.state.column = 0
@@ -505,7 +537,20 @@ export class Lexer {
     }
 
     if (!this.isAtEnd()) {
+      const trimRight = this.peek() === '-'
+      if (trimRight) this.advance()
       this.match(this.commentEnd) // consume end delimiter
+      this.trimNextWhitespace = trimRight
+    }
+  }
+
+  private trimPreviousText(): void {
+    const previous = this.state.tokens.at(-1)
+    if (!previous || previous.type !== TokenType.TEXT) return
+
+    previous.value = previous.value.replace(/[ \t\r\n]+$/, '')
+    if (previous.value.length === 0) {
+      this.state.tokens.pop()
     }
   }
 

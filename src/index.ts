@@ -1,12 +1,12 @@
 /**
- * Jinja-Bun: Jinja2/Django Template Language engine for Bun/JavaScript
+ * binja: Jinja2/Django Template Language engine for Bun/JavaScript
  *
- * 100% compatible with Django Template Language (DTL)
+ * Broad Django Template Language (DTL) and Jinja2 syntax support
  * High performance template rendering for Bun runtime
  *
  * @example
  * ```typescript
- * import { Environment } from 'jinja-bun'
+ * import { Environment } from 'binja'
  *
  * const env = new Environment({
  *   templates: './templates',
@@ -20,15 +20,16 @@
  * ```
  */
 
-import { Lexer, Token, TokenType } from './lexer'
-import { Parser, TemplateNode } from './parser'
-import { Runtime, RuntimeOptions, Context } from './runtime'
-import { builtinFilters, FilterFunction } from './filters'
-import { compileToString, compileToFunction, CompileOptions } from './compiler'
-import { flattenTemplate, canFlatten, TemplateLoader } from './compiler/flattener'
-import { startDebugCollection, endDebugCollection, generateDebugPanel } from './debug'
+import { Lexer } from './lexer'
+import { Parser, type TemplateNode } from './parser'
+import { Runtime } from './runtime'
+import type { FilterFunction } from './filters'
+import { compileToString, compileToFunction, type CompileOptions } from './compiler'
+import { flattenTemplate, canFlatten, type TemplateLoader } from './compiler/flattener'
+import { generateDebugPanel, withDebugCollection } from './debug'
 import type { PanelOptions } from './debug'
-import * as path from 'path'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import * as path from 'node:path'
 
 // Pre-compiled regex for URL parameter replacement (avoid per-call compilation)
 const URL_PARAM_REGEX = /<[^>]+>|:[a-zA-Z_]+|\(\?P<[^>]+>\[[^\]]+\]\)/g
@@ -43,10 +44,35 @@ const URL_PARAM_REGEX = /<[^>]+>|:[a-zA-Z_]+|\(\?P<[^>]+>\[[^\]]+\]\)/g
 function resolveContained(root: string, name: string): string | null {
   const normalizedRoot = path.resolve(root)
   const resolved = path.resolve(normalizedRoot, name)
-  if (resolved !== normalizedRoot && !resolved.startsWith(normalizedRoot + path.sep)) {
+  if (!isPathInside(normalizedRoot, resolved)) {
     return null
   }
+
+  // Lexical containment alone is insufficient when a path component is a
+  // symlink. Resolve the closest existing ancestor so both existing files and
+  // not-yet-created candidates are checked against the real template root.
+  if (existsSync(normalizedRoot)) {
+    try {
+      const realRoot = realpathSync(normalizedRoot)
+      let existingPath = resolved
+      while (!existsSync(existingPath)) {
+        const parent = path.dirname(existingPath)
+        if (parent === existingPath) return null
+        existingPath = parent
+      }
+      if (!isPathInside(realRoot, realpathSync(existingPath))) {
+        return null
+      }
+    } catch {
+      return null
+    }
+  }
+
   return resolved
+}
+
+function isPathInside(root: string, candidate: string): boolean {
+  return candidate === root || candidate.startsWith(root + path.sep)
 }
 
 export interface EnvironmentOptions {
@@ -101,6 +127,11 @@ export class Environment {
   private cacheMisses: number = 0
 
   constructor(options: EnvironmentOptions = {}) {
+    const cacheMaxSize = options.cacheMaxSize ?? 100
+    if (!Number.isInteger(cacheMaxSize) || cacheMaxSize <= 0) {
+      throw new RangeError('cacheMaxSize must be a positive integer')
+    }
+
     this.options = {
       templates: options.templates ?? './templates',
       autoescape: options.autoescape ?? true,
@@ -109,7 +140,7 @@ export class Environment {
       urlResolver: options.urlResolver ?? this.defaultUrlResolver.bind(this),
       staticResolver: options.staticResolver ?? this.defaultStaticResolver.bind(this),
       cache: options.cache ?? true,
-      cacheMaxSize: options.cacheMaxSize ?? 100,
+      cacheMaxSize,
       extensions: options.extensions ?? ['.html', '.jinja', '.jinja2', ''],
       debug: options.debug ?? false,
       debugOptions: options.debugOptions ?? {},
@@ -156,22 +187,18 @@ export class Environment {
     templateName: string,
     context: Record<string, any>
   ): Promise<string> {
-    const collector = startDebugCollection()
-    collector.captureContext(context)
-    collector.addTemplate(templateName, 'root')
-    collector.setMode('runtime')
+    return withDebugCollection(async (collector) => {
+      collector.captureContext(context)
+      collector.addTemplate(templateName, 'root')
+      collector.setMode('runtime')
 
-    collector.startRender()
-    const ast = await this.loadTemplate(templateName)
-    let html = this.runtime.render(ast, context)
-    // Handle case where render might return a Promise
-    if (html && typeof (html as any).then === 'function') {
-      html = await (html as any)
-    }
-    collector.endRender()
+      collector.startRender()
+      const ast = await this.loadTemplate(templateName)
+      const html = await this.runtime.render(ast, context)
+      collector.endRender()
 
-    const data = endDebugCollection()!
-    return this.injectDebugPanel(String(html || ''), data)
+      return this.injectDebugPanel(String(html || ''), collector.getData())
+    })
   }
 
   /**
@@ -181,20 +208,17 @@ export class Environment {
     source: string,
     context: Record<string, any>
   ): Promise<string> {
-    const collector = startDebugCollection()
-    collector.captureContext(context)
-    collector.setMode('runtime')
+    return withDebugCollection(async (collector) => {
+      collector.captureContext(context)
+      collector.setMode('runtime')
 
-    collector.startRender()
-    const ast = this.compile(source)
-    let html = this.runtime.render(ast, context)
-    if (html && typeof (html as any).then === 'function') {
-      html = await (html as any)
-    }
-    collector.endRender()
+      collector.startRender()
+      const ast = this.compile(source)
+      const html = await this.runtime.render(ast, context)
+      collector.endRender()
 
-    const data = endDebugCollection()!
-    return this.injectDebugPanel(String(html || ''), data)
+      return this.injectDebugPanel(String(html || ''), collector.getData())
+    })
   }
 
   /**
@@ -255,7 +279,8 @@ export class Environment {
       // LRU eviction: remove oldest (first) entries if cache is full
       while (this.templateCache.size >= this.options.cacheMaxSize) {
         const oldestKey = this.templateCache.keys().next().value
-        if (oldestKey) this.templateCache.delete(oldestKey)
+        if (oldestKey === undefined) break
+        this.templateCache.delete(oldestKey)
       }
       this.templateCache.set(templateName, ast)
     }
@@ -336,7 +361,9 @@ export class Environment {
     for (const ext of this.options.extensions) {
       const fullPath = basePath + ext
       if (await Bun.file(fullPath).exists()) {
-        return fullPath
+        // Re-check the actual file (including its extension) so a symlinked
+        // template cannot escape after the extension search.
+        return resolveContained(this.options.templates, fullPath)
       }
     }
 
@@ -481,12 +508,8 @@ export async function compileWithInheritance(
       }
       for (const ext of extensions) {
         const fullPath = basePath + ext
-        const file = Bun.file(fullPath)
-        // Sync check - Bun.file().text() is async but we need sync for flattening
-        // Use require('fs') for sync file reading during compilation
-        const fs = require('fs')
-        if (fs.existsSync(fullPath)) {
-          return fs.readFileSync(fullPath, 'utf-8')
+        if (existsSync(fullPath) && resolveContained(templatesDir, fullPath) !== null) {
+          return readFileSync(fullPath, 'utf-8')
         }
       }
       throw new Error(`Template not found: ${name}`)
@@ -529,7 +552,6 @@ export async function compileWithInheritanceToCode(
 ): Promise<string> {
   const extensions = options.extensions ?? ['.html', '.jinja', '.jinja2', '']
   const templatesDir = path.resolve(options.templates)
-  const fs = require('fs')
 
   const loader: TemplateLoader = {
     load(name: string): string {
@@ -540,8 +562,8 @@ export async function compileWithInheritanceToCode(
       }
       for (const ext of extensions) {
         const fullPath = basePath + ext
-        if (fs.existsSync(fullPath)) {
-          return fs.readFileSync(fullPath, 'utf-8')
+        if (existsSync(fullPath) && resolveContained(templatesDir, fullPath) !== null) {
+          return readFileSync(fullPath, 'utf-8')
         }
       }
       throw new Error(`Template not found: ${name}`)

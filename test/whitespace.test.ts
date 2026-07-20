@@ -4,8 +4,6 @@
  *
  * Jinja2 Reference: https://jinja.palletsprojects.com/en/3.1.x/templates/#whitespace-control
  *
- * NOTE: Some tests are marked with .todo() or .skip() as they test features
- * that require implementation of full whitespace control in the lexer/parser/runtime.
  */
 import { describe, test, expect } from 'bun:test'
 import { Environment, render, Template } from '../src'
@@ -14,30 +12,27 @@ import { Lexer, TokenType } from '../src/lexer'
 describe('Whitespace Control', () => {
   // ==================== Block Tag Trimming ====================
   describe('Block Tag Trimming ({%- ... -%})', () => {
-    // These tests document expected Jinja2 whitespace trimming behavior
-    // They are marked as todo() until whitespace control is fully implemented
-
-    test.todo('trims left whitespace with {%-', async () => {
+    test('trims left whitespace with {%-', async () => {
       const result = await render('hello   {%- if true %} world{% endif %}', {})
       expect(result).toBe('hello world')
     })
 
-    test.todo('trims right whitespace with -%}', async () => {
+    test('trims right whitespace with -%}', async () => {
       const result = await render('{% if true -%}   hello{% endif %}', {})
       expect(result).toBe('hello')
     })
 
-    test.todo('trims both sides with {%- ... -%}', async () => {
+    test('trims both sides with {%- ... -%}', async () => {
       const result = await render('hello   {%- if true -%}   world   {%- endif -%}   !', {})
       expect(result).toBe('helloworld!')
     })
 
-    test.todo('trims newlines on left with {%-', async () => {
+    test('trims newlines on left with {%-', async () => {
       const result = await render('hello\n\n{%- if true %} world{% endif %}', {})
       expect(result).toBe('hello world')
     })
 
-    test.todo('trims newlines on right with -%}', async () => {
+    test('trims newlines on right with -%}', async () => {
       const result = await render('{% if true -%}\n\nhello{% endif %}', {})
       expect(result).toBe('hello')
     })
@@ -47,12 +42,12 @@ describe('Whitespace Control', () => {
       expect(result).toBe('hello    world')
     })
 
-    test.todo('trims tabs', async () => {
+    test('trims tabs', async () => {
       const result = await render('hello\t\t{%- if true %}\tworld{% endif %}', {})
       expect(result).toBe('hello\tworld')
     })
 
-    test.todo('trims mixed whitespace (spaces, tabs, newlines)', async () => {
+    test('trims mixed whitespace (spaces, tabs, newlines)', async () => {
       const result = await render('hello \t\n  {%- if true -%}  \t\n world{% endif %}', {})
       expect(result).toBe('helloworld')
     })
@@ -60,27 +55,27 @@ describe('Whitespace Control', () => {
 
   // ==================== Variable Output Trimming ====================
   describe('Variable Output Trimming ({{- ... -}})', () => {
-    test.todo('trims left whitespace with {{-', async () => {
+    test('trims left whitespace with {{-', async () => {
       const result = await render('hello   {{- name }}', { name: 'world' })
       expect(result).toBe('helloworld')
     })
 
-    test.todo('trims right whitespace with -}}', async () => {
+    test('trims right whitespace with -}}', async () => {
       const result = await render('{{ name -}}   !', { name: 'hello' })
       expect(result).toBe('hello!')
     })
 
-    test.todo('trims both sides with {{- ... -}}', async () => {
+    test('trims both sides with {{- ... -}}', async () => {
       const result = await render('hello   {{- name -}}   !', { name: 'world' })
       expect(result).toBe('helloworld!')
     })
 
-    test.todo('trims newlines on left with {{-', async () => {
+    test('trims newlines on left with {{-', async () => {
       const result = await render('hello\n\n{{- name }}', { name: 'world' })
       expect(result).toBe('helloworld')
     })
 
-    test.todo('trims newlines on right with -}}', async () => {
+    test('trims newlines on right with -}}', async () => {
       const result = await render('{{ name -}}\n\n!', { name: 'hello' })
       expect(result).toBe('hello!')
     })
@@ -90,12 +85,12 @@ describe('Whitespace Control', () => {
       expect(result).toBe('hello   world   !')
     })
 
-    test.todo('trims around filter expressions', async () => {
+    test('trims around filter expressions', async () => {
       const result = await render('hello   {{- name|upper -}}   !', { name: 'world' })
       expect(result).toBe('helloWORLD!')
     })
 
-    test.todo('trims around complex expressions', async () => {
+    test('trims around complex expressions', async () => {
       const result = await render('a   {{- x + y -}}   b', { x: 1, y: 2 })
       expect(result).toBe('a3b')
     })
@@ -103,22 +98,22 @@ describe('Whitespace Control', () => {
 
   // ==================== Comment Trimming ====================
   describe('Comment Trimming ({#- ... -#})', () => {
-    test.todo('trims left whitespace with {#-', async () => {
+    test('trims left whitespace with {#-', async () => {
       const result = await render('hello   {#- comment #}world', {})
       expect(result).toBe('helloworld')
     })
 
-    test.todo('trims right whitespace with -#}', async () => {
+    test('trims right whitespace with -#}', async () => {
       const result = await render('hello{# comment -#}   world', {})
       expect(result).toBe('helloworld')
     })
 
-    test.todo('trims both sides with {#- ... -#}', async () => {
+    test('trims both sides with {#- ... -#}', async () => {
       const result = await render('hello   {#- comment -#}   world', {})
       expect(result).toBe('helloworld')
     })
 
-    test.todo('trims newlines around comments', async () => {
+    test('trims newlines around comments', async () => {
       const result = await render('hello\n{#- comment -#}\nworld', {})
       expect(result).toBe('helloworld')
     })
@@ -128,7 +123,7 @@ describe('Whitespace Control', () => {
       expect(result).toBe('hello      world')
     })
 
-    test.todo('handles multiline comment with trimming', async () => {
+    test('handles multiline comment with trimming', async () => {
       const result = await render('hello   {#- line1\nline2\nline3 -#}   world', {})
       expect(result).toBe('helloworld')
     })
@@ -136,14 +131,14 @@ describe('Whitespace Control', () => {
 
   // ==================== For Loop Whitespace Control ====================
   describe('For Loop Whitespace Control', () => {
-    test.todo('removes extra whitespace in for loops', async () => {
+    test('removes extra whitespace in for loops', async () => {
       const result = await render('{%- for i in items -%}{{ i }}{%- endfor -%}', {
         items: [1, 2, 3],
       })
       expect(result).toBe('123')
     })
 
-    test.todo('produces clean output without extra newlines', async () => {
+    test('produces clean output without extra newlines', async () => {
       const template = `
 {%- for item in items -%}
 {{ item }}
@@ -165,7 +160,7 @@ describe('Whitespace Control', () => {
       expect(result).toBe('apple, banana, cherry')
     })
 
-    test.todo('handles nested loops with whitespace control', async () => {
+    test('handles nested loops with whitespace control', async () => {
       const template = `{%- for row in matrix -%}[{%- for col in row -%}{{ col }}{%- endfor -%}]{%- endfor -%}`
       const result = await render(template, {
         matrix: [
@@ -176,7 +171,7 @@ describe('Whitespace Control', () => {
       expect(result).toBe('[12][34]')
     })
 
-    test.todo('preserves intentional spacing in loop body', async () => {
+    test('preserves intentional spacing in loop body', async () => {
       const template = `{%- for item in items %}{{ item }} {% endfor -%}`
       const result = await render(template, { items: ['a', 'b', 'c'] })
       expect(result).toBe('a b c ')
@@ -185,18 +180,18 @@ describe('Whitespace Control', () => {
 
   // ==================== If Statement Whitespace Control ====================
   describe('If Statement Whitespace Control', () => {
-    test.todo('removes extra whitespace around if statements', async () => {
+    test('removes extra whitespace around if statements', async () => {
       const result = await render('start{%- if show -%}content{%- endif -%}end', { show: true })
       expect(result).toBe('startcontentend')
     })
 
-    test.todo('handles if-else with trimming', async () => {
+    test('handles if-else with trimming', async () => {
       const template = `start{%- if show -%}yes{%- else -%}no{%- endif -%}end`
       expect(await render(template, { show: true })).toBe('startyesend')
       expect(await render(template, { show: false })).toBe('startnoend')
     })
 
-    test.todo('handles if-elif-else with trimming', async () => {
+    test('handles if-elif-else with trimming', async () => {
       const template = `{%- if x == 1 -%}one{%- elif x == 2 -%}two{%- else -%}other{%- endif -%}`
       expect(await render(template, { x: 1 })).toBe('one')
       expect(await render(template, { x: 2 })).toBe('two')
@@ -217,14 +212,14 @@ describe('Whitespace Control', () => {
 
   // ==================== Block Tag Whitespace Control ====================
   describe('Block Tag Whitespace Control', () => {
-    test.todo('trims around block tags', async () => {
+    test('trims around block tags', async () => {
       const env = new Environment({ templates: '/tmp' })
       const base = `base   {%- block content -%}   default   {%- endblock -%}   end`
       const result = await env.renderString(base, {})
       expect(result).toBe('basedefaultend')
     })
 
-    test.todo('handles with tag trimming', async () => {
+    test('handles with tag trimming', async () => {
       const result = await render('start   {%- with x=1 -%}   {{ x }}   {%- endwith -%}   end', {})
       expect(result).toBe('start1end')
     })
@@ -280,12 +275,12 @@ describe('Whitespace Control', () => {
 
   // ==================== Mixed Content ====================
   describe('Mixed Trimmed and Non-Trimmed Tags', () => {
-    test.todo('mixes trimmed and non-trimmed tags', async () => {
+    test('mixes trimmed and non-trimmed tags', async () => {
       const result = await render('a   {{- x }}   {{ y -}}   z', { x: 'b', y: 'c' })
       expect(result).toBe('ab   cz')
     })
 
-    test.todo('handles complex mixed template', async () => {
+    test('handles complex mixed template', async () => {
       const template = `
 start
 {%- for item in items %}
@@ -297,12 +292,12 @@ end
       expect(result).toBe('\nstart123end\n')
     })
 
-    test.todo('selective trimming in loop', async () => {
+    test('selective trimming in loop', async () => {
       const template = `{%- for item in items -%}
   {{ item }}
 {%- endfor -%}`
       const result = await render(template, { items: ['a', 'b'] })
-      expect(result).toBe('  a\n  b\n')
+      expect(result).toBe('ab')
     })
   })
 
@@ -314,7 +309,7 @@ end
       expect(result).toBe('<ul><li>one</li><li>two</li><li>three</li></ul>')
     })
 
-    test.todo('HTML list with trimming for clean output', async () => {
+    test('HTML list with trimming for clean output', async () => {
       const template = `<ul>
 {%- for item in items %}
 <li>{{ item }}</li>
@@ -324,7 +319,7 @@ end
       expect(result).toBe('<ul>\n<li>one</li>\n<li>two</li>\n<li>three</li>\n</ul>')
     })
 
-    test.todo('inline elements without unwanted spaces', async () => {
+    test('inline elements without unwanted spaces', async () => {
       const template = `<span>{{- name -}}</span>`
       const result = await render(template, { name: 'John' })
       expect(result).toBe('<span>John</span>')
@@ -336,7 +331,7 @@ end
       expect(result).toBe('<span>John</span>')
     })
 
-    test.todo('clean attribute values', async () => {
+    test('clean attribute values', async () => {
       const template = `<div class="{%- if active -%}active{%- endif -%}">content</div>`
       const result = await render(template, { active: true })
       expect(result).toBe('<div class="active">content</div>')
@@ -345,7 +340,7 @@ end
 
   // ==================== Edge Cases ====================
   describe('Edge Cases', () => {
-    test.todo('handles empty content with trimming', async () => {
+    test('handles empty content with trimming', async () => {
       const result = await render('{%- if false -%}content{%- endif -%}', {})
       expect(result).toBe('')
     })
@@ -355,7 +350,7 @@ end
       expect(result).toBe('')
     })
 
-    test.todo('handles multiple consecutive trimmed tags', async () => {
+    test('handles multiple consecutive trimmed tags', async () => {
       const result = await render('{%- if true -%}{%- if true -%}x{%- endif -%}{%- endif -%}', {})
       expect(result).toBe('x')
     })
@@ -365,22 +360,22 @@ end
       expect(result).toBe('x')
     })
 
-    test.todo('handles trimming at template boundaries', async () => {
+    test('handles trimming at template boundaries', async () => {
       const result = await render('{%- if true -%}content{%- endif -%}', {})
       expect(result).toBe('content')
     })
 
-    test.todo('handles only whitespace between trimmed tags', async () => {
+    test('handles only whitespace between trimmed tags', async () => {
       const result = await render('{%- if true -%}   {%- endif -%}', {})
       expect(result).toBe('')
     })
 
-    test.todo('handles newline-only content between trimmed tags', async () => {
+    test('handles newline-only content between trimmed tags', async () => {
       const result = await render('{%- if true -%}\n\n\n{%- endif -%}', {})
       expect(result).toBe('')
     })
 
-    test.todo('trimming does not affect string literal content', async () => {
+    test('trimming does not affect string literal content', async () => {
       const result = await render('{{- "   hello   " -}}', {})
       expect(result).toBe('   hello   ')
     })
@@ -390,12 +385,12 @@ end
       expect(result).toBe('   hello   ')
     })
 
-    test.todo('handles trimming with filters', async () => {
+    test('handles trimming with filters', async () => {
       const result = await render('   {{- "hello"|upper -}}   ', {})
       expect(result).toBe('HELLO')
     })
 
-    test.todo('handles nested if with selective trimming', async () => {
+    test('handles nested if with selective trimming', async () => {
       const result = await render(
         'a{%- if true %} b {% if true -%}c{%- endif %} d{%- endif %}e',
         {}
@@ -413,7 +408,7 @@ end
       expect(blockStart?.value).toBe('{%-')
     })
 
-    test.todo('recognizes {{- variable start', () => {
+    test('recognizes {{- variable start', () => {
       const lexer = new Lexer('{{- name }}')
       const tokens = lexer.tokenize()
       const varStart = tokens.find((t) => t.type === TokenType.VARIABLE_START)
@@ -428,7 +423,7 @@ end
       expect(blockEnd).toBeDefined()
     })
 
-    test.todo('recognizes -}} variable end', () => {
+    test('recognizes -}} variable end', () => {
       const lexer = new Lexer('{{ name -}}')
       const tokens = lexer.tokenize()
       const varEnd = tokens.find((t) => t.type === TokenType.VARIABLE_END)
@@ -457,7 +452,7 @@ end
 
   // ==================== Template Class ====================
   describe('Template Class Whitespace Control', () => {
-    test.todo('Template function preserves whitespace control', async () => {
+    test('Template function preserves whitespace control', async () => {
       const tmpl = Template('hello   {{- name -}}   world')
       expect(await tmpl.render({ name: 'there' })).toBe('hellothereworld')
     })
@@ -467,7 +462,7 @@ end
       expect(await tmpl.render({ name: 'there' })).toBe('hello there world')
     })
 
-    test.todo('reusable template with whitespace control', async () => {
+    test('reusable template with whitespace control', async () => {
       const tmpl = Template('{%- for i in items -%}{{ i }}{%- endfor -%}')
       expect(await tmpl.render({ items: [1, 2, 3] })).toBe('123')
       expect(await tmpl.render({ items: ['a', 'b'] })).toBe('ab')
@@ -488,7 +483,7 @@ end
       expect(noTrim).toBe('abc')
     })
 
-    test.todo('demonstrates difference: multiline template trimming', async () => {
+    test('demonstrates difference: multiline template trimming', async () => {
       const items = [1, 2]
 
       const withTrim = `{%- for i in items -%}{{ i }}{%- endfor -%}`
@@ -499,7 +494,7 @@ end
 
   // ==================== Special Characters ====================
   describe('Special Characters Around Trim Markers', () => {
-    test.todo('handles unicode characters with trimming', async () => {
+    test('handles unicode characters with trimming', async () => {
       const result = await render('hello   {{- name -}}   world', { name: 'aloha' })
       expect(result).toBe('helloalohaworld')
     })
@@ -548,8 +543,8 @@ end
     })
   })
 
-  // ==================== Current Implementation Behavior ====================
-  describe('Current Implementation Behavior (without full whitespace control)', () => {
+  // ==================== Non-trimmed Behavior ====================
+  describe('Non-trimmed behavior', () => {
     test('block tags preserve surrounding whitespace', async () => {
       const result = await render('a   {% if true %}b{% endif %}   c', {})
       expect(result).toBe('a   b   c')

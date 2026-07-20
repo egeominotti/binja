@@ -180,7 +180,7 @@ export class LiquidLexer {
       this.skipWhitespace()
 
       // Check for whitespace control -}} or -%}
-      if (this.peek() === '-' && this.check('-' + closeTag)) {
+      if (this.peek() === '-' && this.check(`-${closeTag}`)) {
         this.advance() // skip -
       }
 

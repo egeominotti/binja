@@ -30,7 +30,7 @@ await render('{{ script }}', {
 
 Use `|safe` only for trusted content:
 
-```django
+```jinja
 {{ trusted_html|safe }}
 ```
 
@@ -40,7 +40,7 @@ Use `|safe` only for trusted content:
 
 ### 1. Never Trust User Input
 
-```django
+```jinja
 {# DANGEROUS - XSS vulnerability #}
 {{ user_comment|safe }}
 
@@ -65,7 +65,7 @@ await env.render('page.html', {
 
 For forms, include CSRF tokens:
 
-```django
+```jinja
 <form method="POST">
   {% csrf_token %}
   <input name="email" value="{{ email }}">
@@ -77,7 +77,7 @@ For forms, include CSRF tokens:
 
 When embedding data in JavaScript:
 
-```django
+```jinja
 <script>
   // Use json filter for safe JSON embedding
   const data = {{ data|json|safe }};
@@ -94,7 +94,7 @@ When embedding data in JavaScript:
 
 URL-encode user data in URLs:
 
-```django
+```jinja
 <a href="/search?q={{ query|urlencode }}">Search</a>
 ```
 

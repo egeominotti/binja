@@ -25,7 +25,7 @@ export const odd: TestFunction = (value) => {
 }
 
 export const number: TestFunction = (value) => {
-  return typeof value === 'number' && !isNaN(value)
+  return typeof value === 'number' && !Number.isNaN(value)
 }
 
 export const integer: TestFunction = (value) => {
@@ -33,7 +33,7 @@ export const integer: TestFunction = (value) => {
 }
 
 export const float: TestFunction = (value) => {
-  return typeof value === 'number' && !Number.isInteger(value) && !isNaN(value)
+  return typeof value === 'number' && !Number.isInteger(value) && !Number.isNaN(value)
 }
 
 // Comparison tests

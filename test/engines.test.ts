@@ -230,6 +230,29 @@ describe('Liquid Engine', () => {
       )
       expect(result).toBe('Empty')
     })
+
+    test('for with limit', async () => {
+      const result = await liquid.render('{% for item in items limit: 2 %}{{ item }}{% endfor %}', {
+        items: ['a', 'b', 'c', 'd'],
+      })
+      expect(result).toBe('ab')
+    })
+
+    test('for with offset and limit', async () => {
+      const result = await liquid.render(
+        '{% for item in items offset: 1 limit: amount %}{{ item }}{% endfor %}',
+        { items: ['a', 'b', 'c', 'd'], amount: 2 }
+      )
+      expect(result).toBe('bc')
+    })
+
+    test('for with reversed', async () => {
+      const result = await liquid.render(
+        '{% for item in items limit: 3 reversed %}{{ item }}{% endfor %}',
+        { items: ['a', 'b', 'c', 'd'] }
+      )
+      expect(result).toBe('cba')
+    })
   })
 
   describe('Assign Tag', () => {

@@ -68,7 +68,7 @@ const app = new Elysia()
 ```
 
 **views/components/item.html**
-```django
+```jinja
 <li id="item-{{ item.id }}" class="item">
   {{ item.name }}
   <button hx-delete="/items/{{ item.id }}"
@@ -146,7 +146,7 @@ async function sendWelcomeEmail(user: User) {
 ```
 
 **emails/welcome.html**
-```django
+```jinja
 <!DOCTYPE html>
 <html>
 <head>
@@ -234,7 +234,7 @@ async function generateInvoice(invoice: Invoice) {
 ```
 
 **templates/invoice.html**
-```django
+```jinja
 <!DOCTYPE html>
 <html>
 <head>
