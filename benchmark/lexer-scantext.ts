@@ -134,7 +134,11 @@ const templates = {
 }
 
 // Benchmark function
-function benchmark(name: string, fn: () => void, iterations: number = 10000): { opsPerSec: number; avgMs: number } {
+function benchmark(
+  _name: string,
+  fn: () => void,
+  iterations: number = 10000
+): { opsPerSec: number; avgMs: number } {
   // Warmup
   for (let i = 0; i < 100; i++) fn()
 
@@ -152,12 +156,15 @@ function benchmark(name: string, fn: () => void, iterations: number = 10000): { 
 }
 
 // Run benchmarks
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log('LEXER scanText() BENCHMARK')
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log()
 
-const results: Record<string, { chars: number; delimiters: number; opsPerSec: number; avgMs: number }> = {}
+const results: Record<
+  string,
+  { chars: number; delimiters: number; opsPerSec: number; avgMs: number }
+> = {}
 
 for (const [name, template] of Object.entries(templates)) {
   // Count characteristics
@@ -173,32 +180,34 @@ for (const [name, template] of Object.entries(templates)) {
 
   results[name] = { chars, delimiters, opsPerSec, avgMs }
 
-  const delimiterRatio = ((delimiters * 2) / chars * 100).toFixed(1)
+  const delimiterRatio = (((delimiters * 2) / chars) * 100).toFixed(1)
   console.log(`📊 ${name}`)
-  console.log(`   Template: ${chars} chars, ${delimiters} delimiters (${delimiterRatio}% delimiter density)`)
+  console.log(
+    `   Template: ${chars} chars, ${delimiters} delimiters (${delimiterRatio}% delimiter density)`
+  )
   console.log(`   Performance: ${opsPerSec.toLocaleString()} ops/sec (${avgMs.toFixed(4)} ms/op)`)
   console.log()
 }
 
 // Summary table
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log('SUMMARY')
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log()
 console.log('| Template        | Chars  | Delims | Density | Ops/sec    | ms/op   |')
 console.log('|-----------------|--------|--------|---------|------------|---------|')
 
 for (const [name, data] of Object.entries(results)) {
-  const density = ((data.delimiters * 2) / data.chars * 100).toFixed(1)
+  const density = (((data.delimiters * 2) / data.chars) * 100).toFixed(1)
   console.log(
     `| ${name.padEnd(15)} | ${String(data.chars).padStart(6)} | ${String(data.delimiters).padStart(6)} | ${density.padStart(6)}% | ${data.opsPerSec.toLocaleString().padStart(10)} | ${data.avgMs.toFixed(4).padStart(7)} |`
   )
 }
 
 console.log()
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log('ANALYSIS')
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log()
 
 // Calculate optimization potential
@@ -215,9 +224,9 @@ console.log('- Delimiter-dense: LOW potential (frequent delimiter checks unavoid
 console.log()
 
 // Detailed timing breakdown
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log('DETAILED TIMING: Character processing rate')
-console.log('=' .repeat(70))
+console.log('='.repeat(70))
 console.log()
 
 for (const [name, data] of Object.entries(results)) {

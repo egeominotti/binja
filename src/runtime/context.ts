@@ -96,6 +96,10 @@ export class Context {
   private _currentForloop: ForLoop | null = null
   // Cache the current scope for faster set() operations
   private _currentScope: Record<string, any>
+  // Cache the nearest scope index for each resolved name. A fresh cache is used
+  // at each scope depth, so shadowing and pop() restore the correct bindings.
+  private _lookupCache: Record<string, number> = Object.create(null)
+  private _lookupCacheStack: Array<Record<string, number>> = []
 
   // Optimized: use object spread instead of Object.create(null) + assign - 10-15% faster
   constructor(data: Record<string, any> = {}, parent: Context | null = null) {
@@ -110,41 +114,53 @@ export class Context {
       return this._currentForloop
     }
 
-    // Search in current scopes (innermost first) - using 'in' operator on plain objects
-    for (let i = this.scopes.length - 1; i >= 0; i--) {
-      const scope = this.scopes[i]
-      if (name in scope) {
-        return scope[name]
-      }
-    }
-
-    // Search in parent context
-    return this.parent ? this.parent.get(name) : undefined
+    const scopeIndex = this.resolveScope(name)
+    return scopeIndex >= 0
+      ? this.scopes[scopeIndex][name]
+      : this.parent
+        ? this.parent.get(name)
+        : undefined
   }
 
   set(name: string, value: any): void {
     // Direct property assignment on cached current scope
     this._currentScope[name] = value
+    this._lookupCache[name] = this.scopes.length - 1
   }
 
   has(name: string): boolean {
-    for (let i = this.scopes.length - 1; i >= 0; i--) {
-      if (name in this.scopes[i]) return true
-    }
-    return this.parent ? this.parent.has(name) : false
+    return this.resolveScope(name) >= 0 || (this.parent ? this.parent.has(name) : false)
   }
 
   // Optimized: use object spread - 10-15% faster than Object.create(null) + assign
   push(data: Record<string, any> = {}): void {
     this._currentScope = { ...data }
     this.scopes.push(this._currentScope)
+    this._lookupCacheStack.push(this._lookupCache)
+    this._lookupCache = Object.create(null)
   }
 
   pop(): void {
     if (this.scopes.length > 1) {
       this.scopes.pop()
       this._currentScope = this.scopes[this.scopes.length - 1]
+      this._lookupCache = this._lookupCacheStack.pop() ?? Object.create(null)
     }
+  }
+
+  private resolveScope(name: string): number {
+    const cached = this._lookupCache[name]
+    if (cached !== undefined) return cached
+
+    for (let i = this.scopes.length - 1; i >= 0; i--) {
+      if (name in this.scopes[i]) {
+        this._lookupCache[name] = i
+        return i
+      }
+    }
+
+    this._lookupCache[name] = -1
+    return -1
   }
 
   derived(data: Record<string, any> = {}): Context {

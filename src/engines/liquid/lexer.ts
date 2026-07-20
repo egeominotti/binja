@@ -40,6 +40,9 @@ export interface LiquidToken {
   column: number
 }
 
+const RAW_OPEN_PATTERN = /\{%\s*raw\s*%\}/y
+const RAW_END_PATTERN = /\{%\s*endraw\s*%\}/g
+
 export class LiquidLexer {
   private source: string
   private pos: number = 0
@@ -91,19 +94,18 @@ export class LiquidLexer {
   }
 
   private checkRawTag(): boolean {
-    // Check for {% raw %}
-    const remaining = this.source.slice(this.pos)
-    return /^\{%\s*raw\s*%\}/.test(remaining)
+    RAW_OPEN_PATTERN.lastIndex = this.pos
+    return RAW_OPEN_PATTERN.test(this.source)
   }
 
   private scanRawBlock(): void {
     // Match {% raw %}
-    const rawMatch = this.source.slice(this.pos).match(/^\{%\s*raw\s*%\}/)
+    RAW_OPEN_PATTERN.lastIndex = this.pos
+    const rawMatch = RAW_OPEN_PATTERN.exec(this.source)
     if (!rawMatch) return
 
     const rawOpen = rawMatch[0]
-    this.pos += rawOpen.length
-    this.column += rawOpen.length
+    this.advanceTo(this.pos + rawOpen.length)
 
     // Add tokens for {% raw %}
     this.addToken(LiquidTokenType.TAG_START, '{%')
@@ -115,17 +117,9 @@ export class LiquidLexer {
     const startLine = this.line
     const startColumn = this.column
 
-    while (!this.isAtEnd()) {
-      const remaining = this.source.slice(this.pos)
-      if (/^\{%\s*endraw\s*%\}/.test(remaining)) {
-        break
-      }
-      if (this.peek() === '\n') {
-        this.line++
-        this.column = 0
-      }
-      this.advance()
-    }
+    RAW_END_PATTERN.lastIndex = this.pos
+    const endMatch = RAW_END_PATTERN.exec(this.source)
+    this.advanceTo(endMatch?.index ?? this.source.length)
 
     // Add raw content as TEXT
     if (this.pos > contentStart) {
@@ -139,11 +133,9 @@ export class LiquidLexer {
     }
 
     // Match {% endraw %}
-    const endMatch = this.source.slice(this.pos).match(/^\{%\s*endraw\s*%\}/)
     if (endMatch) {
       const endRaw = endMatch[0]
-      this.pos += endRaw.length
-      this.column += endRaw.length
+      this.advanceTo(this.pos + endRaw.length)
       this.addToken(LiquidTokenType.TAG_START, '{%')
       this.addToken(LiquidTokenType.ID, 'endraw')
       this.addToken(LiquidTokenType.TAG_END, '%}')
@@ -155,11 +147,16 @@ export class LiquidLexer {
     const startLine = this.line
     const startColumn = this.column
 
-    while (!this.isAtEnd() && !this.check('{{') && !this.check('{%')) {
-      if (this.peek() === '\n') {
-        this.line++
-        this.column = 0
+    while (!this.isAtEnd()) {
+      const nextBrace = this.source.indexOf('{', this.pos)
+      if (nextBrace === -1) {
+        this.advanceTo(this.source.length)
+        break
       }
+
+      this.advanceTo(nextBrace)
+      if (this.check('{{') || this.check('{%')) break
+
       this.advance()
     }
 
@@ -388,6 +385,16 @@ export class LiquidLexer {
     this.pos++
     this.column++
     return c
+  }
+
+  private advanceTo(target: number): void {
+    while (this.pos < target) {
+      if (this.source[this.pos] === '\n') {
+        this.line++
+        this.column = 0
+      }
+      this.advance()
+    }
   }
 
   private check(expected: string): boolean {
