@@ -1,204 +1,75 @@
 ---
-title: Handlebars Engine
-description: Handlebars template syntax support
+title: Handlebars subset
+description: Supported Handlebars-style syntax and explicit compatibility boundaries.
 ---
 
-binja supports Handlebars template syntax through a dedicated engine.
-
-## Installation
-
-Handlebars support is included with binja:
-
-```bash
-bun add binja
-```
-
-## Basic Usage
-
-```typescript
+```ts
 import * as handlebars from 'binja/engines/handlebars'
 
-const html = await handlebars.render('Hello {{name}}!', { name: 'World' })
-// Output: Hello World!
+const html = await handlebars.render('Hello {{name}}!', { name: 'Ada' })
 ```
 
-## Syntax
+## Supported syntax
 
-### Variables
+### Output and paths
 
 ```handlebars
 {{name}}
-{{user.email}}
-{{items.[0]}}
+{{user.address.city}}
+{{user/name}}
+{{{trustedHtml}}}
+{{! inline comment }}
+{{!-- block comment --}}
 ```
 
-### Unescaped Output
+Double braces use the shared HTML autoescape. Triple braces mark the value trusted; never use them for unsanitized input.
 
-Use triple braces for unescaped HTML:
+### Conditions
 
 ```handlebars
-{{{rawHtml}}}
+{{#if enabled}}Enabled{{else}}Disabled{{/if}}
+{{#unless hidden}}Visible{{else}}Hidden{{/unless}}
 ```
 
-### Comments
+### Iteration
 
 ```handlebars
-{{! This is a comment }}
-
-{{!--
-  This is a
-  multi-line comment
---}}
-```
-
-## Control Structures
-
-### if / else
-
-```handlebars
-{{#if user}}
-  Hello {{user.name}}!
+{{#each items}}
+  {{@index}}: {{this}}
+  {{#if @first}}first{{/if}}
+  {{#if @last}}last{{/if}}
 {{else}}
-  Hello Guest!
-{{/if}}
-```
-
-### unless
-
-```handlebars
-{{#unless isAdmin}}
-  <p>You don't have admin access.</p>
-{{/unless}}
-```
-
-### each
-
-```handlebars
-{{#each items}}
-  <li>{{this}}</li>
+  Empty
 {{/each}}
 ```
 
-With index:
+Supported metadata is translated to the shared loop object, including `@index`, `@first`, and `@last`.
 
-```handlebars
-{{#each items}}
-  <li>{{@index}}: {{this}}</li>
-{{/each}}
-```
-
-With else (empty):
-
-```handlebars
-{{#each items}}
-  <li>{{this}}</li>
-{{else}}
-  <li>No items found</li>
-{{/each}}
-```
-
-### with
+### Context blocks
 
 ```handlebars
 {{#with user}}
-  <p>Name: {{name}}</p>
-  <p>Email: {{email}}</p>
+  {{this.name}} — {{this.email}}
 {{/with}}
 ```
 
-## Loop Variables
+Use explicit `this` paths inside `with`/`each` for portable behavior within this implementation.
 
-| Variable | Description |
-|----------|-------------|
-| `@index` | Zero-based index |
-| `@first` | True if first iteration |
-| `@last` | True if last iteration |
-| `@key` | Key for object iteration |
+## API
 
-```handlebars
-{{#each items}}
-  <li class="{{#if @first}}first{{/if}} {{#if @last}}last{{/if}}">
-    {{@index}}: {{this}}
-  </li>
-{{/each}}
+```ts
+const ast = handlebars.parse(source)
+const renderCached = handlebars.compile(source)
+const html = await renderCached(context)
 ```
 
-## Helpers
+`compile()` caches the parsed AST and remains asynchronous; it is not core AOT.
 
-### Built-in Helpers
+## Compatibility boundaries
 
-binja's Handlebars engine supports:
+- No custom-helper registration API is exposed. A callable intentionally placed in context may be invoked by supported expression syntax, but this is not Handlebars.js helper resolution.
+- Partial syntax can be parsed, but the direct API has no partial registry/loader, so partial rendering is not supported.
+- Block parameters, decorators, data frames beyond documented loop metadata, whitespace semantics, subexpressions, and upstream plugin behavior are not guaranteed.
+- Mismatched or unclosed blocks produce syntax errors instead of being silently accepted.
 
-- `if`, `unless`
-- `each`
-- `with`
-
-### Using binja Filters
-
-All 84+ binja filters work in Handlebars:
-
-```typescript
-const html = await handlebars.render('{{name}}', { name: 'world' })
-```
-
-For filters in Handlebars, use the context:
-
-```typescript
-const html = await handlebars.render('{{upper name}}', {
-  name: 'world',
-  upper: (s: string) => s.toUpperCase()
-})
-```
-
-## Partials
-
-```handlebars
-{{>header}}
-
-<main>
-  {{>content}}
-</main>
-
-{{>footer}}
-```
-
-Register partials:
-
-```typescript
-import * as handlebars from 'binja/engines/handlebars'
-
-// Coming soon: partial registration
-```
-
-## Comparison with Jinja2
-
-| Feature | Handlebars | Jinja2 |
-|---------|------------|--------|
-| Variables | `{{var}}` | `{{ var }}` |
-| Unescaped | `{{{var}}}` | `{{ var\|safe }}` |
-| If | `{{#if}}` | `{% if %}` |
-| Loop | `{{#each}}` | `{% for %}` |
-| Comments | `{{! }}` | `{# #}` |
-| Filters | helpers | `\|filter` |
-
-## Migration from Handlebars.js
-
-```typescript
-// Before: Handlebars.js
-import Handlebars from 'handlebars'
-const template = Handlebars.compile(source)
-const html = template(context)
-
-// After: binja
-import * as handlebars from 'binja/engines/handlebars'
-const html = await handlebars.render(source, context)
-```
-
-## Performance
-
-Handlebars templates in binja benefit from:
-
-- Same optimized runtime as Jinja2
-- Same 84+ built-in filters
-- Template caching
-- AOT compilation support
+Use upstream Handlebars when a project depends on its complete helper/partial ecosystem.

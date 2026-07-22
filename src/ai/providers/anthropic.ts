@@ -6,6 +6,7 @@ import type { AIProvider } from '../types'
 
 export function createAnthropicProvider(model?: string, apiKey?: string): AIProvider {
   const key = apiKey || process.env.ANTHROPIC_API_KEY
+  const selectedModel = model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
 
   return {
     name: 'anthropic',
@@ -19,7 +20,7 @@ export function createAnthropicProvider(model?: string, apiKey?: string): AIProv
       const client = new Anthropic({ apiKey: key })
 
       const response = await client.messages.create({
-        model: model || 'claude-sonnet-4-20250514',
+        model: selectedModel,
         max_tokens: 1500,
         messages: [
           {

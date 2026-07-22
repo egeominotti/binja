@@ -98,14 +98,14 @@ Handle empty lists:
 | `loop.length` | Total number of items |
 | `loop.revindex` | Iterations remaining (1-indexed) |
 | `loop.revindex0` | Iterations remaining (0-indexed) |
-| `loop.parent` | Parent loop context |
+| `loop.parentloop` | Parent loop context |
 
 **Django aliases:**
 - `forloop.counter` = `loop.index`
 - `forloop.counter0` = `loop.index0`
 - `forloop.first` = `loop.first`
 - `forloop.last` = `loop.last`
-- `forloop.parentloop` = `loop.parent`
+- `forloop.parentloop` = `loop.parentloop`
 
 ### Using Loop Variables
 
@@ -124,29 +124,25 @@ Handle empty lists:
   <h2>{{ category.name }}</h2>
   <ul>
     {% for item in category.items %}
-      <li>{{ loop.parent.index }}.{{ loop.index }} - {{ item }}</li>
+      <li>{{ loop.parentloop.index }}.{{ loop.index }} - {{ item }}</li>
     {% endfor %}
   </ul>
 {% endfor %}
 ```
 
-### Loop with Condition
+### Filtering inside a loop
 
 ```jinja
-{% for item in items if item.is_active %}
-  <li>{{ item.name }}</li>
+{% for item in items %}
+  {% if item.is_active %}<li>{{ item.name }}</li>{% endif %}
 {% endfor %}
 ```
 
 ### Dictionary Iteration
 
-```jinja
-{% for key, value in data.items() %}
-  <dt>{{ key }}</dt>
-  <dd>{{ value }}</dd>
-{% endfor %}
+Use the `items` filter for JavaScript objects:
 
-{# Or with items filter #}
+```jinja
 {% for key, value in data|items %}
   {{ key }}: {{ value }}
 {% endfor %}
@@ -181,7 +177,7 @@ Scoped variables (available only within block):
 {% endwith %}
 ```
 
-## Raw Output
+## Literal template syntax
 
 Output template syntax without processing:
 

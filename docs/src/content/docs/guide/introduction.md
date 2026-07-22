@@ -1,88 +1,76 @@
 ---
 title: Introduction
-description: What is binja and why should you use it?
+description: Binja's execution modes, compatibility scope, and intended use.
 ---
 
-**binja** is a high-performance Jinja2/Django Template Language engine built specifically for the [Bun](https://bun.sh) runtime. It supports a broad Django/Jinja-compatible subset while being 2-4x faster than Nunjucks in the published runtime benchmarks and up to **160x faster** with AOT (Ahead-of-Time) compilation.
+Binja is a Bun-first TypeScript template engine. Its default syntax combines a tested subset of Jinja expressions with common Django Template Language tags and aliases.
 
-## Key Features
+## Capabilities
 
-### Performance
+- asynchronous source-string and loader-backed rendering;
+- synchronous AOT functions for the supported static subset;
+- inheritance, includes, blocks, `block.super`, and LRU caching through `Environment`;
+- autoescape by default, explicit safe strings, HTML-safe JSON, and protected property access;
+- 91 filter registry entries and 35 test entries, including aliases;
+- Hono and Elysia adapters;
+- CLI compilation/check/lint workflows;
+- debug collection and optional AI-assisted linting;
+- Handlebars, Liquid, and Twig compatibility subsets.
 
-- **2-4x faster** than Nunjucks in runtime mode
-- **160x faster** with AOT compilation for production
-- Pure TypeScript implementation optimized for Bun
-- Inline filter optimization for ~70 common filters
+## Compatibility is a tested subset
 
-### Compatibility
+Binja does not claim complete Django, Jinja2, Handlebars, Liquid, or Twig compatibility. Upstream engines include extension APIs and host-specific behavior that Binja does not expose. Unsupported syntax should fail explicitly rather than disappear from output.
 
-- Broad **Django Template Language (DTL)** support
-- Extensive Jinja2 syntax support
-- Familiar migration path for Django templates in JavaScript
+| Module | Intended scope | Important boundary |
+|---|---|---|
+| Core Jinja/DTL | Common variables, expressions, control flow, filters/tests, inheritance, includes, and selected Django tags | No Python extension ecosystem or complete upstream syntax |
+| Handlebars | Variables, escaped/triple output, comments, `if`, `unless`, `each`, `with`, loop metadata | No custom-helper or partial registration API |
+| Liquid | Common expressions, filters, `if`/`unless`/`case`, loops/modifiers/ranges, `assign`, `capture`, counters | No Shopify object/theme runtime; `break`/`continue` rejected |
+| Twig | Common Jinja-like syntax plus `elseif`, `? :`, `??`, Twig filter aliases, `divisible by` | No Symfony extensions, macros, namespaces, or loader API in the Twig module |
 
-### Multi-Engine Support
+## Rendering modes
 
-binja uniquely supports multiple template syntaxes through a unified API:
+### Runtime
 
-| Engine | Syntax | Use Case |
-|--------|--------|----------|
-| **Jinja2/DTL** | `{{ var }}` `{% if %}` | Python/Django projects |
-| **Handlebars** | `{{var}}` `{{#if}}` | JavaScript ecosystem |
-| **Liquid** | `{{ var }}` `{% if %}` | Shopify, Jekyll |
-| **Twig** | `{{ var }}` `{% if %}` | PHP/Symfony projects |
-
-All engines share the same 84+ built-in filters and runtime optimizations.
-
-### Developer Experience
-
-- **84 built-in filters** covering string, number, date, list, URL operations
-- **28 built-in tests** for the `is` operator
-- **Debug panel** similar to Django Debug Toolbar
-- **AI-powered linting** for security, performance, and accessibility
-- **CLI tool** for compilation, checking, and watching templates
-- **Framework adapters** for Hono and Elysia
-
-## Two Rendering Modes
-
-binja supports two rendering modes to optimize for different use cases:
-
-### Runtime Mode
-
-Best for development and templates with dynamic inheritance.
-
-```typescript
+```ts
 import { render } from 'binja'
 
-const html = await render('Hello, {{ name }}!', { name: 'World' })
+const html = await render('Hello {{ name }}', { name: 'Ada' })
 ```
 
-### AOT Mode
+Use `Environment` for file loading, includes, inheritance, cache management, resolvers, globals, custom filters, timezone handling, or debug mode.
 
-Best for production - pre-compile templates to JavaScript functions.
+### AOT
 
-```typescript
+```ts
 import { compile } from 'binja'
 
-// Compile once at startup
-const template = compile('<h1>{{ title|upper }}</h1>')
-
-// Render synchronously (extremely fast)
-const html = template({ title: 'welcome' })
-// Output: <h1>WELCOME</h1>
+const renderCard = compile('<article>{{ title|upper }}</article>')
+const html = renderCard({ title: 'News' })
 ```
 
-## When to Use binja
+AOT rendering is synchronous after compilation. It supports the common expression/control-flow subset and built-in filter/test registries. Dynamic template loading, URL/static resolver tags, and runtime-only nodes must use `Environment`.
 
-binja is ideal for:
+### Static inheritance AOT
 
-- **Bun web applications** using Hono, Elysia, or raw Bun.serve
-- **Server-side rendering** where performance matters
-- **Migrating Django projects** to JavaScript/TypeScript
-- **Multi-engine projects** that need Handlebars, Liquid, or Twig support
-- **Static site generators** that need fast template compilation
+```ts
+import { compileWithInheritance } from 'binja'
 
-## Next Steps
+const renderPage = await compileWithInheritance('pages/home.html', {
+  templates: './views',
+})
+```
 
-- [Installation](/binja/guide/installation/) - Get binja installed
-- [Quick Start](/binja/guide/quickstart/) - Build your first template
-- [Benchmarks](/binja/guide/benchmarks/) - See detailed performance numbers
+Every `extends` and `include` target must be a literal so the flattener can resolve it safely during compilation.
+
+## Intended use
+
+Binja fits Bun server-side rendering, HTML/email generation, static build pipelines, and projects migrating a compatible subset of templates from another ecosystem. Run the target templates through `binja check` and regression tests before a migration; syntax similarity is not proof of full compatibility.
+
+## Next steps
+
+- [Installation](/binja/guide/installation/)
+- [Quick start](/binja/guide/quickstart/)
+- [AOT compilation](/binja/guide/aot/)
+- [Security model](/binja/security/)
+- [Benchmarks](/binja/guide/benchmarks/)

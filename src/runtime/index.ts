@@ -2,14 +2,16 @@
  * Jinja2/DTL Runtime - Executes AST and produces output
  * Compatible with both Jinja2 and Django Template Language
  *
- * OPTIMIZED: Uses synchronous execution path for maximum performance.
- * Only Include/Extends tags require async (for template loading).
+ * Uses a synchronous expression path. Includes and inheritance switch template
+ * loading/rendering to the asynchronous path; filter functions remain synchronous.
  */
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context } from './context'
 import { builtinFilters, type FilterFunction } from '../filters'
 import { builtinTests, type TestFunction } from '../tests'
-import { TemplateRuntimeError, findSimilar } from '../errors'
+import { TemplateNotFoundError, TemplateRuntimeError, findSimilar } from '../errors'
+import { hasOwnKey, htmlSafeJson, safeGet } from '../security'
+import { getDebugCollector } from '../debug/collector'
 import type {
   ASTNode,
   TemplateNode,
@@ -21,6 +23,10 @@ import type {
   IncludeNode,
   SetNode,
   WithNode,
+  AutoescapeNode,
+  SpacelessNode,
+  CaptureNode,
+  CounterNode,
   UrlNode,
   StaticNode,
   NowNode,
@@ -65,6 +71,10 @@ interface RenderState {
   parentTemplate: TemplateNode | null
   cycleState: Map<string, number>
   ifchangedState: Map<string, any>
+  autoescapeStack: boolean[]
+  collectingTemplates: Set<TemplateNode>
+  renderingTemplates: Set<TemplateNode>
+  counters: Map<string, number>
 }
 
 export class Runtime {
@@ -87,14 +97,18 @@ export class Runtime {
       staticResolver: options.staticResolver ?? ((path) => `/static/${path}`),
       templateLoader:
         options.templateLoader ??
-        (async () => {
-          throw new Error('Template loader not configured')
+        (async (name) => {
+          throw new TemplateRuntimeError('Template loader not configured', {
+            line: 1,
+            column: 1,
+            templateName: name,
+          })
         }),
       timezone: options.timezone ?? undefined,
     }
 
     // Merge builtin and custom filters
-    this.filters = { ...builtinFilters, ...this.options.filters }
+    this.filters = Object.assign(Object.create(null), builtinFilters, this.options.filters)
 
     // Override date filter with timezone support if timezone is configured
     if (this.options.timezone) {
@@ -110,7 +124,7 @@ export class Runtime {
     }
 
     // Merge builtin and custom tests
-    this.tests = { ...builtinTests, ...this.options.tests }
+    this.tests = Object.assign(Object.create(null), builtinTests, this.options.tests)
   }
 
   async render(ast: TemplateNode, context: Record<string, any> = {}): Promise<string> {
@@ -119,6 +133,10 @@ export class Runtime {
       parentTemplate: null,
       cycleState: new Map(),
       ifchangedState: new Map(),
+      autoescapeStack: [this.options.autoescape],
+      collectingTemplates: new Set(),
+      renderingTemplates: new Set(),
+      counters: new Map(),
     }
 
     return this.renderState.run(state, async () => {
@@ -182,6 +200,15 @@ export class Runtime {
       if (node.type === 'With') {
         if (this.nodesNeedAsync((node as WithNode).body)) return true
       }
+      if (node.type === 'Autoescape') {
+        if (this.nodesNeedAsync((node as AutoescapeNode).body)) return true
+      }
+      if (node.type === 'Spaceless') {
+        if (this.nodesNeedAsync((node as SpacelessNode).body)) return true
+      }
+      if (node.type === 'Capture') {
+        if (this.nodesNeedAsync((node as CaptureNode).body)) return true
+      }
     }
     return false
   }
@@ -208,7 +235,7 @@ export class Runtime {
     return parts.join('')
   }
 
-  // Optimized: inline hot paths (Text, Output) before switch - 10-15% faster
+  // Keep the common Text and Output paths ahead of the larger switch.
   private renderNodeSync(node: ASTNode, ctx: Context): string | null {
     // Hot path 1: Text nodes (most common in templates)
     if (node.type === 'Text') {
@@ -231,6 +258,19 @@ export class Runtime {
         return ''
       case 'With':
         return this.renderWithSync(node as WithNode, ctx)
+      case 'Autoescape':
+        return this.renderAutoescapeSync(node as AutoescapeNode, ctx)
+      case 'Spaceless':
+        return this.renderNodesSync((node as SpacelessNode).body, ctx).replace(/>\s+</g, '><')
+      case 'Capture': {
+        const capture = node as CaptureNode
+        const value = new String(this.renderNodesSync(capture.body, ctx)) as any
+        value.__safe__ = true
+        ctx.set(capture.target, value)
+        return ''
+      }
+      case 'Counter':
+        return this.renderCounter(node as CounterNode)
       case 'Url':
         return this.renderUrlSync(node as UrlNode, ctx)
       case 'Static':
@@ -254,7 +294,7 @@ export class Runtime {
       case 'Lorem':
         return this.renderLoremSync(node as LoremNode, ctx)
       case 'CsrfToken':
-        return this.renderCsrfTokenSync()
+        return this.renderCsrfTokenSync(ctx)
       case 'Debug':
         return this.renderDebugSync(ctx)
       case 'Templatetag':
@@ -288,77 +328,80 @@ export class Runtime {
     ctx.push()
     ctx.pushForLoop(items, 0)
 
-    // Optimized: use string concatenation for small loops, array for large
-    // String concat is faster for < 25 items, array.join for larger
-    let result: string
+    try {
+      // Optimized: use string concatenation for small loops, array for large
+      // String concat is faster for < 25 items, array.join for larger
+      let result: string
 
-    // Optimized: hoist isUnpacking check outside loop - 8-12% faster
-    if (Array.isArray(node.target)) {
-      // Unpacking loop (e.g., {% for key, value in dict.items %})
-      const targets = node.target as string[]
-      const targetsLen = targets.length
+      // Hoist the tuple-unpacking check outside the loop.
+      if (Array.isArray(node.target)) {
+        // Unpacking loop (e.g., {% for key, value in dict.items %})
+        const targets = node.target as string[]
+        const targetsLen = targets.length
 
-      if (len < 25) {
-        // Small loop: string concat
-        result = ''
-        for (let i = 0; i < len; i++) {
-          const item = items[i]
-          if (i > 0) ctx.updateForLoop(i, items)
+        if (len < 25) {
+          // Small loop: string concat
+          result = ''
+          for (let i = 0; i < len; i++) {
+            const item = items[i]
+            if (i > 0) ctx.updateForLoop(i, items)
 
-          // Optimized: toIterable now returns pure arrays, so just check for array
-          const values = Array.isArray(item) ? item : [item, item]
+            // Optimized: toIterable now returns pure arrays, so just check for array
+            const values = Array.isArray(item) ? item : [item, item]
 
-          for (let j = 0; j < targetsLen; j++) {
-            ctx.set(targets[j], values[j])
+            for (let j = 0; j < targetsLen; j++) {
+              ctx.set(targets[j], values[j])
+            }
+
+            result += this.renderNodesSync(node.body, ctx)
           }
+        } else {
+          // Large loop: array join
+          const parts = new Array<string>(len)
+          for (let i = 0; i < len; i++) {
+            const item = items[i]
+            if (i > 0) ctx.updateForLoop(i, items)
 
-          result += this.renderNodesSync(node.body, ctx)
+            // Optimized: toIterable now returns pure arrays, so just check for array
+            const values = Array.isArray(item) ? item : [item, item]
+
+            for (let j = 0; j < targetsLen; j++) {
+              ctx.set(targets[j], values[j])
+            }
+
+            parts[i] = this.renderNodesSync(node.body, ctx)
+          }
+          result = parts.join('')
         }
       } else {
-        // Large loop: array join
-        const parts = new Array<string>(len)
-        for (let i = 0; i < len; i++) {
-          const item = items[i]
-          if (i > 0) ctx.updateForLoop(i, items)
+        // Simple loop (hot path - 99% of use cases)
+        const target = node.target as string
 
-          // Optimized: toIterable now returns pure arrays, so just check for array
-          const values = Array.isArray(item) ? item : [item, item]
-
-          for (let j = 0; j < targetsLen; j++) {
-            ctx.set(targets[j], values[j])
+        if (len < 25) {
+          // Small loop: string concat (faster for small N)
+          result = ''
+          for (let i = 0; i < len; i++) {
+            if (i > 0) ctx.updateForLoop(i, items)
+            ctx.set(target, items[i])
+            result += this.renderNodesSync(node.body, ctx)
           }
-
-          parts[i] = this.renderNodesSync(node.body, ctx)
+        } else {
+          // Large loop: array join (better for large N)
+          const parts = new Array<string>(len)
+          for (let i = 0; i < len; i++) {
+            if (i > 0) ctx.updateForLoop(i, items)
+            ctx.set(target, items[i])
+            parts[i] = this.renderNodesSync(node.body, ctx)
+          }
+          result = parts.join('')
         }
-        result = parts.join('')
       }
-    } else {
-      // Simple loop (hot path - 99% of use cases)
-      const target = node.target as string
 
-      if (len < 25) {
-        // Small loop: string concat (faster for small N)
-        result = ''
-        for (let i = 0; i < len; i++) {
-          if (i > 0) ctx.updateForLoop(i, items)
-          ctx.set(target, items[i])
-          result += this.renderNodesSync(node.body, ctx)
-        }
-      } else {
-        // Large loop: array join (better for large N)
-        const parts = new Array<string>(len)
-        for (let i = 0; i < len; i++) {
-          if (i > 0) ctx.updateForLoop(i, items)
-          ctx.set(target, items[i])
-          parts[i] = this.renderNodesSync(node.body, ctx)
-        }
-        result = parts.join('')
-      }
+      return result
+    } finally {
+      ctx.popForLoop()
+      ctx.pop()
     }
-
-    ctx.popForLoop()
-    ctx.pop()
-    return result
   }
 
   private renderBlockSync(node: BlockNode, ctx: Context): string {
@@ -371,20 +414,18 @@ export class Runtime {
     if (!blockToRender) return ''
 
     ctx.push()
-    // Only pre-render the parent body for {{ block.super }} when the block being
-    // rendered actually references `block`. Rendering it unconditionally was a
-    // wasted second pass that also mutated stateful tags (cycle/ifchanged) in a
-    // discarded render, corrupting later output.
-    if (this.blockUsesSuper(blockToRender)) {
-      const parentContent = index > 0 ? this.renderBlockChainSync(chain, index - 1, ctx) : ''
-      // Mark as safe to prevent double-escaping
-      const safeContent = new String(parentContent) as any
-      safeContent.__safe__ = true
-      ctx.set('block', { super: safeContent })
+    try {
+      // Only pre-render the parent body for {{ block.super }} when referenced.
+      if (this.blockUsesSuper(blockToRender)) {
+        const parentContent = index > 0 ? this.renderBlockChainSync(chain, index - 1, ctx) : ''
+        const safeContent = new String(parentContent) as any
+        safeContent.__safe__ = true
+        ctx.set('block', { super: safeContent })
+      }
+      return this.renderNodesSync(blockToRender.body, ctx)
+    } finally {
+      ctx.pop()
     }
-    const result = this.renderNodesSync(blockToRender.body, ctx)
-    ctx.pop()
-    return result
   }
 
   // Memoized check: does this block's body reference the `block` variable
@@ -423,12 +464,23 @@ export class Runtime {
 
   private renderWithSync(node: WithNode, ctx: Context): string {
     ctx.push()
-    for (const { target, value } of node.assignments) {
-      ctx.set(target, this.eval(value, ctx))
+    try {
+      for (const { target, value } of node.assignments) {
+        ctx.set(target, this.eval(value, ctx))
+      }
+      return this.renderNodesSync(node.body, ctx)
+    } finally {
+      ctx.pop()
     }
-    const result = this.renderNodesSync(node.body, ctx)
-    ctx.pop()
-    return result
+  }
+
+  private renderAutoescapeSync(node: AutoescapeNode, ctx: Context): string {
+    this.activeState.autoescapeStack.push(node.enabled)
+    try {
+      return this.renderNodesSync(node.body, ctx)
+    } finally {
+      this.activeState.autoescapeStack.pop()
+    }
   }
 
   private renderUrlSync(node: UrlNode, ctx: Context): string {
@@ -444,7 +496,7 @@ export class Runtime {
       ctx.set(node.asVar, url)
       return ''
     }
-    return url
+    return this.stringify(url)
   }
 
   private renderStaticSync(node: StaticNode, ctx: Context): string {
@@ -454,7 +506,7 @@ export class Runtime {
       ctx.set(node.asVar, url)
       return ''
     }
-    return url
+    return this.stringify(url)
   }
 
   private renderNowSync(node: NowNode, ctx: Context): string {
@@ -488,6 +540,17 @@ export class Runtime {
       return node.silent ? '' : this.stringify(value)
     }
     return this.stringify(value)
+  }
+
+  private renderCounter(node: CounterNode): string {
+    const current = this.activeState.counters.get(node.target) ?? 0
+    if (node.direction === 'decrement') {
+      const next = current - 1
+      this.activeState.counters.set(node.target, next)
+      return String(next)
+    }
+    this.activeState.counters.set(node.target, current + 1)
+    return String(current)
   }
 
   // Django: {% firstof %} - outputs first truthy value
@@ -554,7 +617,7 @@ export class Runtime {
 
     for (const item of list) {
       // Get the grouping key using attribute access
-      const grouper = item && typeof item === 'object' ? item[node.key] : undefined
+      const grouper = safeGet(item, node.key)
 
       if (grouper !== currentGrouper) {
         if (currentList.length > 0) {
@@ -706,17 +769,23 @@ export class Runtime {
   }
 
   // Django: {% csrf_token %} - outputs CSRF token hidden input
-  private renderCsrfTokenSync(): string {
-    // In a real Django app, this would use the actual CSRF token
-    // For compatibility, output a placeholder that can be replaced server-side
-    return '<input type="hidden" name="csrfmiddlewaretoken" value="CSRF_TOKEN_PLACEHOLDER">'
+  private renderCsrfTokenSync(ctx: Context): string {
+    const token = ctx.get('csrf_token') ?? ctx.get('csrfToken')
+    if (token == null || token === '') return ''
+    return `<input type="hidden" name="csrfmiddlewaretoken" value="${Bun.escapeHTML(String(token))}">`
   }
 
   // Django: {% debug %} - outputs debug info
   private renderDebugSync(ctx: Context): string {
     // Output context info for debugging
     const data = ctx.toObject?.() || {}
-    return `<pre>${JSON.stringify(data, null, 2)}</pre>`
+    let serialized: string
+    try {
+      serialized = JSON.stringify(data, null, 2)
+    } catch {
+      serialized = '[unserializable context]'
+    }
+    return `<pre>${Bun.escapeHTML(serialized)}</pre>`
   }
 
   // Django: {% templatetag %} - outputs template syntax characters
@@ -942,7 +1011,7 @@ export class Runtime {
   }
 
   // SYNC expression evaluation (no async overhead!)
-  // Optimized: inline hot paths (Literal, Name, GetAttr) before switch - 15-20% faster
+  // Keep common Literal, Name and GetAttr paths ahead of the larger switch.
   private eval(node: ExpressionNode, ctx: Context): any {
     // Hot path 1: Literal (most common in comparisons, filter args)
     if (node.type === 'Literal') {
@@ -991,38 +1060,18 @@ export class Runtime {
     }
   }
 
-  // Optimized: fast property access with minimal checks - 15-20% faster
   private evalGetAttr(node: GetAttrNode, ctx: Context): any {
     const obj = this.eval(node.object, ctx)
     if (obj == null) return undefined
 
     const attr = node.attribute
-    const value = obj[attr]
-
-    // Fast path: most common case - simple property access (string, number, object)
-    // Functions are rare, skip the typeof check for most cases
-    if (value === undefined) {
-      // Could be undefined property or array index - check array case
-      if (Array.isArray(obj)) {
-        const numIndex = parseInt(attr, 10)
-        if (!Number.isNaN(numIndex)) return obj[numIndex]
-      }
-      return undefined
-    }
-
-    // Only bind functions (rare case)
-    if (typeof value === 'function') {
-      return value.bind(obj)
-    }
-
-    return value
+    return safeGet(obj, attr)
   }
 
   private evalGetItem(node: GetItemNode, ctx: Context): any {
     const obj = this.eval(node.object, ctx)
     const index = this.eval(node.index, ctx)
-    if (obj == null) return undefined
-    return obj[index]
+    return safeGet(obj, index)
   }
 
   // Pre-compiled regex for inline filters
@@ -1036,6 +1085,7 @@ export class Runtime {
   private evalFilter(node: FilterExprNode, ctx: Context): any {
     const value = this.eval(node.node, ctx)
     const filterName = node.filter
+    getDebugCollector()?.recordFilter(filterName)
     const argsLen = node.args.length
 
     // ==================== FAST PATH: No arguments ====================
@@ -1070,8 +1120,6 @@ export class Runtime {
           const str = String(value ?? '').trim()
           return str ? str.split(Runtime.WHITESPACE_REGEX).length : 0
         }
-        case 'escapejs':
-          return JSON.stringify(String(value ?? '')).slice(1, -1)
         // linebreaks / linebreaksbr deliberately fall through to the filter
         // registry: their inline copies did not HTML-escape user content before
         // marking it safe (an XSS sink). The registry implementations escape.
@@ -1122,7 +1170,9 @@ export class Runtime {
           if (typeof value === 'string' || Array.isArray(value)) return value.length
           if (typeof value === 'object') {
             let count = 0
-            for (const _ in value) count++
+            for (const key in value) {
+              if (Object.hasOwn(value, key)) count++
+            }
             return count
           }
           return 0
@@ -1166,7 +1216,7 @@ export class Runtime {
         case 'json':
         case 'tojson': {
           try {
-            const jsonStr = new String(JSON.stringify(value)) as any
+            const jsonStr = new String(htmlSafeJson(value)) as any
             jsonStr.__safe__ = true
             return jsonStr
           } catch {
@@ -1175,9 +1225,7 @@ export class Runtime {
         }
         case 'pprint': {
           try {
-            const result = new String(JSON.stringify(value, null, 2)) as any
-            result.__safe__ = true
-            return result
+            return JSON.stringify(value, null, 2)
           } catch {
             return String(value)
           }
@@ -1277,7 +1325,10 @@ export class Runtime {
         }
         case 'batch': {
           if (!Array.isArray(value)) return [[value]]
-          const size = Number(arg) || 1
+          const size = Math.trunc(Number(arg) || 1)
+          if (!Number.isFinite(size) || size <= 0) {
+            throw new RangeError('batch size must be a positive integer')
+          }
           const result: any[][] = []
           for (let i = 0; i < value.length; i += size) {
             result.push(value.slice(i, i + size))
@@ -1286,7 +1337,10 @@ export class Runtime {
         }
         case 'columns': {
           if (!Array.isArray(value)) return [[value]]
-          const cols = Number(arg) || 2
+          const cols = Math.trunc(Number(arg) || 2)
+          if (!Number.isFinite(cols) || cols <= 0) {
+            throw new RangeError('columns count must be a positive integer')
+          }
           const result: any[][] = []
           for (let i = 0; i < value.length; i += cols) {
             result.push(value.slice(i, i + cols))
@@ -1298,44 +1352,45 @@ export class Runtime {
             (value == null ? 0 : (value.length ?? Object.keys(value).length ?? 0)) === Number(arg)
           )
         case 'attr':
-          return value == null ? undefined : value[arg]
+          return safeGet(value, arg)
         case 'dictsort':
           if (!Array.isArray(value)) return value
           return [...value].sort((a, b) => {
-            const aVal = arg ? a[arg] : a
-            const bVal = arg ? b[arg] : b
+            const aVal = arg ? safeGet(a, arg) : a
+            const bVal = arg ? safeGet(b, arg) : b
             return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
           })
         case 'dictsortreversed':
           if (!Array.isArray(value)) return value
           return [...value].sort((a, b) => {
-            const aVal = arg ? a[arg] : a
-            const bVal = arg ? b[arg] : b
+            const aVal = arg ? safeGet(a, arg) : a
+            const bVal = arg ? safeGet(b, arg) : b
             return aVal > bVal ? -1 : aVal < bVal ? 1 : 0
           })
         case 'map':
           if (!Array.isArray(value)) return []
-          if (typeof arg === 'string') return value.map((item) => item?.[arg])
+          if (typeof arg === 'string') return value.map((item) => safeGet(item, arg))
           return value
         case 'select':
           if (!Array.isArray(value)) return []
           if (arg === undefined) return value.filter((item) => !!item)
-          return value.filter((item) => !!item?.[arg])
+          return value.filter((item) => !!safeGet(item, arg))
         case 'reject':
           if (!Array.isArray(value)) return []
           if (arg === undefined) return value.filter((item) => !item)
-          return value.filter((item) => !item?.[arg])
+          return value.filter((item) => !safeGet(item, arg))
         case 'groupby': {
           if (!Array.isArray(value)) return []
-          const groups: Record<string, any[]> = {}
+          const groups = new Map<string, any[]>()
           for (const item of value) {
-            const key = String(arg ? item[arg] : item)
-            if (!(key in groups)) groups[key] = []
-            groups[key].push(item)
+            const key = String(arg ? safeGet(item, arg) : item)
+            const group = groups.get(key) ?? []
+            if (!groups.has(key)) groups.set(key, group)
+            group.push(item)
           }
           const result: any[] = []
-          for (const key in groups) {
-            result.push({ grouper: key, list: groups[key] })
+          for (const [key, list] of groups) {
+            result.push({ grouper: key, list })
           }
           return result
         }
@@ -1365,7 +1420,7 @@ export class Runtime {
         case 'json':
         case 'tojson': {
           try {
-            const jsonStr = new String(JSON.stringify(value, null, arg)) as any
+            const jsonStr = new String(htmlSafeJson(value, arg)) as any
             jsonStr.__safe__ = true
             return jsonStr
           } catch {
@@ -1380,7 +1435,8 @@ export class Runtime {
         // Misc
         case 'indent': {
           const str = String(value ?? '')
-          const indentStr = typeof arg === 'string' ? arg : ' '.repeat(Number(arg) || 4)
+          const indentStr =
+            typeof arg === 'string' ? arg : ' '.repeat(Math.max(0, Math.trunc(Number(arg) || 4)))
           const lines = str.split('\n')
           let result = lines[0] // First line not indented by default
           for (let i = 1; i < lines.length; i++) {
@@ -1414,11 +1470,8 @@ export class Runtime {
           return String(val)
         }
         case 'json_script': {
-          const jsonStr = JSON.stringify(value)
-            .replace(/</g, '\\u003C')
-            .replace(/>/g, '\\u003E')
-            .replace(/&/g, '\\u0026')
-          const id = arg ? ` id="${String(arg)}"` : ''
+          const jsonStr = htmlSafeJson(value)
+          const id = arg ? ` id="${Bun.escapeHTML(String(arg))}"` : ''
           const html = `<script${id} type="application/json">${jsonStr}</script>`
           const safe = new String(html) as any
           safe.__safe__ = true
@@ -1439,7 +1492,10 @@ export class Runtime {
         }
         case 'batch': {
           if (!Array.isArray(value)) return [[value]]
-          const size = Number(arg1) || 1
+          const size = Math.trunc(Number(arg1) || 1)
+          if (!Number.isFinite(size) || size <= 0) {
+            throw new RangeError('batch size must be a positive integer')
+          }
           const fillWith = arg2
           const result: any[][] = []
           for (let i = 0; i < value.length; i += size) {
@@ -1544,7 +1600,22 @@ export class Runtime {
         availableOptions: available.slice(0, 15),
       })
     }
-    return filter(value, ...args, ...Object.values(kwargs))
+    const result = filter(value, ...args, ...Object.values(kwargs))
+    if (
+      result !== null &&
+      (typeof result === 'object' || typeof result === 'function') &&
+      typeof result.then === 'function'
+    ) {
+      throw new TemplateRuntimeError(
+        `Async filter '${filterName}' is not supported; resolve asynchronous data before rendering`,
+        {
+          line: node.line,
+          column: node.column,
+          source: this.source,
+        }
+      )
+    }
+    return result
   }
 
   // Optimized: inline common operators, avoid Number() for integers
@@ -1555,6 +1626,7 @@ export class Runtime {
     // Short-circuit operators
     if (op === 'and') return this.isTruthy(left) ? this.eval(node.right, ctx) : left
     if (op === 'or') return this.isTruthy(left) ? left : this.eval(node.right, ctx)
+    if (op === '??') return left == null ? this.eval(node.right, ctx) : left
 
     const right = this.eval(node.right, ctx)
 
@@ -1704,6 +1776,7 @@ export class Runtime {
 
   private evalTest(node: TestExprNode, ctx: Context): boolean {
     const testName = node.test
+    getDebugCollector()?.recordTest(testName)
     const negated = node.negated
 
     // ==================== FAST PATH: defined/undefined (special - checks existence) ====================
@@ -1793,45 +1866,15 @@ export class Runtime {
 
         // Collection tests
         case 'empty':
-          if (value == null) result = true
-          else if (typeof value === 'string' || Array.isArray(value)) result = value.length === 0
-          else if (typeof value === 'object') {
-            result = true
-            for (const _ in value) {
-              result = false
-              break
-            }
-          } else result = false
+          result = this.tests.empty(value)
           break
 
         // Truthiness tests
         case 'truthy':
-          if (value == null) result = false
-          else if (typeof value === 'boolean') result = value
-          else if (typeof value === 'number') result = value !== 0
-          else if (typeof value === 'string') result = value.length > 0
-          else if (Array.isArray(value)) result = value.length > 0
-          else if (typeof value === 'object') {
-            result = false
-            for (const _ in value) {
-              result = true
-              break
-            }
-          } else result = true
+          result = this.isTruthy(value)
           break
         case 'falsy':
-          if (value == null) result = true
-          else if (typeof value === 'boolean') result = !value
-          else if (typeof value === 'number') result = value === 0
-          else if (typeof value === 'string') result = value.length === 0
-          else if (Array.isArray(value)) result = value.length === 0
-          else if (typeof value === 'object') {
-            result = true
-            for (const _ in value) {
-              result = false
-              break
-            }
-          } else result = false
+          result = !this.isTruthy(value)
           break
         case 'true':
           result = value === true
@@ -1887,7 +1930,7 @@ export class Runtime {
         case 'in':
           if (Array.isArray(arg)) result = arg.includes(value)
           else if (typeof arg === 'string') result = arg.includes(String(value))
-          else if (typeof arg === 'object' && arg !== null) result = value in arg
+          else if (typeof arg === 'object' && arg !== null) result = hasOwnKey(arg, value)
           else result = false
           break
 
@@ -1914,7 +1957,7 @@ export class Runtime {
 
   private evalObjectSync(obj: Record<string, ExpressionNode>, ctx: Context): Record<string, any> {
     const result: Record<string, any> = {}
-    // Optimized: for...in instead of Object.entries() - 20-30% faster
+    // Avoid allocating an entries array while checking object truthiness.
     for (const key in obj) {
       result[key] = this.eval(obj[key], ctx)
     }
@@ -1924,28 +1967,53 @@ export class Runtime {
   // ==================== ASYNC PATH (for Extends/Include) ====================
 
   private async collectBlocks(ast: TemplateNode, ctx: Context): Promise<void> {
-    for (const node of ast.body) {
-      if (node.type === 'Extends') {
-        const templateName = this.eval((node as ExtendsNode).template, ctx)
-        const parentTemplate = await this.options.templateLoader(String(templateName))
-        this.activeState.parentTemplate = parentTemplate
-        await this.collectBlocks(parentTemplate, ctx)
-      } else if (node.type === 'Block') {
-        const block = node as BlockNode
-        const chain = this.activeState.blocks.get(block.name) ?? []
-        chain.push(block)
-        this.activeState.blocks.set(block.name, chain)
+    if (this.activeState.collectingTemplates.has(ast)) {
+      throw new TemplateRuntimeError('Circular template inheritance detected', {
+        line: ast.line,
+        column: ast.column,
+      })
+    }
+
+    this.activeState.collectingTemplates.add(ast)
+    try {
+      for (const node of ast.body) {
+        if (node.type === 'Extends') {
+          const templateName = this.eval((node as ExtendsNode).template, ctx)
+          getDebugCollector()?.addTemplate(String(templateName), 'extends')
+          const parentTemplate = await this.options.templateLoader(String(templateName))
+          this.activeState.parentTemplate = parentTemplate
+          await this.collectBlocks(parentTemplate, ctx)
+        } else if (node.type === 'Block') {
+          const block = node as BlockNode
+          const chain = this.activeState.blocks.get(block.name) ?? []
+          chain.push(block)
+          this.activeState.blocks.set(block.name, chain)
+        }
       }
+    } finally {
+      this.activeState.collectingTemplates.delete(ast)
     }
   }
 
   private async renderTemplateAsync(ast: TemplateNode, ctx: Context): Promise<string> {
-    const parts: string[] = []
-    for (const node of ast.body) {
-      const result = await this.renderNodeAsync(node, ctx)
-      if (result !== null) parts.push(result)
+    if (this.activeState.renderingTemplates.has(ast)) {
+      throw new TemplateRuntimeError('Circular template include detected', {
+        line: ast.line,
+        column: ast.column,
+      })
     }
-    return parts.join('')
+
+    this.activeState.renderingTemplates.add(ast)
+    try {
+      const parts: string[] = []
+      for (const node of ast.body) {
+        const result = await this.renderNodeAsync(node, ctx)
+        if (result !== null) parts.push(result)
+      }
+      return parts.join('')
+    } finally {
+      this.activeState.renderingTemplates.delete(ast)
+    }
   }
 
   private async renderNodeAsync(node: ASTNode, ctx: Context): Promise<string | null> {
@@ -1969,6 +2037,22 @@ export class Runtime {
         return ''
       case 'With':
         return this.renderWithAsync(node as WithNode, ctx)
+      case 'Autoescape':
+        return this.renderAutoescapeAsync(node as AutoescapeNode, ctx)
+      case 'Spaceless':
+        return (await this.renderNodesAsync((node as SpacelessNode).body, ctx)).replace(
+          />\s+</g,
+          '><'
+        )
+      case 'Capture': {
+        const capture = node as CaptureNode
+        const value = new String(await this.renderNodesAsync(capture.body, ctx)) as any
+        value.__safe__ = true
+        ctx.set(capture.target, value)
+        return ''
+      }
+      case 'Counter':
+        return this.renderCounter(node as CounterNode)
       case 'Load':
         return null
       case 'Url':
@@ -1991,7 +2075,7 @@ export class Runtime {
       case 'Lorem':
         return this.renderLoremSync(node as LoremNode, ctx)
       case 'CsrfToken':
-        return this.renderCsrfTokenSync()
+        return this.renderCsrfTokenSync(ctx)
       case 'Debug':
         return this.renderDebugSync(ctx)
       case 'Templatetag':
@@ -2029,27 +2113,28 @@ export class Runtime {
     ctx.push()
     ctx.pushForLoop(items, 0)
 
-    for (let i = 0; i < len; i++) {
-      const item = items[i]
-      if (i > 0) ctx.updateForLoop(i, items)
+    try {
+      for (let i = 0; i < len; i++) {
+        const item = items[i]
+        if (i > 0) ctx.updateForLoop(i, items)
 
-      if (isUnpacking) {
-        // Optimized: toIterable now returns pure arrays
-        const values = Array.isArray(item) ? item : [item, item]
-        const targets = node.target as string[]
-        for (let j = 0; j < targets.length; j++) {
-          ctx.set(targets[j], values[j])
+        if (isUnpacking) {
+          const values = Array.isArray(item) ? item : [item, item]
+          const targets = node.target as string[]
+          for (let j = 0; j < targets.length; j++) {
+            ctx.set(targets[j], values[j])
+          }
+        } else {
+          ctx.set(node.target as string, item)
         }
-      } else {
-        ctx.set(node.target as string, item)
+
+        parts[i] = await this.renderNodesAsync(node.body, ctx)
       }
-
-      parts[i] = await this.renderNodesAsync(node.body, ctx)
+      return parts.join('')
+    } finally {
+      ctx.popForLoop()
+      ctx.pop()
     }
-
-    ctx.popForLoop()
-    ctx.pop()
-    return parts.join('')
   }
 
   private async renderBlockAsync(node: BlockNode, ctx: Context): Promise<string> {
@@ -2066,24 +2151,24 @@ export class Runtime {
     if (!blockToRender) return ''
 
     ctx.push()
-    // Only pre-render the parent body for {{ block.super }} when referenced (see
-    // renderBlockSync) — avoids a discarded second render that corrupts
-    // stateful-tag bookkeeping and wastes work.
-    if (this.blockUsesSuper(blockToRender)) {
-      const parentContent = index > 0 ? await this.renderBlockChainAsync(chain, index - 1, ctx) : ''
-      // Mark as safe to prevent double-escaping
-      const safeContent = new String(parentContent) as any
-      safeContent.__safe__ = true
-      ctx.set('block', { super: safeContent })
+    try {
+      if (this.blockUsesSuper(blockToRender)) {
+        const parentContent =
+          index > 0 ? await this.renderBlockChainAsync(chain, index - 1, ctx) : ''
+        const safeContent = new String(parentContent) as any
+        safeContent.__safe__ = true
+        ctx.set('block', { super: safeContent })
+      }
+      return await this.renderNodesAsync(blockToRender.body, ctx)
+    } finally {
+      ctx.pop()
     }
-    const result = await this.renderNodesAsync(blockToRender.body, ctx)
-    ctx.pop()
-    return result
   }
 
   private async renderInclude(node: IncludeNode, ctx: Context): Promise<string> {
     try {
       const templateName = this.eval(node.template, ctx)
+      getDebugCollector()?.addTemplate(String(templateName), 'include')
       const template = await this.options.templateLoader(String(templateName))
 
       let includeCtx: Context
@@ -2094,21 +2179,48 @@ export class Runtime {
         includeCtx = ctx.derived(additional)
       }
 
-      return this.renderTemplateAsync(template, includeCtx)
+      return this.renderIncludedTemplate(template, includeCtx)
     } catch (error) {
-      if (node.ignoreMissing) return ''
+      if (node.ignoreMissing && error instanceof TemplateNotFoundError) return ''
       throw error
+    }
+  }
+
+  private async renderIncludedTemplate(template: TemplateNode, ctx: Context): Promise<string> {
+    const state = this.activeState
+    const previousBlocks = state.blocks
+    const previousParent = state.parentTemplate
+    state.blocks = new Map()
+    state.parentTemplate = null
+
+    try {
+      await this.collectBlocks(template, ctx)
+      return await this.renderTemplateAsync(state.parentTemplate ?? template, ctx)
+    } finally {
+      state.blocks = previousBlocks
+      state.parentTemplate = previousParent
     }
   }
 
   private async renderWithAsync(node: WithNode, ctx: Context): Promise<string> {
     ctx.push()
-    for (const { target, value } of node.assignments) {
-      ctx.set(target, this.eval(value, ctx))
+    try {
+      for (const { target, value } of node.assignments) {
+        ctx.set(target, this.eval(value, ctx))
+      }
+      return await this.renderNodesAsync(node.body, ctx)
+    } finally {
+      ctx.pop()
     }
-    const result = await this.renderNodesAsync(node.body, ctx)
-    ctx.pop()
-    return result
+  }
+
+  private async renderAutoescapeAsync(node: AutoescapeNode, ctx: Context): Promise<string> {
+    this.activeState.autoescapeStack.push(node.enabled)
+    try {
+      return await this.renderNodesAsync(node.body, ctx)
+    } finally {
+      this.activeState.autoescapeStack.pop()
+    }
   }
 
   private async renderNodesAsync(nodes: ASTNode[], ctx: Context): Promise<string> {
@@ -2129,6 +2241,7 @@ export class Runtime {
 
   // Optimized stringify: inline hot paths, avoid String() when possible
   private stringify(value: any): string {
+    const autoescape = this.activeState.autoescapeStack.at(-1) ?? this.options.autoescape
     // Hot path: null/undefined → empty string (very common)
     if (value == null) return ''
 
@@ -2136,7 +2249,7 @@ export class Runtime {
     if (typeof value === 'string') {
       // Check safe marker and autoescape in one branch
       if ((value as any).__safe__) return value
-      return this.options.autoescape ? Bun.escapeHTML(value) : value
+      return autoescape ? Bun.escapeHTML(value) : value
     }
 
     // Boolean → Python-style True/False
@@ -2148,7 +2261,7 @@ export class Runtime {
     // Other types: convert to string then escape
     const str = String(value)
     if ((value as any).__safe__) return str
-    return this.options.autoescape ? Bun.escapeHTML(str) : str
+    return autoescape ? Bun.escapeHTML(str) : str
   }
 
   // Optimized: inline most common cases first (bool, null, string)
@@ -2163,9 +2276,10 @@ export class Runtime {
     if (typeof value === 'number') return value !== 0
     // Arrays: check length
     if (Array.isArray(value)) return value.length > 0
+    if (value instanceof Map || value instanceof Set) return value.size > 0
     // Objects: check if has any own property (avoid Object.keys allocation)
     if (typeof value === 'object') {
-      for (const _ in value) return true
+      for (const _ of Object.keys(value)) return true
       return false
     }
     return true
@@ -2176,8 +2290,8 @@ export class Runtime {
   private deepEqual(
     a: any,
     b: any,
-    seenA = new WeakMap<object, object>(),
-    seenB = new WeakMap<object, object>()
+    seenA = new Map<object, object>(),
+    seenB = new Map<object, object>()
   ): boolean {
     // Fast path: identical references or primitives
     if (a === b) return true
@@ -2219,31 +2333,68 @@ export class Runtime {
 
     if (a instanceof Map || b instanceof Map) {
       if (!(a instanceof Map) || !(b instanceof Map) || a.size !== b.size) return false
-      const left = a.entries()
-      const right = b.entries()
-      while (true) {
-        const leftEntry = left.next()
-        const rightEntry = right.next()
-        if (leftEntry.done || rightEntry.done) return leftEntry.done === rightEntry.done
-        if (
-          !this.deepEqual(leftEntry.value[0], rightEntry.value[0], seenA, seenB) ||
-          !this.deepEqual(leftEntry.value[1], rightEntry.value[1], seenA, seenB)
-        ) {
-          return false
+      const rightEntries = [...b.entries()]
+      const matched = new Set<number>()
+      for (const [leftKey, leftValue] of a) {
+        let match = -1
+        let matchedSeenA: Map<object, object> | undefined
+        let matchedSeenB: Map<object, object> | undefined
+
+        for (let index = 0; index < rightEntries.length; index++) {
+          if (matched.has(index)) continue
+          const [rightKey, rightValue] = rightEntries[index]
+          const trialSeenA = new Map(seenA)
+          const trialSeenB = new Map(seenB)
+          if (
+            this.deepEqual(leftKey, rightKey, trialSeenA, trialSeenB) &&
+            this.deepEqual(leftValue, rightValue, trialSeenA, trialSeenB)
+          ) {
+            match = index
+            matchedSeenA = trialSeenA
+            matchedSeenB = trialSeenB
+            break
+          }
         }
+
+        if (match === -1 || !matchedSeenA || !matchedSeenB) return false
+        matched.add(match)
+        seenA.clear()
+        seenB.clear()
+        for (const [left, right] of matchedSeenA) seenA.set(left, right)
+        for (const [right, left] of matchedSeenB) seenB.set(right, left)
       }
+      return true
     }
 
     if (a instanceof Set || b instanceof Set) {
       if (!(a instanceof Set) || !(b instanceof Set) || a.size !== b.size) return false
-      const left = a.values()
-      const right = b.values()
-      while (true) {
-        const leftValue = left.next()
-        const rightValue = right.next()
-        if (leftValue.done || rightValue.done) return leftValue.done === rightValue.done
-        if (!this.deepEqual(leftValue.value, rightValue.value, seenA, seenB)) return false
+      const rightValues = [...b]
+      const matched = new Set<number>()
+      for (const leftValue of a) {
+        let match = -1
+        let matchedSeenA: Map<object, object> | undefined
+        let matchedSeenB: Map<object, object> | undefined
+
+        for (let index = 0; index < rightValues.length; index++) {
+          if (matched.has(index)) continue
+          const trialSeenA = new Map(seenA)
+          const trialSeenB = new Map(seenB)
+          if (this.deepEqual(leftValue, rightValues[index], trialSeenA, trialSeenB)) {
+            match = index
+            matchedSeenA = trialSeenA
+            matchedSeenB = trialSeenB
+            break
+          }
+        }
+
+        if (match === -1 || !matchedSeenA || !matchedSeenB) return false
+        matched.add(match)
+        seenA.clear()
+        seenB.clear()
+        for (const [left, right] of matchedSeenA) seenA.set(left, right)
+        for (const [right, left] of matchedSeenB) seenB.set(right, left)
       }
+      return true
     }
 
     if (ArrayBuffer.isView(a) || ArrayBuffer.isView(b)) {
@@ -2272,7 +2423,7 @@ export class Runtime {
   private isIn(needle: any, haystack: any): boolean {
     if (Array.isArray(haystack)) return haystack.includes(needle)
     if (typeof haystack === 'string') return haystack.includes(String(needle))
-    if (typeof haystack === 'object' && haystack !== null) return needle in haystack
+    if (typeof haystack === 'object' && haystack !== null) return hasOwnKey(haystack, needle)
     return false
   }
 

@@ -13,6 +13,10 @@ export type NodeType =
   | 'Include'
   | 'Set'
   | 'With'
+  | 'Autoescape'
+  | 'Spaceless'
+  | 'Capture'
+  | 'Counter'
   | 'Macro'
   | 'Call'
   | 'Filter'
@@ -129,6 +133,29 @@ export interface WithNode extends BaseNode {
   type: 'With'
   assignments: Array<{ target: string; value: ExpressionNode }>
   body: ASTNode[]
+}
+
+export interface AutoescapeNode extends BaseNode {
+  type: 'Autoescape'
+  enabled: boolean
+  body: ASTNode[]
+}
+
+export interface SpacelessNode extends BaseNode {
+  type: 'Spaceless'
+  body: ASTNode[]
+}
+
+export interface CaptureNode extends BaseNode {
+  type: 'Capture'
+  target: string
+  body: ASTNode[]
+}
+
+export interface CounterNode extends BaseNode {
+  type: 'Counter'
+  target: string
+  direction: 'increment' | 'decrement'
 }
 
 // ==================== Django-specific Tags ====================
@@ -369,6 +396,10 @@ export type StatementNode =
   | IncludeNode
   | SetNode
   | WithNode
+  | AutoescapeNode
+  | SpacelessNode
+  | CaptureNode
+  | CounterNode
   | LoadNode
   | UrlNode
   | StaticNode

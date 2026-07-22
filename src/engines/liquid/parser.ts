@@ -6,13 +6,25 @@
 
 import { type LiquidToken, LiquidTokenType } from './lexer'
 import type { TemplateNode, ASTNode, ExpressionNode } from '../../parser/nodes'
+import { TemplateSyntaxError } from '../../errors'
+
+const LIQUID_FILTER_MAP: Record<string, string> = {
+  upcase: 'upper',
+  downcase: 'lower',
+  strip: 'trim',
+  size: 'length',
+  truncate: 'truncatechars',
+  json: 'json',
+}
 
 export class LiquidParser {
   private tokens: LiquidToken[]
   private current: number = 0
+  private source: string
 
-  constructor(tokens: LiquidToken[], _source: string = '') {
+  constructor(tokens: LiquidToken[], source: string = '') {
     this.tokens = tokens
+    this.source = source
   }
 
   parse(): TemplateNode {
@@ -129,12 +141,13 @@ export class LiquidParser {
         return this.parseRawTag(line, column)
 
       case 'break':
-        this.expect(LiquidTokenType.TAG_END)
-        return { type: 'Break', line, column } as any
-
       case 'continue':
         this.expect(LiquidTokenType.TAG_END)
-        return { type: 'Continue', line, column } as any
+        throw new TemplateSyntaxError(`Liquid tag '${tagName}' is not supported`, {
+          line,
+          column,
+          source: this.source,
+        })
 
       case 'endif':
       case 'endunless':
@@ -152,12 +165,11 @@ export class LiquidParser {
         return null
 
       default:
-        // Unknown tag - skip it
-        while (!this.check(LiquidTokenType.TAG_END) && !this.isAtEnd()) {
-          this.advance()
-        }
-        if (this.check(LiquidTokenType.TAG_END)) this.advance()
-        return null
+        throw new TemplateSyntaxError(`Unknown Liquid tag '${tagName}'`, {
+          line,
+          column,
+          source: this.source,
+        })
     }
   }
 
@@ -353,12 +365,9 @@ export class LiquidParser {
 
   private parseForIterable(): ExpressionNode {
     // Check for range: (1..5)
-    if (
-      this.check(LiquidTokenType.LBRACKET) ||
-      (this.peek().type === LiquidTokenType.ID && this.peek().value === '(')
-    ) {
-      // Skip opening paren if present
-      if (this.peek().value === '(') this.advance()
+    if (this.check(LiquidTokenType.LBRACKET) || this.check(LiquidTokenType.LPAREN)) {
+      const parenthesized = this.check(LiquidTokenType.LPAREN)
+      if (parenthesized) this.advance()
       if (this.check(LiquidTokenType.LBRACKET)) this.advance()
 
       const start = this.parseExpressionAtom()
@@ -368,7 +377,7 @@ export class LiquidParser {
         const end = this.parseExpressionAtom()
 
         // Skip closing
-        if (this.peek().value === ')') this.advance()
+        if (parenthesized) this.expect(LiquidTokenType.RPAREN)
         if (this.check(LiquidTokenType.RBRACKET)) this.advance()
 
         return {
@@ -413,16 +422,10 @@ export class LiquidParser {
     this.consumeTag('endcapture')
     this.expect(LiquidTokenType.TAG_END)
 
-    // Capture is like set but with body content
     return {
-      type: 'Set',
-      targets: [name],
-      value: {
-        type: 'Capture',
-        body,
-        line,
-        column,
-      },
+      type: 'Capture',
+      target: name,
+      body,
       line,
       column,
     } as any
@@ -432,17 +435,10 @@ export class LiquidParser {
     const name = this.expect(LiquidTokenType.ID).value
     this.expect(LiquidTokenType.TAG_END)
 
-    // Output the current value and increment/decrement
     return {
-      type: 'Output',
-      expression: {
-        type: 'FunctionCall',
-        callee: { type: 'Name', name: tagName, line, column },
-        args: [{ type: 'Name', name, line, column }],
-        kwargs: {},
-        line,
-        column,
-      },
+      type: 'Counter',
+      target: name,
+      direction: tagName,
       line,
       column,
     } as any
@@ -615,7 +611,8 @@ export class LiquidParser {
     // Handle filters
     while (this.check(LiquidTokenType.PIPE)) {
       this.advance()
-      const filterName = this.expect(LiquidTokenType.ID).value
+      const rawFilterName = this.expect(LiquidTokenType.ID).value
+      const filterName = LIQUID_FILTER_MAP[rawFilterName] ?? rawFilterName
       const args: ExpressionNode[] = []
 
       if (this.check(LiquidTokenType.COLON)) {

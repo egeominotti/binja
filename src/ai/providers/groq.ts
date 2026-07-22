@@ -1,11 +1,10 @@
-/**
- * Groq Provider (Fast & Free tier available)
- */
+/** Groq provider using its OpenAI-compatible Chat Completions endpoint. */
 
 import type { AIProvider } from '../types'
 
 export function createGroqProvider(model?: string, apiKey?: string): AIProvider {
   const key = apiKey || process.env.GROQ_API_KEY
+  const selectedModel = model || process.env.GROQ_MODEL || 'openai/gpt-oss-120b'
 
   return {
     name: 'groq',
@@ -21,12 +20,13 @@ export function createGroqProvider(model?: string, apiKey?: string): AIProvider 
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
+        signal: AbortSignal.timeout(30_000),
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify({
-          model: model || 'llama-3.1-70b-versatile',
+          model: selectedModel,
           max_tokens: 1500,
           messages: [
             {

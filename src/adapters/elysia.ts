@@ -16,7 +16,7 @@
 
 import { readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
-import { Environment, compile as binjaCompile, resolveContained } from '../index'
+import { Environment, resolveContained } from '../index'
 import type { Elysia } from 'elysia'
 
 export interface BinjaElysiaOptions {
@@ -30,6 +30,8 @@ export interface BinjaElysiaOptions {
   debug?: boolean
   /** Cache compiled templates (default: true in production) */
   cache?: boolean
+  /** Maximum templates cached by this adapter instance (default: 100) */
+  cacheMaxSize?: number
   /** Global context data available in all templates */
   globals?: Record<string, any>
   /** Layout template name (optional) */
@@ -38,7 +40,10 @@ export interface BinjaElysiaOptions {
   contentVar?: string
 }
 
-const templateCache = new Map<string, (ctx: Record<string, any>) => Promise<string>>()
+type CompiledTemplate = (ctx: Record<string, any>) => Promise<string>
+
+const secondaryCaches = new Set<{ cache: WeakRef<Map<string, CompiledTemplate>> }>()
+const jinjaEnvironments = new Set<{ env: WeakRef<Environment>; root: string }>()
 
 /**
  * Create binja plugin for Elysia
@@ -50,12 +55,31 @@ export function binja(options: BinjaElysiaOptions = {}) {
     engine = 'jinja2',
     debug = false,
     cache = process.env.NODE_ENV === 'production',
+    cacheMaxSize = 100,
     globals = {},
     layout,
     contentVar = 'content',
   } = options
 
-  const env = new Environment({ debug })
+  if (!Number.isInteger(cacheMaxSize) || cacheMaxSize <= 0) {
+    throw new RangeError('cacheMaxSize must be a positive integer')
+  }
+
+  const templateCache = new Map<string, CompiledTemplate>()
+
+  const env = new Environment({
+    templates: root,
+    extensions: [extension, ''],
+    debug,
+    cache,
+    cacheMaxSize,
+    globals,
+  })
+  if (engine === 'jinja2') {
+    jinjaEnvironments.add({ env: new WeakRef(env), root })
+  } else if (cache) {
+    secondaryCaches.add({ cache: new WeakRef(templateCache) })
+  }
 
   // Get render function based on engine
   const getRenderFn = async (engineName: string) => {
@@ -84,9 +108,12 @@ export function binja(options: BinjaElysiaOptions = {}) {
 
     let html: string
 
-    // Check cache
-    if (cache && templateCache.has(cacheKey)) {
+    if (engine === 'jinja2') {
+      html = await env.render(templatePath, context)
+    } else if (cache && templateCache.has(cacheKey)) {
       const compiledFn = templateCache.get(cacheKey)!
+      templateCache.delete(cacheKey)
+      templateCache.set(cacheKey, compiledFn)
       html = await compiledFn({ ...globals, ...context })
     } else {
       // Read and render template
@@ -116,12 +143,15 @@ export function binja(options: BinjaElysiaOptions = {}) {
             compileFn = async (ctx) => fn(ctx)
             break
           }
-          default: {
-            const compiled = binjaCompile(source)
-            compileFn = async (ctx) => compiled(ctx)
-          }
+          default:
+            throw new Error(`Unsupported template engine: ${engine}`)
         }
 
+        while (templateCache.size >= cacheMaxSize) {
+          const oldestKey = templateCache.keys().next().value
+          if (oldestKey === undefined) break
+          templateCache.delete(oldestKey)
+        }
         templateCache.set(cacheKey, compileFn)
         html = await compileFn({ ...globals, ...context })
       } else {
@@ -135,9 +165,16 @@ export function binja(options: BinjaElysiaOptions = {}) {
       if (layoutPath === null) {
         throw new Error(`Layout name escapes the root directory: ${layout}`)
       }
-      const layoutSource = await readFile(layoutPath, 'utf-8')
-      const render = await getRenderFn(engine)
-      html = await render(layoutSource, { ...globals, ...context, [contentVar]: html })
+      if (engine === 'jinja2') {
+        const safeContent = new String(html) as any
+        safeContent.__safe__ = true
+        const layoutName = extname(layout) ? layout : `${layout}${extension}`
+        html = await env.render(layoutName, { ...context, [contentVar]: safeContent })
+      } else {
+        const layoutSource = await readFile(layoutPath, 'utf-8')
+        const render = await getRenderFn(engine)
+        html = await render(layoutSource, { ...globals, ...context, [contentVar]: html })
+      }
     }
 
     return new Response(html, {
@@ -155,16 +192,46 @@ export function binja(options: BinjaElysiaOptions = {}) {
  * Clear template cache
  */
 export function clearCache(): void {
-  templateCache.clear()
+  for (const entry of secondaryCaches) {
+    const cache = entry.cache.deref()
+    if (cache) cache.clear()
+    else secondaryCaches.delete(entry)
+  }
+  for (const entry of jinjaEnvironments) {
+    const env = entry.env.deref()
+    if (env) env.clearCache()
+    else jinjaEnvironments.delete(entry)
+  }
 }
 
 /**
  * Get cache stats
  */
 export function getCacheStats(): { size: number; keys: string[] } {
+  const keys: string[] = []
+  for (const entry of secondaryCaches) {
+    const cache = entry.cache.deref()
+    if (!cache) {
+      secondaryCaches.delete(entry)
+      continue
+    }
+    keys.push(...cache.keys())
+  }
+  for (const entry of jinjaEnvironments) {
+    const env = entry.env.deref()
+    if (!env) {
+      jinjaEnvironments.delete(entry)
+      continue
+    }
+    const { root } = entry
+    for (const key of env.cacheKeys()) {
+      keys.push(`jinja2:${root}:${key}`)
+    }
+  }
+
   return {
-    size: templateCache.size,
-    keys: Array.from(templateCache.keys()),
+    size: keys.length,
+    keys,
   }
 }
 

@@ -20,14 +20,15 @@
  * ```
  */
 
-import { Lexer } from './lexer'
+import { Lexer, type Token } from './lexer'
 import { Parser, type TemplateNode } from './parser'
 import { Runtime } from './runtime'
 import type { FilterFunction } from './filters'
 import { compileToString, compileToFunction, type CompileOptions } from './compiler'
 import { flattenTemplate, canFlatten, type TemplateLoader } from './compiler/flattener'
-import { generateDebugPanel, withDebugCollection } from './debug'
+import { generateDebugPanel, getDebugCollector, withDebugCollection } from './debug'
 import type { PanelOptions } from './debug'
+import { TemplateNotFoundError } from './errors'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import * as path from 'node:path'
 
@@ -242,10 +243,22 @@ export class Environment {
    * Compile a template string to AST (useful for caching)
    */
   compile(source: string): TemplateNode {
+    const collector = getDebugCollector()
+    collector?.startLexer()
     const lexer = new Lexer(source)
-    const tokens = lexer.tokenize()
-    const parser = new Parser(tokens, source)
-    return parser.parse()
+    let tokens: Token[]
+    try {
+      tokens = lexer.tokenize()
+    } finally {
+      collector?.endLexer()
+    }
+    collector?.startParser()
+    try {
+      const parser = new Parser(tokens, source)
+      return parser.parse()
+    } finally {
+      collector?.endParser()
+    }
   }
 
   /**
@@ -255,6 +268,7 @@ export class Environment {
     // Check cache first (LRU: move to end on access)
     if (this.options.cache && this.templateCache.has(templateName)) {
       this.cacheHits++
+      getDebugCollector()?.recordCacheHit()
       // LRU: delete and re-add to move to end (most recently used)
       const ast = this.templateCache.get(templateName)!
       this.templateCache.delete(templateName)
@@ -263,14 +277,15 @@ export class Environment {
     }
 
     this.cacheMisses++
+    getDebugCollector()?.recordCacheMiss()
 
     // Resolve template path
     const templatePath = await this.resolveTemplatePath(templateName)
     if (!templatePath) {
-      throw new Error(`Template not found: ${templateName}`)
+      throw new TemplateNotFoundError(templateName)
     }
 
-    // Read and compile - Bun.file() is 5-10x faster than fs.promises
+    // Read and compile with Bun's file API.
     const source = await Bun.file(templatePath).text()
     const ast = this.compile(source)
 
@@ -302,6 +317,13 @@ export class Environment {
    */
   cacheSize(): number {
     return this.templateCache.size
+  }
+
+  /**
+   * Get cached template names in LRU order (oldest to newest)
+   */
+  cacheKeys(): string[] {
+    return Array.from(this.templateCache.keys())
   }
 
   /**
@@ -357,7 +379,7 @@ export class Environment {
     const basePath = resolveContained(this.options.templates, templateName)
     if (basePath === null) return null
 
-    // Try with each extension - Bun.file().exists() is faster than fs.access
+    // Try each configured extension in order.
     for (const ext of this.options.extensions) {
       const fullPath = basePath + ext
       if (await Bun.file(fullPath).exists()) {
@@ -381,7 +403,7 @@ export class Environment {
     let url = pattern
     for (const key in kwargs) {
       const encoded = encodeURIComponent(String(kwargs[key]))
-      // Use replaceAll for fixed strings (faster than multiple replace calls)
+      // Replace every fixed-string route placeholder.
       url = url.replaceAll(`:${key}`, encoded)
       url = url.replaceAll(`<${key}>`, encoded)
       url = url.replaceAll(`(?P<${key}>[^/]+)`, encoded)
@@ -431,7 +453,8 @@ export function Template(source: string, options: EnvironmentOptions = {}) {
     globals: options.globals ?? {},
     urlResolver: options.urlResolver,
     staticResolver: options.staticResolver,
-    templateLoader: async () => ast,
+    templateLoader: env.loadTemplate.bind(env),
+    timezone: options.timezone,
   })
 
   return {
@@ -445,7 +468,7 @@ export function Template(source: string, options: EnvironmentOptions = {}) {
 
 /**
  * Compile a template to an optimized JavaScript function (AOT mode)
- * Returns a sync function that is 10-50x faster than runtime rendering
+ * Returns a synchronous render function for templates supported by the AOT compiler.
  *
  * Note: This function does NOT support {% extends %} or {% include %}.
  * Use compileWithInheritance() for templates with inheritance.
@@ -475,8 +498,9 @@ export interface CompileWithInheritanceOptions extends CompileOptions {
 }
 
 /**
- * Compile a template with full inheritance support (extends/include/block)
- * Resolves all template inheritance at compile-time for maximum AOT performance.
+ * Compile a template with static inheritance support (extends/include/block).
+ * Resolves literal template dependencies at compile time and returns a
+ * synchronous render function.
  *
  * IMPORTANT: All {% extends %} and {% include %} must use static string literals.
  * Dynamic template names (variables) are not supported in AOT mode.
@@ -589,8 +613,9 @@ export async function compileWithInheritanceToCode(
 }
 
 /**
- * Compile a template to JavaScript code string (for build tools/CLI)
- * The generated code can be saved to a file and imported directly
+ * Compile a template to a JavaScript function-source fragment for build tools.
+ * The generated function expects Binja runtime helpers in the surrounding scope;
+ * use the CLI when a complete importable ESM module is required.
  *
  * @example
  * ```typescript
@@ -614,7 +639,12 @@ export type { TemplateNode, ASTNode, ExpressionNode } from './parser/nodes'
 export { Runtime, Context } from './runtime'
 export { builtinFilters } from './filters'
 export type { FilterFunction } from './filters'
-export { TemplateError, TemplateSyntaxError, TemplateRuntimeError } from './errors'
+export {
+  TemplateError,
+  TemplateNotFoundError,
+  TemplateSyntaxError,
+  TemplateRuntimeError,
+} from './errors'
 export type { CompileOptions } from './compiler'
 export { builtinTests } from './tests'
 export type { TestFunction } from './tests'

@@ -83,21 +83,27 @@ describe('LRU Template Cache', () => {
       await env.render('t2.html', {})
       await env.render('t3.html', {})
       expect(env.cacheSize()).toBe(3)
+      expect(env.cacheKeys()).toEqual(['t1.html', 't2.html', 't3.html'])
 
-      // Load template 4 - should evict t1 (oldest)
+      // A hit moves the entry to the most-recently-used end.
+      await env.render('t1.html', {})
+      expect(env.cacheKeys()).toEqual(['t2.html', 't3.html', 't1.html'])
+
+      // Load template 4 - should evict t2 (oldest)
       await env.render('t4.html', {})
       expect(env.cacheSize()).toBe(3)
 
-      // Load template 5 - should evict t2
+      // Load template 5 - should evict t3
       await env.render('t5.html', {})
       expect(env.cacheSize()).toBe(3)
 
-      // Access t3 again (cache hit, moves to end)
+      // Reload t3 (cache miss, evicts t1)
       await env.render('t3.html', {})
 
-      // Load t1 again - should evict t4 (oldest after t3 was moved)
+      // Load t1 again - should evict t4
       await env.render('t1.html', {})
       expect(env.cacheSize()).toBe(3)
+      expect(env.cacheKeys()).toEqual(['t5.html', 't3.html', 't1.html'])
     })
 
     test('recently accessed templates are preserved', async () => {

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }} - {{ siteName }}</title>
+</head>
+<body>
+  <h1>Search</h1>
+  <form action="/search">
+    <input name="q" value="{{ query }}">
+    <button type="submit">Search</button>
+  </form>
+  <p>{{ resultCount }} result{{ resultCount|pluralize }}</p>
+  {% for post in results %}
+    <p><a href="/blog/{{ post.id }}">{{ post.title }}</a></p>
+  {% else %}
+    <p>No matching posts.</p>
+  {% endfor %}
+</body>
+</html>

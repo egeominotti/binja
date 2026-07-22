@@ -1,179 +1,78 @@
 ---
 title: AOT Compilation
-description: Pre-compile templates for maximum production performance
+description: Compile Binja's supported static subset to synchronous JavaScript render functions.
 ---
 
-AOT (Ahead-of-Time) compilation converts templates into optimized JavaScript functions at build/startup time, providing **160x faster** rendering than runtime mode.
+AOT compilation parses a template once and generates a synchronous JavaScript function. Compilation/setup cost is paid before the hot render path.
 
-## Basic Usage
+## Basic use
 
-```typescript
+```ts
 import { compile } from 'binja'
 
-// Compile once at startup
 const renderUser = compile('<h1>{{ name|upper }}</h1>')
-
-// Use many times (sync, extremely fast!)
-const html = renderUser({ name: 'john' })
-// Output: <h1>JOHN</h1>
+const html = renderUser({ name: 'ada' })
 ```
 
-## Performance Comparison
+Compile once at process startup or build time and reuse the returned function.
 
-| Mode | Speed | Use Case |
-|------|-------|----------|
-| Runtime (`render()`) | 371K ops/s | Development |
-| AOT (`compile()`) | **14.3M ops/s** | Production |
+## Supported common subset
 
-**39x faster** than runtime mode, **160x faster** than Nunjucks.
+- variables, literals, arrays, objects, property/item access;
+- arithmetic, boolean, comparison, membership, conditional, and coalescing expressions;
+- built-in filters and tests;
+- `if`/`elif`/`else`, `for`/`empty`, `set`, `with`;
+- `autoescape`, `spaceless`, comments, raw/verbatim text;
+- loop aliases and Python/Jinja truthiness/stringification.
 
-## Production Pattern
+## Runtime-only or rejected features
 
-```typescript
-import { compile } from 'binja'
+Plain `compile()` rejects `extends`, `include`, URL/static tags, and any AST node the compiler cannot represent faithfully. It also does not accept an `Environment` custom-filter registry; use the built-in registry or runtime mode for custom filters.
 
-// Pre-compile all templates at server startup
-const templates = {
-  home: compile(await Bun.file('./views/home.html').text()),
-  user: compile(await Bun.file('./views/user.html').text()),
-  product: compile(await Bun.file('./views/product.html').text()),
-}
+Use `Environment` for dynamic template names:
 
-// Rendering is now synchronous and extremely fast
-app.get('/', () => templates.home({ title: 'Welcome' }))
-app.get('/user/:id', ({ params }) => templates.user({ id: params.id }))
-app.get('/product/:id', ({ params }) => templates.product({ id: params.id }))
+```ts
+const env = new Environment({ templates: './views', cache: true })
+const html = await env.render(templateName, context)
 ```
 
-## Supported Features
+## Static inheritance and includes
 
-AOT compilation supports:
+```ts
+import { compileWithInheritance } from 'binja'
 
-- Variables and expressions
-- Filters (all 84 built-in filters)
-- Conditionals (`{% if %}`, `{% elif %}`, `{% else %}`)
-- Loops (`{% for %}`, `{% empty %}`)
-- Set/With statements
-- Comments
-- Raw/Verbatim blocks
-
-## Not Supported in AOT
-
-The following features require runtime mode:
-
-- `{% extends %}` - Use `compileWithInheritance()` or Environment
-- `{% include %}` - Use `compileWithInheritance()` or Environment
-- Dynamic template loading
-
-### For Template Inheritance
-
-Use `Environment` with caching for templates that use inheritance:
-
-```typescript
-import { Environment } from 'binja'
-
-const env = new Environment({
+const renderPage = await compileWithInheritance('page.html', {
   templates: './views',
-  cache: true, // Enable caching
+  extensions: ['.html', '.jinja', '.jinja2', ''],
 })
-
-// Pre-warm cache at startup
-await env.loadTemplate('base.html')
-await env.loadTemplate('home.html')
-
-// Rendering uses cached AST
-const html = await env.render('home.html', { title: 'Welcome' })
 ```
 
-## Generate JavaScript Code
+The flattener resolves literal `extends` and `include` dependencies below `templates`, expands blocks/`block.super`, and rejects dynamic names or root escapes.
 
-For build tools, generate standalone JavaScript code:
+## Generating modules
 
-```typescript
-import { compileToCode } from 'binja'
+The easiest supported path to an importable file is the CLI:
 
-const code = compileToCode('<h1>{{ title }}</h1>', {
-  functionName: 'renderHeader'
-})
-
-// Save to file
-await Bun.write('./compiled/header.js', code)
+```sh
+binja compile ./views -o ./compiled
 ```
 
-**Generated code:**
-```javascript
-export function renderHeader(ctx) {
-  let __out = '';
-  __out += '<h1>';
-  __out += escape(ctx.title);
-  __out += '</h1>';
-  return __out;
-}
-```
+Generated modules include Binja's helper contract, import the built-in filter/test registries, and export `render` plus a default function.
 
-## CLI Compilation
-
-Compile templates from command line:
-
-```bash
-# Compile all templates to JavaScript
-binja compile ./templates -o ./dist
-
-# Watch mode for development
-binja watch ./templates -o ./dist
-```
+`compileToCode()` and `compileWithInheritanceToCode()` are lower-level APIs. They return a function source fragment that expects helpers (`stringify`, truthiness, lookup, filter/test dispatch, and iteration) in the surrounding build-tool scope; they do not return a complete ESM module.
 
 ## Options
 
-```typescript
-const template = compile(source, {
-  // Disable autoescaping (not recommended)
-  autoescape: false,
-
-  // Custom filters
-  filters: {
-    currency: (v) => `$${v.toFixed(2)}`
-  },
-})
-```
-
-## When to Use AOT
-
-**Use AOT when:**
-- Templates are static (don't use `{% extends %}` or `{% include %}`)
-- Maximum performance is critical
-- Templates can be compiled at build/startup time
-
-**Use Runtime when:**
-- Templates use inheritance (`{% extends %}`)
-- Templates use includes (`{% include %}`)
-- Templates are loaded dynamically
-- During development
-
-## Hybrid Approach
-
-Combine both for optimal performance:
-
-```typescript
-import { compile, Environment } from 'binja'
-
-// AOT for static templates
-const staticTemplates = {
-  header: compile(await Bun.file('./partials/header.html').text()),
-  footer: compile(await Bun.file('./partials/footer.html').text()),
+```ts
+interface CompileOptions {
+  functionName?: string
+  minify?: boolean
+  autoescape?: boolean
 }
-
-// Environment for templates with inheritance
-const env = new Environment({
-  templates: './views',
-  cache: true,
-})
-
-// Use both
-app.get('/', async (c) => {
-  const header = staticTemplates.header({ nav: [...] })
-  const content = await env.render('pages/home.html', { ... })
-  const footer = staticTemplates.footer({ year: 2024 })
-  return c.html(header + content + footer)
-})
 ```
+
+Function names are validated against JavaScript identifier and reserved-word rules. `minify` currently removes generated formatting newlines; use a bundler/minifier for full minification.
+
+## Measure on the target
+
+The local audit benchmark reports AOT separately from async runtime and excludes compilation time. See [Benchmarks](/binja/guide/benchmarks/) for current numbers and the reproducibility rules.

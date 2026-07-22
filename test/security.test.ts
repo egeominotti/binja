@@ -419,27 +419,25 @@ describe('Security', () => {
   // ==================== JSON Output Security ====================
   describe('JSON Output Security', () => {
     describe('JSON Filter with HTML-unsafe Content', () => {
-      test('json filter outputs valid JSON when used with safe', async () => {
-        // JSON filter output needs |safe to avoid escaping
-        const result = await render('{{ obj|json|safe }}', { obj: { a: 1, b: 'test' } })
+      test('json filter outputs valid JSON without an extra safe assertion', async () => {
+        const result = await render('{{ obj|json }}', { obj: { a: 1, b: 'test' } })
         expect(JSON.parse(result)).toEqual({ a: 1, b: 'test' })
       })
 
       test('json filter is safe by default', async () => {
-        // JSON filter marks output as safe, so it's not HTML-escaped
-        // This is the correct behavior for embedding JSON in <script> tags
+        // The filter HTML-hardens JSON and then returns a trusted wrapper.
         const result = await render('{{ obj|json }}', { obj: { a: 1 } })
         // The JSON is not escaped, can be parsed directly
         expect(result).toBe('{"a":1}')
       })
 
       test('json filter escapes HTML in string values', async () => {
-        const result = await render('{{ obj|json|safe }}', {
+        const result = await render('{{ obj|json }}', {
           obj: { html: '<script>alert(1)</script>' },
         })
         const parsed = JSON.parse(result)
         expect(parsed.html).toBe('<script>alert(1)</script>')
-        // The JSON itself is safe because the script is inside a string
+        expect(result).not.toContain('<script>')
       })
 
       test('json filter handles nested objects', async () => {
@@ -449,24 +447,23 @@ describe('Security', () => {
             value: '</script><script>alert(1)</script>',
           },
         }
-        const result = await render('{{ obj|json|safe }}', { obj })
+        const result = await render('{{ obj|json }}', { obj })
         // Should be valid JSON that can be parsed
         expect(() => JSON.parse(result)).not.toThrow()
       })
     })
 
     describe('Script Tag in JSON', () => {
-      test('json in script context (manual safe usage)', async () => {
+      test('json in script context cannot terminate the script element', async () => {
         const data = { message: '</script><script>alert("xss")</script>' }
-        const result = await render('var data = {{ data|json|safe }};', { data })
-        // The </script> inside JSON string should not close the script tag
-        // because it is inside JSON string quotes
+        const result = await render('var data = {{ data|json }};', { data })
+        expect(result).not.toContain('</script>')
         expect(() => JSON.parse(result.replace('var data = ', '').replace(';', ''))).not.toThrow()
       })
 
       test('tojson alias works same as json', async () => {
-        const result1 = await render('{{ obj|json|safe }}', { obj: { x: 1 } })
-        const result2 = await render('{{ obj|tojson|safe }}', { obj: { x: 1 } })
+        const result1 = await render('{{ obj|json }}', { obj: { x: 1 } })
+        const result2 = await render('{{ obj|tojson }}', { obj: { x: 1 } })
         expect(result1).toBe(result2)
       })
     })
@@ -792,17 +789,17 @@ describe('Security', () => {
       const result = await render('{{ x|escapejs }}', { x: 'say "hello"' })
       // The output may be HTML-escaped too if autoescape is on
       // The key is that quotes are escaped
-      expect(result).toMatch(/\\"|&quot;|\\&quot;/)
+      expect(result).toContain('\\u0022')
     })
 
     test('escapejs escapes newlines', async () => {
       const result = await render('{{ x|escapejs }}', { x: 'line1\nline2' })
-      expect(result).toContain('\\n')
+      expect(result).toContain('\\u000A')
     })
 
     test('escapejs escapes backslashes', async () => {
       const result = await render('{{ x|escapejs }}', { x: 'path\\to\\file' })
-      expect(result).toContain('\\\\')
+      expect(result).toContain('\\u005C')
     })
 
     test('escapejs safe for JavaScript strings', async () => {

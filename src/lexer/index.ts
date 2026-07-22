@@ -13,6 +13,7 @@ export class Lexer {
   private blockEnd: string
   private commentStart: string
   private commentEnd: string
+  private textDelimiterLead: string | null
   private trimNextWhitespace = false
 
   constructor(
@@ -41,6 +42,9 @@ export class Lexer {
     this.blockEnd = options.blockEnd ?? '%}'
     this.commentStart = options.commentStart ?? '{#'
     this.commentEnd = options.commentEnd ?? '#}'
+
+    const leads = [this.variableStart[0], this.blockStart[0], this.commentStart[0]]
+    this.textDelimiterLead = leads.every((lead) => lead === leads[0]) ? leads[0] : null
   }
 
   tokenize(): Token[] {
@@ -81,6 +85,8 @@ export class Lexer {
 
       // Check for raw/verbatim block - capture content as-is until endraw/endverbatim
       const savedPos = this.state.pos
+      const savedLine = this.state.line
+      const savedColumn = this.state.column
       this.skipWhitespace()
       if (this.checkWord('raw') || this.checkWord('verbatim')) {
         const tagName = this.checkWord('raw') ? 'raw' : 'verbatim'
@@ -89,6 +95,8 @@ export class Lexer {
       }
       // Reset position if not raw/verbatim
       this.state.pos = savedPos
+      this.state.line = savedLine
+      this.state.column = savedColumn
 
       this.addToken(TokenType.BLOCK_START, this.blockStart + (wsControl ? '-' : ''))
       this.scanExpression(this.blockEnd, TokenType.BLOCK_END)
@@ -117,7 +125,7 @@ export class Lexer {
     }
     // Check that word ends (not part of larger identifier)
     const nextChar = this.state.source[start + word.length]
-    return !nextChar || !this.isAlphaNumeric(nextChar)
+    return !nextChar || (!this.isAlphaNumeric(nextChar) && nextChar !== '_')
   }
 
   private scanRawBlock(tagName: string): void {
@@ -213,12 +221,7 @@ export class Lexer {
     })
   }
 
-  /**
-   * Optimized scanText using indexOf
-   * Instead of checking 3 delimiters at each character position,
-   * we use indexOf to jump directly to the next '{' character.
-   * Benchmarks show +178% average speedup, up to +393% for text-heavy templates.
-   */
+  /** Scan text by jumping to the next possible delimiter start. */
   private scanText(): void {
     const start = this.state.pos
     const startLine = this.state.line
@@ -226,18 +229,19 @@ export class Lexer {
     const source = this.state.source
 
     while (!this.isAtEnd()) {
-      // Find next potential delimiter start (all delimiters start with '{')
-      const nextBrace = source.indexOf('{', this.state.pos)
+      // Default delimiters share "{" and use one indexOf. Custom delimiter
+      // families may have different first characters, so choose the earliest.
+      const nextDelimiter = this.textDelimiterLead
+        ? source.indexOf(this.textDelimiterLead, this.state.pos)
+        : this.findNextDelimiterStart(source, this.state.pos)
 
-      if (nextBrace === -1) {
-        // No more braces - consume rest as text
+      if (nextDelimiter === -1) {
         this.advanceToEnd()
         break
       }
 
-      // Fast-forward to the brace, tracking newlines
-      if (nextBrace > this.state.pos) {
-        this.advanceTo(nextBrace)
+      if (nextDelimiter > this.state.pos) {
+        this.advanceTo(nextDelimiter)
       }
 
       // Check if it's actually a template delimiter
@@ -249,7 +253,7 @@ export class Lexer {
         break
       }
 
-      // Just a lone '{', advance past it
+      // A delimiter-leading character that did not form a full delimiter.
       if (this.peek() === '\n') {
         this.state.line++
         this.state.column = 0
@@ -267,6 +271,15 @@ export class Lexer {
         column: startColumn,
       })
     }
+  }
+
+  private findNextDelimiterStart(source: string, from: number): number {
+    let next = -1
+    for (const delimiter of [this.variableStart, this.blockStart, this.commentStart]) {
+      const candidate = source.indexOf(delimiter[0], from)
+      if (candidate !== -1 && (next === -1 || candidate < next)) next = candidate
+    }
+    return next
   }
 
   /** Advance to target position while tracking line/column */
@@ -395,7 +408,15 @@ export class Lexer {
     }
 
     // Decimal part
-    if (this.peek() === '.' && this.isDigit(this.peekNext())) {
+    // Django-style numeric path segments (`items.0.1`) use dots as accessors.
+    // Once a number follows a DOT token, leave the next dot for the operator
+    // scanner instead of folding two path segments into the decimal `0.1`.
+    const previousToken = this.state.tokens.at(-1)
+    if (
+      previousToken?.type !== TokenType.DOT &&
+      this.peek() === '.' &&
+      this.isDigit(this.peekNext())
+    ) {
       this.advance() // consume .
       while (this.isDigit(this.peek())) {
         this.advance()
@@ -414,7 +435,9 @@ export class Lexer {
     }
 
     const value = this.state.source.slice(start, this.state.pos)
-    const type = KEYWORDS[value] ?? TokenType.NAME
+    // KEYWORDS is a normal object; use an own-property check so identifiers
+    // such as "constructor" and "toString" never resolve Object.prototype.
+    const type = Object.hasOwn(KEYWORDS, value) ? KEYWORDS[value] : TokenType.NAME
 
     this.addToken(type, value)
   }
@@ -523,6 +546,8 @@ export class Lexer {
   }
 
   private scanComment(): void {
+    const startLine = this.state.line
+    const startColumn = this.state.column
     // Skip until comment end
     while (
       !this.isAtEnd() &&
@@ -536,12 +561,19 @@ export class Lexer {
       this.advance()
     }
 
-    if (!this.isAtEnd()) {
-      const trimRight = this.peek() === '-'
-      if (trimRight) this.advance()
-      this.match(this.commentEnd) // consume end delimiter
-      this.trimNextWhitespace = trimRight
+    if (this.isAtEnd()) {
+      throw new TemplateSyntaxError('Unclosed template comment', {
+        line: startLine,
+        column: startColumn,
+        source: this.state.source,
+        suggestion: `Add closing delimiter '${this.commentEnd}'`,
+      })
     }
+
+    const trimRight = this.peek() === '-'
+    if (trimRight) this.advance()
+    this.match(this.commentEnd) // consume end delimiter
+    this.trimNextWhitespace = trimRight
   }
 
   private trimPreviousText(): void {
@@ -582,7 +614,7 @@ export class Lexer {
     const len = expected.length
     if (start + len > source.length) return false
 
-    // Optimized: char-by-char comparison instead of slice() - 39% faster
+    // Compare delimiters without allocating a temporary slice.
     for (let i = 0; i < len; i++) {
       if (source[start + i] !== expected[i]) return false
     }
@@ -600,7 +632,7 @@ export class Lexer {
     const len = expected.length
     if (start + len > source.length) return false
 
-    // Optimized: char-by-char comparison instead of slice() - 39% faster
+    // Compare delimiters without allocating a temporary slice.
     for (let i = 0; i < len; i++) {
       if (source[start + i] !== expected[i]) return false
     }
@@ -621,7 +653,7 @@ export class Lexer {
     return c === ' ' || c === '\t' || c === '\n' || c === '\r'
   }
 
-  // Optimized: use charCodeAt for faster character classification - 10-15% faster
+  // Use character codes for allocation-free character classification.
   private isDigit(c: string): boolean {
     const code = c.charCodeAt(0)
     return code >= 48 && code <= 57 // '0'-'9'

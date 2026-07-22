@@ -5,13 +5,16 @@
 
 import { type HbsToken, HbsTokenType } from './lexer'
 import type { TemplateNode, ASTNode, ExpressionNode } from '../../parser/nodes'
+import { TemplateSyntaxError } from '../../errors'
 
 export class HandlebarsParser {
   private tokens: HbsToken[]
   private current: number = 0
+  private source: string
 
-  constructor(tokens: HbsToken[], _source: string = '') {
+  constructor(tokens: HbsToken[], source: string = '') {
     this.tokens = tokens
+    this.source = source
   }
 
   parse(): TemplateNode {
@@ -35,6 +38,17 @@ export class HandlebarsParser {
         const nextToken = this.tokens[this.current + 1]
         if (nextToken && endTags.includes(nextToken.value)) {
           break
+        }
+        if (nextToken && endTags.length > 0) {
+          const expected = endTags.find((tag) => tag !== 'else') ?? endTags[0]
+          throw new TemplateSyntaxError(
+            `Mismatched closing block: expected '${expected}', got '${nextToken.value}'`,
+            {
+              line: nextToken.line,
+              column: nextToken.column,
+              source: this.source,
+            }
+          )
         }
       }
 
@@ -68,9 +82,7 @@ export class HandlebarsParser {
         return this.parseBlock()
 
       case HbsTokenType.OPEN_END:
-        // End block - consume and return null
-        this.consumeEndBlock()
-        return null
+        throw this.syntaxError(`Unexpected closing block '${this.tokens[this.current + 1]?.value}'`)
 
       case HbsTokenType.OPEN_COMMENT:
         this.skipComment()
@@ -192,7 +204,7 @@ export class HandlebarsParser {
     }
 
     // Consume {{/if}}
-    this.consumeEndBlock()
+    this.consumeEndBlock('if')
 
     return {
       type: 'If',
@@ -206,8 +218,14 @@ export class HandlebarsParser {
   }
 
   private parseUnlessBlock(condition: ExpressionNode, line: number, column: number): ASTNode {
-    const body = this.parseNodes(['unless'])
-    this.consumeEndBlock()
+    const body = this.parseNodes(['unless', 'else'])
+    let else_: ASTNode[] = []
+
+    if (this.checkOpenBlock('else')) {
+      this.consumeElse()
+      else_ = this.parseNodes(['unless'])
+    }
+    this.consumeEndBlock('unless')
 
     // Unless is just if with negated condition
     return {
@@ -221,7 +239,7 @@ export class HandlebarsParser {
       },
       body,
       elifs: [],
-      else_: [],
+      else_,
       line,
       column,
     } as any
@@ -237,7 +255,7 @@ export class HandlebarsParser {
       else_ = this.parseNodes(['each'])
     }
 
-    this.consumeEndBlock()
+    this.consumeEndBlock('each')
 
     return {
       type: 'For',
@@ -252,7 +270,7 @@ export class HandlebarsParser {
 
   private parseWithBlock(context: ExpressionNode, line: number, column: number): ASTNode {
     const body = this.parseNodes(['with'])
-    this.consumeEndBlock()
+    this.consumeEndBlock('with')
 
     return {
       type: 'With',
@@ -271,7 +289,7 @@ export class HandlebarsParser {
     column: number
   ): ASTNode {
     const _body = this.parseNodes([name])
-    this.consumeEndBlock()
+    this.consumeEndBlock(name)
 
     // Store as a macro call
     return {
@@ -453,12 +471,23 @@ export class HandlebarsParser {
     this.expect(HbsTokenType.CLOSE)
   }
 
-  private consumeEndBlock(): void {
-    if (this.check(HbsTokenType.OPEN_END)) {
-      this.advance()
-      if (this.check(HbsTokenType.ID)) this.advance()
-      if (this.check(HbsTokenType.CLOSE)) this.advance()
+  private consumeEndBlock(expectedName: string): void {
+    if (!this.check(HbsTokenType.OPEN_END)) {
+      throw this.syntaxError(`Unclosed Handlebars block '${expectedName}'`)
     }
+    this.advance()
+    const name = this.expect(HbsTokenType.ID)
+    if (name.value !== expectedName) {
+      throw new TemplateSyntaxError(
+        `Mismatched closing block: expected '${expectedName}', got '${name.value}'`,
+        {
+          line: name.line,
+          column: name.column,
+          source: this.source,
+        }
+      )
+    }
+    this.expect(HbsTokenType.CLOSE)
   }
 
   private skipComment(): void {
@@ -489,6 +518,15 @@ export class HandlebarsParser {
 
   private expect(type: HbsTokenType): HbsToken {
     if (this.check(type)) return this.advance()
-    throw new Error(`Expected ${type} but got ${this.peek().type}`)
+    throw this.syntaxError(`Expected ${type} but got ${this.peek().type}`)
+  }
+
+  private syntaxError(message: string): TemplateSyntaxError {
+    const token = this.peek()
+    return new TemplateSyntaxError(message, {
+      line: token.line,
+      column: token.column,
+      source: this.source,
+    })
   }
 }

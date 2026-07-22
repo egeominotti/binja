@@ -110,9 +110,9 @@ export const upper: TestFunction = (value) => {
 export const empty: TestFunction = (value) => {
   if (value == null) return true
   if (typeof value === 'string' || Array.isArray(value)) return value.length === 0
+  if (value instanceof Map || value instanceof Set) return value.size === 0
   if (typeof value === 'object') {
-    // Avoid Object.keys() allocation - return early on first key found
-    for (const _ in value) return false
+    for (const _ of Object.keys(value)) return false
     return true
   }
   return false
@@ -121,7 +121,7 @@ export const empty: TestFunction = (value) => {
 export const in_: TestFunction = (value, container) => {
   if (Array.isArray(container)) return container.includes(value)
   if (typeof container === 'string') return container.includes(String(value))
-  if (typeof container === 'object' && container !== null) return value in container
+  if (typeof container === 'object' && container !== null) return Object.hasOwn(container, value)
   return false
 }
 
@@ -140,9 +140,9 @@ export const truthy: TestFunction = (value) => {
   if (typeof value === 'number') return value !== 0
   if (typeof value === 'string') return value.length > 0
   if (Array.isArray(value)) return value.length > 0
+  if (value instanceof Map || value instanceof Set) return value.size > 0
   if (typeof value === 'object') {
-    // Avoid Object.keys() allocation - return early on first key found
-    for (const _ in value) return true
+    for (const _ of Object.keys(value)) return true
     return false
   }
   return true
@@ -175,6 +175,7 @@ export const builtinTests: Record<string, TestFunction> = {
   defined,
   undefined: undefined_,
   none,
+  null: none, // Twig alias
   None: none, // Alias for Django compatibility
   boolean,
   string,

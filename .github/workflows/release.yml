@@ -34,6 +34,12 @@ jobs:
       - name: Run tests
         run: bun test
 
+      - name: Run extended generative tests
+        run: bun run test:generative
+
+      - name: Run executable examples
+        run: bun run test:examples
+
       - name: Build
         run: bun run build
 

@@ -219,28 +219,22 @@ describe('Autoescape', () => {
 
   // ==================== Autoescape Block ====================
   describe('Autoescape Block', () => {
-    // Note: The autoescape block tag is parsed but content inside is currently skipped
-    // These tests document the current behavior and serve as placeholders for future implementation
-
-    test('autoescape block is recognized (content currently skipped)', async () => {
+    test('autoescape true enables escaping inside the block', async () => {
       const env = new Environment({ autoescape: false })
       const result = await env.renderString(
-        'before{% autoescape true %}inside{% endautoescape %}after',
-        {}
+        'before{% autoescape true %}{{ value }}{% endautoescape %}after',
+        { value: '<b>inside</b>' }
       )
-      // Current implementation skips autoescape block content
-      // This tests that the tags are at least parsed without error
-      expect(result).toBe('beforeafter')
+      expect(result).toBe('before&lt;b&gt;inside&lt;/b&gt;after')
     })
 
-    test('autoescape false block is recognized (content currently skipped)', async () => {
+    test('autoescape false disables escaping inside the block', async () => {
       const env = new Environment({ autoescape: true })
       const result = await env.renderString(
-        'before{% autoescape false %}inside{% endautoescape %}after',
-        {}
+        'before{% autoescape false %}{{ value }}{% endautoescape %}after',
+        { value: '<b>inside</b>' }
       )
-      // Current implementation skips autoescape block content
-      expect(result).toBe('beforeafter')
+      expect(result).toBe('before<b>inside</b>after')
     })
 
     test('autoescape block does not throw errors', async () => {

@@ -124,7 +124,9 @@ export class DebugCollector {
 
   endLexer(): void {
     if ((this.data as any)._lexerStart) {
-      this.data.lexerTime = performance.now() - (this.data as any)._lexerStart
+      this.data.lexerTime =
+        (this.data.lexerTime ?? 0) + performance.now() - (this.data as any)._lexerStart
+      delete (this.data as any)._lexerStart
     }
   }
 
@@ -134,7 +136,9 @@ export class DebugCollector {
 
   endParser(): void {
     if ((this.data as any)._parserStart) {
-      this.data.parserTime = performance.now() - (this.data as any)._parserStart
+      this.data.parserTime =
+        (this.data.parserTime ?? 0) + performance.now() - (this.data as any)._parserStart
+      delete (this.data as any)._parserStart
     }
   }
 
@@ -170,12 +174,24 @@ export class DebugCollector {
   // Context
   captureContext(context: Record<string, any>): void {
     this.data.contextKeys = Object.keys(context)
+    const seen = new WeakSet<object>()
     for (const [key, value] of Object.entries(context)) {
-      this.data.contextSnapshot[key] = this.captureValue(value)
+      this.data.contextSnapshot[key] = this.captureValue(value, 0, seen)
     }
   }
 
-  private captureValue(value: any, depth = 0): ContextValue {
+  private captureValue(value: any, depth = 0, seen = new WeakSet<object>()): ContextValue {
+    if (value !== null && typeof value === 'object') {
+      if (seen.has(value)) {
+        return {
+          type: this.getType(value),
+          preview: '[Circular]',
+          value,
+          expandable: false,
+        }
+      }
+      seen.add(value)
+    }
     const type = this.getType(value)
     const preview = this.getPreview(value)
     const expandable = this.isExpandable(value)
@@ -187,11 +203,11 @@ export class DebugCollector {
       result.children = {}
       if (Array.isArray(value)) {
         value.forEach((item, i) => {
-          result.children![String(i)] = this.captureValue(item, depth + 1)
+          result.children![String(i)] = this.captureValue(item, depth + 1, seen)
         })
       } else if (typeof value === 'object' && value !== null) {
         for (const [k, v] of Object.entries(value)) {
-          result.children![k] = this.captureValue(v, depth + 1)
+          result.children![k] = this.captureValue(v, depth + 1, seen)
         }
       }
     }
@@ -215,7 +231,7 @@ export class DebugCollector {
     return typeof value
   }
 
-  private getPreview(value: any, maxLen = 50): string {
+  private getPreview(value: any, maxLen = 50, seen = new WeakSet<object>(), depth = 0): string {
     if (value === null) return 'null'
     if (value === undefined) return 'undefined'
     if (typeof value === 'string') {
@@ -225,15 +241,17 @@ export class DebugCollector {
       return String(value)
     }
     if (Array.isArray(value)) {
+      if (seen.has(value)) return '[Circular]'
+      seen.add(value)
       if (value.length === 0) return '[]'
-      if (value.length <= 3) {
-        const items = value.map((v) => this.getPreview(v, 15)).join(', ')
+      if (value.length <= 3 && depth < 2) {
+        const items = value.map((v) => this.getPreview(v, 15, seen, depth + 1)).join(', ')
         return `[${items}]`
       }
       return `[${this.getPreview(value[0], 15)}, ... +${value.length - 1}]`
     }
     if (value instanceof Date) {
-      return value.toISOString()
+      return Number.isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString()
     }
     if (typeof value === 'object') {
       const keys = Object.keys(value)

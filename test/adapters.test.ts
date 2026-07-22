@@ -4,10 +4,21 @@
  */
 
 import { describe, test, expect, beforeAll } from 'bun:test'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Hono } from 'hono'
 import { Elysia } from 'elysia'
-import { binja as honoAdapter, clearCache as honoClearCache } from '../src/adapters/hono'
-import { binja as elysiaAdapter, clearCache as elysiaClearCache } from '../src/adapters/elysia'
+import {
+  binja as honoAdapter,
+  clearCache as honoClearCache,
+  getCacheStats as getHonoCacheStats,
+} from '../src/adapters/hono'
+import {
+  binja as elysiaAdapter,
+  clearCache as elysiaClearCache,
+  getCacheStats as getElysiaCacheStats,
+} from '../src/adapters/elysia'
 
 const _TEST_PORT_HONO = 4001
 const _TEST_PORT_ELYSIA = 4002
@@ -93,6 +104,69 @@ describe('Hono Adapter', () => {
     const res = await globalApp.request('/')
     expect(res.status).toBe(200)
   })
+
+  test('cached mode preserves includes, inheritance and configured root', async () => {
+    honoClearCache()
+    const cachedApp = new Hono()
+    cachedApp.use(honoAdapter({ root: './test/views', cache: true }))
+    cachedApp.get('/', (c) =>
+      c.render('adapter-child', { title: 'Inherited', message: 'included' })
+    )
+
+    const first = await cachedApp.request('/')
+    const second = await cachedApp.request('/')
+    expect(first.status).toBe(200)
+    expect(await first.text()).toContain('<title>Inherited</title>')
+    expect(await second.text()).toContain('<span>included</span>')
+    expect(getHonoCacheStats().keys).toContain('jinja2:./test/views:adapter-child.html')
+  })
+
+  test('secondary-engine cache does not leak stale compilations into a new app', async () => {
+    honoClearCache()
+    const root = mkdtempSync(join(tmpdir(), `binja-hono-cache-${process.pid}-`))
+    const templatePath = join(root, 'page.html')
+
+    try {
+      writeFileSync(templatePath, 'old {{ value }}')
+      const firstApp = new Hono()
+      firstApp.use(honoAdapter({ root, engine: 'handlebars', cache: true }))
+      firstApp.get('/', (c) => c.render('page', { value: 'version' }))
+      expect(await (await firstApp.request('/')).text()).toBe('old version')
+
+      writeFileSync(templatePath, 'new {{ value }}')
+      const secondApp = new Hono()
+      secondApp.use(honoAdapter({ root, engine: 'handlebars', cache: true }))
+      secondApp.get('/', (c) => c.render('page', { value: 'version' }))
+      expect(await (await secondApp.request('/')).text()).toBe('new version')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+      honoClearCache()
+    }
+  })
+
+  test('secondary-engine cache obeys the per-adapter LRU bound', async () => {
+    honoClearCache()
+    const root = mkdtempSync(join(tmpdir(), `binja-hono-lru-${process.pid}-`))
+    for (const name of ['a', 'b', 'c']) writeFileSync(join(root, `${name}.html`), name)
+
+    try {
+      const app = new Hono()
+      app.use(honoAdapter({ root, engine: 'handlebars', cache: true, cacheMaxSize: 2 }))
+      app.get('/:page', (c) => c.render(c.req.param('page')))
+      for (const name of ['a', 'b', 'c']) {
+        expect((await app.request(`/${name}`)).status).toBe(200)
+      }
+
+      const keys = getHonoCacheStats().keys
+      expect(keys).toHaveLength(2)
+      expect(keys.some((key) => key.endsWith('/a.html'))).toBe(false)
+      expect(keys.some((key) => key.endsWith('/b.html'))).toBe(true)
+      expect(keys.some((key) => key.endsWith('/c.html'))).toBe(true)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+      honoClearCache()
+    }
+  })
 })
 
 describe('Elysia Adapter', () => {
@@ -152,21 +226,35 @@ describe('Elysia Adapter', () => {
     const res = await globalApp.handle(new Request('http://localhost/'))
     expect(res.status).toBe(200)
   })
+
+  test('cached mode preserves includes and inheritance', async () => {
+    elysiaClearCache()
+    const cachedApp = new Elysia()
+      .use(elysiaAdapter({ root: './test/views', cache: true }))
+      .get('/', ({ render }) =>
+        render('adapter-child', { title: 'Inherited', message: 'included' })
+      )
+
+    const res = await cachedApp.handle(new Request('http://localhost/'))
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('<title>Inherited</title>')
+    expect(html).toContain('<span>included</span>')
+    expect(getElysiaCacheStats().keys).toContain('jinja2:./test/views:adapter-child.html')
+  })
 })
 
 describe('Cache Management', () => {
   test('Hono cache operations', () => {
     honoClearCache()
-    const { getCacheStats } = require('../src/adapters/hono')
-    const stats = getCacheStats()
+    const stats = getHonoCacheStats()
     expect(stats.size).toBe(0)
     expect(stats.keys).toEqual([])
   })
 
   test('Elysia cache operations', () => {
     elysiaClearCache()
-    const { getCacheStats } = require('../src/adapters/elysia')
-    const stats = getCacheStats()
+    const stats = getElysiaCacheStats()
     expect(stats.size).toBe(0)
     expect(stats.keys).toEqual([])
   })

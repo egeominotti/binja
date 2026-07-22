@@ -1,136 +1,107 @@
 ---
 title: Security
-description: Security considerations and best practices
+description: Binja's trust boundary, escaping behavior, loader containment, and deployment responsibilities.
 ---
 
-## XSS Protection
+## Trust boundary
 
-### Autoescape (Default)
+Templates are trusted application code. Do not render attacker-authored template source as a sandbox: filters, method calls, globals, and application-provided objects are capabilities.
 
-binja enables autoescape by default, protecting against Cross-Site Scripting (XSS) attacks:
+Treat context values, template names, JSON payloads, generated attribute names/values, error text, and debug/query telemetry as untrusted.
 
-```typescript
-await render('{{ script }}', {
-  script: '<script>alert("xss")</script>'
-})
-// Output: &lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;
+## HTML autoescape
+
+Autoescape is enabled by default:
+
+```ts
+await render('{{ value }}', { value: '<script>alert(1)</script>' })
+// &lt;script&gt;alert(1)&lt;/script&gt;
 ```
 
-### Escaped Characters
-
-| Character | Escaped |
-|-----------|---------|
-| `<` | `&lt;` |
-| `>` | `&gt;` |
-| `&` | `&amp;` |
-| `"` | `&quot;` |
-| `'` | `&#x27;` |
-
-### Safe Content
-
-Use `|safe` only for trusted content:
+`safe` is an explicit assertion that a value is trusted HTML:
 
 ```jinja
-{{ trusted_html|safe }}
+{{ application_sanitized_html|safe }}
 ```
 
-**Warning:** Never use `|safe` on user-provided content!
+Never use it merely to fix double escaping or to embed raw user input. `autoescape false` has the same trust requirement.
 
-## Best Practices
+## Property access
 
-### 1. Never Trust User Input
+Runtime, AOT, generated CLI modules, and property-oriented filters reject common prototype-escape primitives: `__proto__`, `prototype`, `constructor`, `caller`, `callee`, and `arguments`. Mapping membership checks own keys only.
+
+This defense does not turn arbitrary application objects into a safe sandbox. Pass narrow data objects rather than database clients, request objects, secrets, or privileged services.
+
+## JSON and JavaScript
+
+`json`/`tojson` escape `<`, `>`, `&`, U+2028, and U+2029 so a value cannot terminate a script element. Prefer an inert JSON script block:
 
 ```jinja
-{# DANGEROUS - XSS vulnerability #}
-{{ user_comment|safe }}
-
-{# SAFE - escaped by default #}
-{{ user_comment }}
-```
-
-### 2. Validate Data Server-Side
-
-Always validate and sanitize data before passing to templates:
-
-```typescript
-// Validate input
-const sanitizedInput = sanitize(userInput)
-
-await env.render('page.html', {
-  content: sanitizedInput
-})
-```
-
-### 3. Use CSRF Protection
-
-For forms, include CSRF tokens:
-
-```jinja
-<form method="POST">
-  {% csrf_token %}
-  <input name="email" value="{{ email }}">
-  <button type="submit">Submit</button>
-</form>
-```
-
-### 4. Escape JavaScript
-
-When embedding data in JavaScript:
-
-```jinja
+{{ payload|json_script:'bootstrap-data' }}
 <script>
-  // Use json filter for safe JSON embedding
-  const data = {{ data|json|safe }};
-</script>
-
-{# Or use json_script for extra safety #}
-{{ data|json_script:"data-id" }}
-<script>
-  const data = JSON.parse(document.getElementById('data-id').textContent);
+  const payload = JSON.parse(document.getElementById('bootstrap-data').textContent)
 </script>
 ```
 
-### 5. Escape URLs
+`json_script` also escapes its `id` attribute. Do not append `|safe`; the filter already returns the required trusted wrapper after escaping its components.
 
-URL-encode user data in URLs:
+`escapejs` escapes JavaScript string content, including HTML-breaking punctuation and control characters. It is not a general JavaScript code sanitizer.
+
+## Attribute and URL contexts
+
+Use quoted attributes and allow normal autoescape:
 
 ```jinja
+<input value="{{ value }}">
 <a href="/search?q={{ query|urlencode }}">Search</a>
 ```
 
-## Template Security
+`xmlattr` rejects whitespace, quotes, separators, control characters, and other unsafe attribute-name characters, then escapes values. URL encoding prevents delimiter injection but does not enforce an allowed protocol; validate destination schemes in application code.
 
-### Disable Unsafe Features in Production
+## Template paths
 
-```typescript
+`Environment`, AOT inheritance loading, the CLI, and adapters resolve templates beneath a configured root. Absolute paths, `..` traversal, and symlink escapes are rejected.
+
+Keep template names separate from arbitrary filesystem paths and use a dedicated template directory with minimal permissions.
+
+## Includes and errors
+
+Inheritance/include cycles are detected. `ignore missing` suppresses only `TemplateNotFoundError`; syntax or render failures inside an existing include still surface.
+
+## CSRF
+
+```jinja
+<form method="post">
+  {% csrf_token %}
+</form>
+```
+
+The tag reads `csrf_token` or `csrfToken` from context, escapes it, and renders a hidden input. If the value is absent it renders nothing. Binja does not create, rotate, store, or validate CSRF tokens; use the host framework's CSRF protection.
+
+## Debug mode
+
+The debug panel and `{% debug %}` can expose context, template names, stack traces, SQL text, query parameters, and timing. Enable them only in trusted development environments:
+
+```ts
 const env = new Environment({
   templates: './views',
-  autoescape: true,  // Always keep enabled
-  debug: false,      // Disable in production
+  debug: Bun.env.NODE_ENV !== 'production',
 })
 ```
 
-### Restrict Template Access
+The panel escapes displayed values, but disclosure itself remains sensitive.
 
-Ensure templates can't access:
-- File system paths outside template directory
-- Sensitive configuration
-- Internal Python/JavaScript objects
+## Resource limits
 
-## Reporting Security Issues
+Application code should bound untrusted input sizes. Liquid ranges are capped at 100,000 items, and filters that require a positive step/width reject invalid values, but a large context or expensive custom filter can still consume substantial CPU or memory.
 
-If you discover a security vulnerability, please:
+## Deployment checklist
 
-1. **Do not** open a public issue
-2. Email security details to the maintainers
-3. Allow time for a fix before public disclosure
-
-## Security Checklist
-
-- [ ] Autoescape is enabled (default)
-- [ ] User input is never marked as `|safe`
-- [ ] CSRF tokens are used in forms
-- [ ] Debug mode is disabled in production
-- [ ] Template directory is restricted
-- [ ] JSON data uses `|json` or `|json_script`
-- [ ] URLs use `|urlencode` for user data
+- Keep templates application-controlled.
+- Leave autoescape enabled and audit every `safe`/raw-output use.
+- Pass narrow context objects without secrets or privileged services.
+- Use `json_script` for bootstrap JSON and validate URL protocols.
+- Supply and validate CSRF tokens in the host framework.
+- Keep template roots dedicated and debug mode disabled in production.
+- Apply request, payload, loop, and output-size limits appropriate to the service.
+- Treat parser/render errors as untrusted when placing them in HTML or logs.

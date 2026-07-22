@@ -7,6 +7,7 @@
 
 import { Hono } from 'hono'
 import { binja } from '../src/adapters/hono'
+import packageJson from '../package.json' with { type: 'json' }
 
 // Create app with binja middleware
 const app = new Hono()
@@ -45,7 +46,7 @@ app.get('/', (c) => {
       subheading: 'High-performance templates for Bun',
     },
     features: [
-      { icon: '🚀', title: 'Fast', description: '2-4x faster than Nunjucks' },
+      { icon: '🚀', title: 'Measured', description: 'Warmed runtime and AOT benchmarks' },
       { icon: '🔧', title: 'Multi-Engine', description: 'Jinja2, Handlebars, Liquid, Twig' },
       { icon: '🎯', title: 'Type-Safe', description: 'Full TypeScript support' },
     ],
@@ -104,7 +105,7 @@ app.get('/products', (c) => {
 app.get('/about', (c) => {
   return c.render('about', {
     title: 'About',
-    version: '0.9.0',
+    version: packageJson.version,
     technologies: ['Bun', 'Hono', 'TypeScript', 'binja'],
   })
 })
@@ -115,7 +116,7 @@ app.get('/api/users', (c) => {
 })
 
 // Start server
-const port = 3000
+const port = Number(Bun.env.BINJA_EXAMPLE_PORT ?? 3000)
 console.log(`
 🚀 Hono + binja server running!
 

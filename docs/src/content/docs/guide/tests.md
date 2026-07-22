@@ -1,9 +1,9 @@
 ---
-title: Built-in Tests (28)
-description: Tests for the is operator in conditionals
+title: Built-in Tests (35 registry entries)
+description: Tests and aliases for the is operator in conditions
 ---
 
-Tests check values using the `is` operator (Jinja2 syntax).
+Tests check values using the `is` operator. `builtinTests` currently exposes **35 registry entries**, including aliases (`none`, `null`, `None`, `eq`, `equalto`, `greaterthan`, and `lessthan`).
 
 ## Usage
 
@@ -30,7 +30,7 @@ Use `is not` for negative tests:
 |------|-------------|---------|
 | `defined` | Variable exists | `{% if x is defined %}` |
 | `undefined` | Variable doesn't exist | `{% if x is undefined %}` |
-| `none` | Value is null/undefined | `{% if x is none %}` |
+| `none` / `null` / `None` | Value is null/undefined | `{% if x is none %}` |
 | `boolean` | Value is boolean | `{% if x is boolean %}` |
 | `string` | Value is string | `{% if x is string %}` |
 | `number` | Value is number | `{% if x is number %}` |
@@ -53,11 +53,11 @@ Use `is not` for negative tests:
 
 | Test | Description | Example |
 |------|-------------|---------|
-| `eq(value)` | Equal to | `{% if x is eq(5) %}` |
+| `eq(value)` / `equalto(value)` | Equal to | `{% if x is eq(5) %}` |
 | `ne(value)` | Not equal to | `{% if x is ne(5) %}` |
-| `lt(value)` | Less than | `{% if x is lt(10) %}` |
+| `lt(value)` / `lessthan(value)` | Less than | `{% if x is lt(10) %}` |
 | `le(value)` | Less than or equal | `{% if x is le(10) %}` |
-| `gt(value)` | Greater than | `{% if x is gt(0) %}` |
+| `gt(value)` / `greaterthan(value)` | Greater than | `{% if x is gt(0) %}` |
 | `ge(value)` | Greater than or equal | `{% if x is ge(0) %}` |
 | `sameas(value)` | Same object reference | `{% if x is sameas(y) %}` |
 
@@ -153,10 +153,7 @@ Use `is not` for negative tests:
 ```typescript
 import { builtinTests } from 'binja'
 
-// All 28 built-in tests
-console.log(Object.keys(builtinTests))
-// ['divisibleby', 'even', 'odd', 'number', 'integer', 'float',
-//  'defined', 'undefined', 'none', 'boolean', 'string', 'mapping',
-//  'iterable', 'sequence', 'callable', 'upper', 'lower', 'empty',
-//  'in', 'eq', 'ne', 'sameas', 'equalto', 'truthy', 'falsy', ...]
+const names = Object.keys(builtinTests) // 35 in this release
 ```
+
+Collection semantics follow Binja's Jinja-style truthiness rules: empty arrays, plain objects, `Map`, and `Set` values are empty/falsy; non-empty instances are truthy. Mapping membership checks own properties only.

@@ -42,14 +42,14 @@
 
   <!-- Section description -->
   <text x="80" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">AOT compilation, intelligent caching, and benchmarks.</text>
-  <text x="80" y="400" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Get 160x faster rendering in production.</text>
+  <text x="80" y="400" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Measure warmed runtime and AOT paths reproducibly.</text>
 
   <!-- Performance stats -->
   <rect x="80" y="460" width="200" height="55" rx="10" fill="#10b981" opacity="0.2"/>
-  <text x="180" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">160x Faster AOT</text>
+  <text x="180" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">AOT Functions</text>
 
   <rect x="300" y="460" width="200" height="55" rx="10" fill="#10b981" opacity="0.2"/>
-  <text x="400" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">2-4x Runtime</text>
+  <text x="400" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">Runtime AST</text>
 
   <rect x="520" y="460" width="180" height="55" rx="10" fill="#10b981" opacity="0.2"/>
   <text x="610" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">LRU Cache</text>

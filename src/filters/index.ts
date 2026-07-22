@@ -3,6 +3,8 @@
  * Includes all Django Template Language filters
  */
 
+import { htmlSafeJson, isSafeAttributeName, safeGet } from '../security'
+
 export type FilterFunction = (value: any, ...args: any[]) => any
 
 // Pre-compiled regex patterns for performance (avoid recreation on each filter call)
@@ -98,7 +100,7 @@ export const escape: FilterFunction = (value) => {
   // If already safe, don't double-escape
   if ((value as any)?.__safe__) return value
 
-  // Use Bun's native escapeHTML for maximum performance (480 MB/s - 20 GB/s)
+  // Use Bun's HTML escaper and preserve the safe marker for output rendering.
   const escaped = Bun.escapeHTML(String(value))
 
   // Mark as safe to prevent double-escaping by autoescape
@@ -121,6 +123,10 @@ function markSafe(html: string): any {
   return safeString
 }
 
+function preserveSafety(input: any, output: string): any {
+  return (input as any)?.__safe__ ? markSafe(output) : output
+}
+
 // HTML-escape user text before it is embedded into markup that will be marked
 // safe. Respects the `__safe__` flag (Django does not re-escape SafeData), so
 // content already escaped upstream is passed through unchanged. This is the
@@ -131,7 +137,16 @@ function escapeText(value: any): string {
   return Bun.escapeHTML(String(value))
 }
 
-export const escapejs: FilterFunction = (value) => JSON.stringify(String(value)).slice(1, -1)
+export const escapejs: FilterFunction = (value) => {
+  let output = ''
+  for (const char of String(value)) {
+    const code = char.charCodeAt(0)
+    const mustEscape =
+      code <= 0x1f || code === 0x2028 || code === 0x2029 || `"'\\<>&=-;\``.includes(char)
+    output += mustEscape ? `\\u${code.toString(16).padStart(4, '0').toUpperCase()}` : char
+  }
+  return output
+}
 
 export const linebreaks: FilterFunction = (value) => {
   // Escape the text BEFORE inserting <p>/<br> markup, then mark safe. Escaping
@@ -139,7 +154,7 @@ export const linebreaks: FilterFunction = (value) => {
   // paragraph/line splitting still works on the escaped text.
   const str = escapeText(value)
   const paragraphs = str.split(DOUBLE_NEWLINE_REGEX)
-  // Optimized: for loop instead of .map() - 15-20% faster
+  // Build the output in one pass.
   let html = ''
   for (let i = 0; i < paragraphs.length; i++) {
     if (i > 0) html += '\n'
@@ -252,9 +267,12 @@ export const length: FilterFunction = (value) => {
   if (value == null) return 0
   if (typeof value === 'string' || Array.isArray(value)) return value.length
   if (typeof value === 'object') {
-    // Avoid Object.keys() allocation - count with for...in
+    // Avoid Object.keys() allocation while keeping mapping semantics limited
+    // to own enumerable properties.
     let count = 0
-    for (const _ in value) count++
+    for (const key in value) {
+      if (Object.hasOwn(value, key)) count++
+    }
     return count
   }
   return 0
@@ -331,8 +349,8 @@ export const make_list: FilterFunction = (value) => {
 export const dictsort: FilterFunction = (value, key) => {
   if (!Array.isArray(value)) return value
   return [...value].sort((a, b) => {
-    const aVal = key ? a[key] : a
-    const bVal = key ? b[key] : b
+    const aVal = key ? safeGet(a, key) : a
+    const bVal = key ? safeGet(b, key) : b
     return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
   })
 }
@@ -347,7 +365,10 @@ export const dictsortreversed: FilterFunction = (value, key) => {
 export const columns: FilterFunction = (value, cols) => {
   if (!Array.isArray(value)) return [[value]]
   const result: any[][] = []
-  const numCols = Number(cols) || 2
+  const numCols = Math.trunc(Number(cols) || 2)
+  if (!Number.isFinite(numCols) || numCols <= 0) {
+    throw new RangeError('columns count must be a positive integer')
+  }
 
   for (let i = 0; i < value.length; i += numCols) {
     result.push(value.slice(i, i + numCols))
@@ -525,11 +546,7 @@ export const urlize: FilterFunction = (value) => {
 
 export const json: FilterFunction = (value, indent) => {
   try {
-    const jsonStr = JSON.stringify(value, null, indent)
-    // Mark as safe - JSON should not be HTML-escaped
-    const safeString = new String(jsonStr) as any
-    safeString.__safe__ = true
-    return safeString
+    return markSafe(htmlSafeJson(value, indent))
   } catch {
     return ''
   }
@@ -549,7 +566,10 @@ export const random: FilterFunction = (value) => {
 export const batch: FilterFunction = (value, size, fillWith = null) => {
   if (!Array.isArray(value)) return [[value]]
   const result: any[][] = []
-  const numSize = Number(size) || 1
+  const numSize = Math.trunc(Number(size) || 1)
+  if (!Number.isFinite(numSize) || numSize <= 0) {
+    throw new RangeError('batch size must be a positive integer')
+  }
 
   for (let i = 0; i < value.length; i += numSize) {
     const batch = value.slice(i, i + numSize)
@@ -563,23 +583,21 @@ export const batch: FilterFunction = (value, size, fillWith = null) => {
 }
 
 // Jinja2: groupby
-// Optimized: plain object instead of Map - 53% faster
 export const groupby: FilterFunction = (value, attribute) => {
   if (!Array.isArray(value)) return []
 
-  const groups: Record<string, any[]> = {}
+  const groups = new Map<string, any[]>()
 
   for (const item of value) {
-    const key = String(attribute ? item[attribute] : item)
-    if (!(key in groups)) {
-      groups[key] = []
-    }
-    groups[key].push(item)
+    const key = String(attribute ? safeGet(item, attribute) : item)
+    const group = groups.get(key) ?? []
+    if (!groups.has(key)) groups.set(key, group)
+    group.push(item)
   }
 
   const result: any[] = []
-  for (const key in groups) {
-    result.push({ grouper: key, list: groups[key] })
+  for (const [key, list] of groups) {
+    result.push({ grouper: key, list })
   }
   return result
 }
@@ -594,23 +612,27 @@ export const wordwrap: FilterFunction = (
   wrapString = '\n'
 ) => {
   const str = String(value)
-  if (str.length <= width) return str
+  const lineWidth = Math.trunc(Number(width))
+  if (!Number.isFinite(lineWidth) || lineWidth <= 0) {
+    throw new RangeError('wordwrap width must be a positive integer')
+  }
+  if (str.length <= lineWidth) return str
 
   const words = str.split(' ')
   const lines: string[] = []
   let currentLine = ''
 
   for (const word of words) {
-    if (currentLine.length + word.length + 1 <= width) {
+    if (currentLine.length + word.length + 1 <= lineWidth) {
       currentLine += (currentLine ? ' ' : '') + word
     } else {
       if (currentLine) lines.push(currentLine)
-      if (breakLongWords && word.length > width) {
+      if (breakLongWords && word.length > lineWidth) {
         // Break long word into chunks
         let remaining = word
-        while (remaining.length > width) {
-          lines.push(remaining.slice(0, width))
-          remaining = remaining.slice(width)
+        while (remaining.length > lineWidth) {
+          lines.push(remaining.slice(0, lineWidth))
+          remaining = remaining.slice(lineWidth)
         }
         currentLine = remaining
       } else {
@@ -624,10 +646,11 @@ export const wordwrap: FilterFunction = (
 }
 
 // Jinja2: indent - Indent each line
-// Optimized: for loop instead of .map() - 15-20% faster
+// Build the output in one pass.
 export const indent: FilterFunction = (value, width = 4, first = false, blank = false) => {
   const str = String(value)
-  const indentStr = typeof width === 'string' ? width : ' '.repeat(Number(width))
+  const indentStr =
+    typeof width === 'string' ? width : ' '.repeat(Math.max(0, Math.trunc(Number(width))))
   const lines = str.split('\n')
 
   let result = ''
@@ -648,19 +671,32 @@ export const indent: FilterFunction = (value, width = 4, first = false, blank = 
 }
 
 // Jinja2: replace - Replace substring
-// Optimized: single-pass scanner instead of while + includes() - 30-50% faster
+// Use a single-pass scanner.
 export const replace: FilterFunction = (value, old, newStr, count) => {
   const str = String(value)
   const oldStr = String(old)
   const newString = String(newStr)
 
-  if (count === undefined || count < 0) {
+  if (count === undefined || Number(count) < 0 || Number(count) === Number.POSITIVE_INFINITY) {
     return str.replaceAll(oldStr, newString)
   }
 
   // Single-pass replacement for limited count
-  const maxCount = Number(count)
+  const maxCount = Math.max(0, Math.trunc(Number(count) || 0))
   if (maxCount === 0) return str
+
+  if (oldStr === '') {
+    let output = ''
+    let inserted = 0
+    for (let i = 0; i <= str.length; i++) {
+      if (inserted < maxCount) {
+        output += newString
+        inserted++
+      }
+      if (i < str.length) output += str[i]
+    }
+    return output
+  }
 
   let result = ''
   let pos = 0
@@ -680,7 +716,7 @@ export const replace: FilterFunction = (value, old, newStr, count) => {
 }
 
 // Jinja2: format - Python-style string formatting
-// Optimized: for loop instead of .forEach() - 10-15% faster
+// Avoid an intermediate callback allocation in this hot path.
 export const format: FilterFunction = (value, ...args) => {
   let str = String(value)
   // Support positional: "Hello %s" | format("World")
@@ -713,7 +749,7 @@ export const map: FilterFunction = (value, attribute) => {
   if (!Array.isArray(value)) return []
   if (typeof attribute === 'string') {
     // Map by attribute name
-    return value.map((item) => item?.[attribute])
+    return value.map((item) => safeGet(item, attribute))
   }
   return value
 }
@@ -725,7 +761,7 @@ export const select: FilterFunction = (value, attribute) => {
     return value.filter((item) => !!item)
   }
   // Filter by attribute being truthy
-  return value.filter((item) => !!item?.[attribute])
+  return value.filter((item) => !!safeGet(item, attribute))
 }
 
 // Jinja2: reject - Filter elements that are falsy (or fail test)
@@ -734,11 +770,11 @@ export const reject: FilterFunction = (value, attribute) => {
   if (attribute === undefined) {
     return value.filter((item) => !item)
   }
-  return value.filter((item) => !item?.[attribute])
+  return value.filter((item) => !safeGet(item, attribute))
 }
 
 function matchesAttribute(item: any, attribute: any, test: any, testValue: any): boolean {
-  const attrValue = item?.[attribute]
+  const attrValue = safeGet(item, attribute)
   if (test === undefined) return !!attrValue
   if (test === 'eq' || test === 'equalto') return attrValue === testValue
   if (test === 'ne') return attrValue !== testValue
@@ -769,8 +805,7 @@ export const rejectattr: FilterFunction = (value, attribute, test, testValue) =>
 
 // Jinja2: attr - Get attribute from object
 export const attr: FilterFunction = (value, name) => {
-  if (value == null) return undefined
-  return value[name]
+  return safeGet(value, name)
 }
 
 // Jinja2: max - Maximum value
@@ -780,7 +815,7 @@ export const max: FilterFunction = (value, attribute, defaultValue) => {
   if (attribute) {
     let maxItem = value[0]
     for (let i = 1; i < value.length; i++) {
-      if (value[i][attribute] > maxItem[attribute]) {
+      if (safeGet(value[i], attribute) > safeGet(maxItem, attribute)) {
         maxItem = value[i]
       }
     }
@@ -801,7 +836,7 @@ export const min: FilterFunction = (value, attribute, defaultValue) => {
   if (attribute) {
     let minItem = value[0]
     for (let i = 1; i < value.length; i++) {
-      if (value[i][attribute] < minItem[attribute]) {
+      if (safeGet(value[i], attribute) < safeGet(minItem, attribute)) {
         minItem = value[i]
       }
     }
@@ -816,12 +851,12 @@ export const min: FilterFunction = (value, attribute, defaultValue) => {
 }
 
 // Jinja2: sum - Sum of elements
-// Optimized: for loop instead of .reduce() - 5-10% faster
+// Sum in one pass without an intermediate reduction closure.
 export const sum: FilterFunction = (value, attribute, start = 0) => {
   if (!Array.isArray(value)) return start
   let total = Number(start)
   for (let i = 0; i < value.length; i++) {
-    const val = attribute ? value[i][attribute] : value[i]
+    const val = attribute ? safeGet(value[i], attribute) : value[i]
     total += Number(val) || 0
   }
   return total
@@ -830,11 +865,7 @@ export const sum: FilterFunction = (value, attribute, start = 0) => {
 // Jinja2: pprint - Pretty print for debugging
 export const pprint: FilterFunction = (value) => {
   try {
-    const result = JSON.stringify(value, null, 2)
-    // Mark as safe to prevent escaping of quotes
-    const safeString = new String(result) as any
-    safeString.__safe__ = true
-    return safeString
+    return JSON.stringify(value, null, 2)
   } catch {
     return String(value)
   }
@@ -879,7 +910,7 @@ const PHONE_MAP: Record<string, string> = {
   y: '9',
   z: '9',
 }
-// Optimized: array buffer instead of string concatenation - 15-20% faster
+// Accumulate fragments before joining the final string.
 export const phone2numeric: FilterFunction = (value) => {
   const str = String(value).toLowerCase()
   const len = str.length
@@ -891,7 +922,7 @@ export const phone2numeric: FilterFunction = (value) => {
 }
 
 // Django: linenumbers - Add line numbers
-// Optimized: for loop instead of .map() - 15-20% faster
+// Build the output in one pass.
 export const linenumbers: FilterFunction = (value) => {
   const lines = String(value).split('\n')
   const width = String(lines.length).length
@@ -940,11 +971,7 @@ export const unordered_list: FilterFunction = (value): any => {
 
 // Django: addslashes - Escape backslash, single and double quotes
 export const addslashes: FilterFunction = (value) => {
-  const result = String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"')
-  // Mark as safe since quotes are escaped for JS strings
-  const safeString = new String(result) as any
-  safeString.__safe__ = true
-  return safeString
+  return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"')
 }
 
 // Django: get_digit - Get nth digit from right (1=rightmost)
@@ -975,12 +1002,8 @@ export const iriencode: FilterFunction = (value) => {
 
 // Django: json_script - Output JSON in a <script> tag safely (for embedding in HTML)
 export const json_script: FilterFunction = (value, elementId) => {
-  const jsonStr = JSON.stringify(value)
-    .replace(/</g, '\\u003C') // Escape < to prevent </script> injection
-    .replace(/>/g, '\\u003E') // Escape > for safety
-    .replace(/&/g, '\\u0026') // Escape & for HTML safety
-
-  const id = elementId ? ` id="${String(elementId)}"` : ''
+  const jsonStr = htmlSafeJson(value)
+  const id = elementId ? ` id="${Bun.escapeHTML(String(elementId))}"` : ''
   const html = `<script${id} type="application/json">${jsonStr}</script>`
 
   const safeString = new String(html) as any
@@ -1080,9 +1103,7 @@ export const truncatechars_html: FilterFunction = (value, length = 30) => {
     result += `</${openTags[i]}>`
   }
 
-  const safeString = new String(result) as any
-  safeString.__safe__ = true
-  return safeString
+  return preserveSafety(value, result)
 }
 
 // Django: truncatewords_html - Truncate words preserving HTML tags
@@ -1141,9 +1162,7 @@ export const truncatewords_html: FilterFunction = (value, count = 15) => {
     result += `</${openTags[i]}>`
   }
 
-  const safeString = new String(result) as any
-  safeString.__safe__ = true
-  return safeString
+  return preserveSafety(value, result)
 }
 
 // Django: urlizetrunc - Convert URLs to links with truncation
@@ -1176,13 +1195,30 @@ export const items: FilterFunction = (value) => {
   return Object.entries(value)
 }
 
+// Twig/Jinja helpers for mapping operations.
+export const keys: FilterFunction = (value) => {
+  if (value == null || typeof value !== 'object') return []
+  return Object.keys(value)
+}
+
+export const merge: FilterFunction = (value, other) => {
+  if (Array.isArray(value)) return value.concat(Array.isArray(other) ? other : [other])
+  if (value && typeof value === 'object' && other && typeof other === 'object') {
+    return Object.assign(Object.create(null), value, other)
+  }
+  return other ?? value
+}
+
 // Jinja2: xmlattr - Generate XML/HTML attributes from dict
-// Optimized: uses Bun.escapeHTML for ~30% faster attribute escaping
+// Use the shared Bun HTML escaper for attribute values.
 export const xmlattr: FilterFunction = (value, autospace = true) => {
   if (value == null || typeof value !== 'object') return ''
 
   const attrs: string[] = []
   for (const [key, val] of Object.entries(value)) {
+    if (!isSafeAttributeName(key)) {
+      throw new Error(`Invalid character in attribute name: ${key}`)
+    }
     if (val === true) {
       attrs.push(key)
     } else if (val !== false && val != null) {
@@ -1195,9 +1231,7 @@ export const xmlattr: FilterFunction = (value, autospace = true) => {
   const result = attrs.join(' ')
   const output = autospace && result ? ` ${result}` : result
 
-  const safeString = new String(output) as any
-  safeString.__safe__ = true
-  return safeString
+  return markSafe(output)
 }
 
 // ==================== Built-in Filters Registry ====================
@@ -1314,5 +1348,7 @@ export const builtinFilters: Record<string, FilterFunction> = {
 
   // Jinja2 additional
   items,
+  keys,
+  merge,
   xmlattr,
 }

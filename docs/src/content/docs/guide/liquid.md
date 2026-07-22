@@ -1,226 +1,95 @@
 ---
-title: Liquid Engine
-description: Shopify/Jekyll Liquid template syntax support
+title: Liquid subset
+description: Supported Liquid-style syntax, aliases, ranges, assignments, and limitations.
 ---
 
-binja supports Liquid template syntax, commonly used in Shopify themes and Jekyll static sites.
-
-## Installation
-
-Liquid support is included with binja:
-
-```bash
-bun add binja
-```
-
-## Basic Usage
-
-```typescript
+```ts
 import * as liquid from 'binja/engines/liquid'
 
-const html = await liquid.render('Hello {{ name }}!', { name: 'World' })
-// Output: Hello World!
+const html = await liquid.render('Hello {{ name | upcase }}!', { name: 'Ada' })
 ```
 
-## Syntax
-
-### Variables
+## Output and filters
 
 ```liquid
-{{ name }}
-{{ user.email }}
-{{ items[0] }}
+{{ user.name }}
+{{ users[0].name }}
+{{ title | upcase | truncate: 20 }}
 ```
 
-### Filters
+Common Liquid aliases include `upcase`, `downcase`, `strip`, `size`, `truncate`, and `json`; compatible Binja registry names can also be used when the syntax parses them.
+
+## Conditions
 
 ```liquid
-{{ name | upcase }}
-{{ text | truncate: 20 }}
-{{ price | money }}
-```
-
-### Comments
-
-```liquid
-{% comment %}
-  This is a comment
-{% endcomment %}
-```
-
-## Control Structures
-
-### if / elsif / else
-
-```liquid
-{% if user %}
-  Hello {{ user.name }}!
-{% elsif guest %}
-  Hello Guest!
+{% if product.available %}
+  Available
+{% elsif product.backorder %}
+  Back order
 {% else %}
-  Hello Visitor!
+  Unavailable
 {% endif %}
-```
 
-### unless
+{% unless hidden %}Visible{% endunless %}
 
-```liquid
-{% unless is_admin %}
-  <p>You don't have admin access.</p>
-{% endunless %}
-```
-
-### case / when
-
-```liquid
-{% case status %}
-  {% when 'active' %}
-    <span class="badge-success">Active</span>
-  {% when 'pending' %}
-    <span class="badge-warning">Pending</span>
-  {% else %}
-    <span class="badge-secondary">Unknown</span>
+{% case tier %}
+  {% when 'pro' %}Pro
+  {% when 'team' %}Team
+  {% else %}Free
 {% endcase %}
 ```
 
-### for
+Supported logical/comparison operators include `and`, `or`, `==`, `!=`, `<`, `<=`, `>`, `>=`, and `contains`. Literals include `true`, `false`, `nil`, and `null`.
+
+## Loops and ranges
 
 ```liquid
-{% for item in items %}
-  <li>{{ item }}</li>
-{% endfor %}
-```
-
-With else (empty):
-
-```liquid
-{% for item in items %}
-  <li>{{ item }}</li>
+{% for item in items offset: 1 limit: 3 reversed %}
+  {{ forloop.counter }}: {{ item }}
 {% else %}
-  <li>No items found</li>
+  Empty
 {% endfor %}
+
+{% for n in (1..5) %}{{ n }}{% endfor %}
 ```
 
-### Loop Variables
+`limit` and `offset` may be expressions. `reversed` applies to the selected slice. Inclusive ascending and descending ranges are supported and capped at 100,000 items.
 
-| Variable | Description |
-|----------|-------------|
-| `forloop.index` | 1-based index |
-| `forloop.index0` | 0-based index |
-| `forloop.first` | True if first |
-| `forloop.last` | True if last |
-| `forloop.length` | Total items |
+Loop aliases use the shared runtime (`forloop.counter`, `counter0`, `first`, `last`, `length`, and reverse counters).
+
+## Assignment, capture, and counters
 
 ```liquid
-{% for item in items %}
-  <li class="{% if forloop.first %}first{% endif %}">
-    {{ forloop.index }}. {{ item }}
-  </li>
-{% endfor %}
+{% assign label = 'Status' %}
+{% capture heading %}<strong>{{ label }}</strong>{% endcapture %}
+{{ heading }}
+
+{% increment row %}
+{% increment row %}
+{% decrement remaining %}
 ```
 
-### Loop Parameters
+Counters are render-local, so concurrent renders do not share values.
+
+## Comments and raw text
 
 ```liquid
-{% for item in items limit: 5 %}
-{% for item in items offset: 2 %}
-{% for item in items reversed %}
+{% comment %}not rendered{% endcomment %}
+{% raw %}{{ not_parsed }}{% endraw %}
 ```
 
-## Variable Assignment
+## API
 
-### assign
-
-```liquid
-{% assign greeting = "Hello" %}
-{{ greeting }}
+```ts
+const ast = liquid.parse(source)
+const renderCached = liquid.compile(source)
+const html = await renderCached(context)
 ```
 
-### capture
+## Compatibility boundaries
 
-```liquid
-{% capture full_name %}
-  {{ first_name }} {{ last_name }}
-{% endcapture %}
-
-{{ full_name }}
-```
-
-## Raw Output
-
-```liquid
-{% raw %}
-  {{ this will not be processed }}
-{% endraw %}
-```
-
-## Filters
-
-### Built-in Liquid Filters
-
-binja supports standard Liquid filters plus all 84+ binja filters:
-
-```liquid
-{{ "hello" | upcase }}           {# HELLO #}
-{{ "HELLO" | downcase }}         {# hello #}
-{{ "hello" | capitalize }}       {# Hello #}
-{{ "hello world" | truncate: 8 }} {# hello... #}
-{{ items | size }}               {# 5 #}
-{{ items | first }}
-{{ items | last }}
-{{ items | join: ", " }}
-{{ items | sort }}
-{{ items | reverse }}
-```
-
-## Comparison with Jinja2
-
-| Feature | Liquid | Jinja2 |
-|---------|--------|--------|
-| Variables | `{{ var }}` | `{{ var }}` |
-| Filters | `{{ var \| filter }}` | `{{ var\|filter }}` |
-| If | `{% if %}` | `{% if %}` |
-| Loop | `{% for %}` | `{% for %}` |
-| Assign | `{% assign %}` | `{% set %}` |
-| Comments | `{% comment %}` | `{# #}` |
-| Raw | `{% raw %}` | `{% raw %}` |
-
-## Migration from LiquidJS
-
-```typescript
-// Before: LiquidJS
-import { Liquid } from 'liquidjs'
-const engine = new Liquid()
-const html = await engine.parseAndRender(source, context)
-
-// After: binja
-import * as liquid from 'binja/engines/liquid'
-const html = await liquid.render(source, context)
-```
-
-## Shopify Theme Development
-
-binja's Liquid engine is compatible with Shopify theme syntax:
-
-```liquid
-{% for product in collection.products %}
-  <div class="product">
-    <h2>{{ product.title }}</h2>
-    <p>{{ product.price | money }}</p>
-    {% if product.available %}
-      <button>Add to Cart</button>
-    {% else %}
-      <span>Sold Out</span>
-    {% endif %}
-  </div>
-{% endfor %}
-```
-
-## Performance
-
-Liquid templates in binja benefit from:
-
-- Same optimized runtime as Jinja2
-- Same 84+ built-in filters
-- Template caching
-- AOT compilation support
+- This is not the Shopify theme runtime: Shopify objects, drops, sections, schema, locale/theme files, and the complete tag/filter surface are not provided.
+- Direct `include`/`render` has no configured loader and is therefore not usable through the string-only module API.
+- `break` and `continue` are rejected explicitly in this release.
+- Unknown tags throw a source-aware syntax error.
+- Whitespace and coercion edge cases may differ from LiquidJS or Shopify Liquid; protect migrations with fixtures.

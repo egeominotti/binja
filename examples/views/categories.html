@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }} - {{ siteName }}</title>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <p>{{ stats.totalCategories }} categories · {{ stats.totalPosts }} posts</p>
+  <ul>
+    {% for category in categories %}
+      <li><a href="/categories/{{ category.slug }}">{{ category.name }}</a> ({{ category.count }})</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

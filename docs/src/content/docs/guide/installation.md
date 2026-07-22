@@ -5,7 +5,7 @@ description: How to install binja in your Bun project
 
 ## Requirements
 
-binja requires [Bun](https://bun.sh) runtime. Node.js is not supported.
+Binja requires [Bun](https://bun.sh) `>=1.3.14`. Node.js is not a supported runtime target.
 
 ```bash
 # Install Bun if you haven't already
@@ -18,7 +18,7 @@ curl -fsSL https://bun.sh/install | bash
 bun add binja
 ```
 
-That's it! No external dependencies required.
+Core rendering has no required runtime dependency beyond Bun. Framework adapters and AI providers require their corresponding packages.
 
 ## Optional: AI Linting
 

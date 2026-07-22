@@ -53,7 +53,7 @@ console.log(stats)
 //   maxSize: 100,  // Maximum cache size
 //   hits: 150,     // Cache hits
 //   misses: 10,    // Cache misses
-//   hitRate: 0.94  // Hit rate (93.75%)
+//   hitRate: 93.75 // Percentage from 0 to 100
 // }
 ```
 
@@ -63,9 +63,9 @@ console.log(stats)
 // Log cache stats periodically
 setInterval(() => {
   const stats = env.cacheStats()
-  console.log(`Cache: ${stats.size}/${stats.maxSize}, Hit rate: ${(stats.hitRate * 100).toFixed(1)}%`)
+  console.log(`Cache: ${stats.size}/${stats.maxSize}, Hit rate: ${stats.hitRate.toFixed(1)}%`)
 
-  if (stats.hitRate < 0.8) {
+  if (stats.hitRate < 80) {
     console.warn('Low cache hit rate - consider increasing cacheMaxSize')
   }
 }, 60000)
@@ -78,6 +78,12 @@ setInterval(() => {
 ```typescript
 env.clearCache()
 // Clears all cached templates and resets stats
+```
+
+Inspect the current LRU order when diagnosing cache behavior:
+
+```typescript
+env.cacheKeys() // oldest to newest
 ```
 
 ### Pre-warm Cache
@@ -177,9 +183,9 @@ const env = new Environment({
 | Approach | Use Case | Performance |
 |----------|----------|-------------|
 | **Cache** | Templates with inheritance | Fast (skips lex/parse) |
-| **AOT** | Static templates | Fastest (compiled to JS) |
+| **AOT** | Supported static templates | Synchronous generated JS |
 
-For maximum performance, combine both:
+Choose per template: AOT for supported static sources and an Environment cache for loader-backed templates:
 
 ```typescript
 import { compile, Environment } from 'binja'
@@ -199,7 +205,7 @@ const env = new Environment({
 
 ## Framework Adapter Caching
 
-Framework adapters (Hono, Elysia) have their own cache:
+Framework adapters expose module-level management over all adapter caches in the process. The reported entries include the core Jinja `Environment` caches and the secondary-engine compiled-function cache:
 
 ```typescript
 import { binja, clearCache, getCacheStats } from 'binja/hono'
@@ -216,3 +222,5 @@ app.post('/admin/cache/clear', (c) => {
   return c.json({ success: true })
 })
 ```
+
+`clearCache()` affects every instance created from that adapter module. Treat `keys` as diagnostic labels rather than a stable cache-key API.

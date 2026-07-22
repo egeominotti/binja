@@ -1,124 +1,64 @@
 ---
 title: render()
-description: API reference for the render function
+description: API reference for one-off asynchronous source-string rendering.
 ---
-
-The `render()` function provides runtime template rendering. Best for development and templates with dynamic content.
 
 ## Signature
 
-```typescript
+```ts
 function render(
-  template: string,
+  source: string,
   context?: Record<string, any>,
-  options?: RenderOptions
+  options?: EnvironmentOptions
 ): Promise<string>
 ```
 
-## Parameters
+`render()` creates an `Environment` for the call and delegates to `renderString()`.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `template` | `string` | Template string to render |
-| `context` | `object` | Variables available in template |
-| `options` | `RenderOptions` | Optional configuration |
+```ts
+import { render } from 'binja'
+
+const html = await render('Hello, {{ name|upper }}!', { name: 'Ada' })
+```
 
 ## Options
 
-```typescript
-interface RenderOptions {
-  autoescape?: boolean       // HTML escape by default (default: true)
-  filters?: Record<string, FilterFunction>  // Custom filters
-  globals?: Record<string, any>  // Global variables
-}
-```
+The third argument accepts the same `EnvironmentOptions` as the class, including `autoescape`, `filters`, `globals`, resolvers, timezone, and debug settings.
 
-## Basic Usage
-
-```typescript
-import { render } from 'binja'
-
-const html = await render('Hello, {{ name }}!', { name: 'World' })
-// Output: Hello, World!
-```
-
-## With Filters
-
-```typescript
-const html = await render('{{ title|upper|truncatechars:20 }}', {
-  title: 'Welcome to our amazing website'
-})
-// Output: WELCOME TO OUR AMAZI...
-```
-
-## With Conditionals
-
-```typescript
-const html = await render(`
-  {% if user.is_admin %}
-    <span class="badge">Admin</span>
-  {% else %}
-    <span class="badge">User</span>
-  {% endif %}
-`, {
-  user: { is_admin: true }
-})
-```
-
-## With Loops
-
-```typescript
-const html = await render(`
-  {% for item in items %}
-    <li>{{ loop.index }}. {{ item }}</li>
-  {% empty %}
-    <li>No items</li>
-  {% endfor %}
-`, {
-  items: ['Apple', 'Banana', 'Cherry']
-})
-```
-
-## Custom Filters
-
-```typescript
-const html = await render('{{ price|currency }}',
+```ts
+const html = await render(
+  '{{ price|currency }}',
   { price: 42.5 },
   {
-    filters: {
-      currency: (value) => `$${value.toFixed(2)}`
-    }
+    filters: { currency: (value: number) => `€${value.toFixed(2)}` },
   }
 )
-// Output: $42.50
 ```
 
-## Disabling Autoescape
+## Loader behavior
 
-```typescript
-// Not recommended for user input!
-const html = await render('{{ html }}',
-  { html: '<b>Bold</b>' },
-  { autoescape: false }
-)
-// Output: <b>Bold</b>
+For repeated rendering, file loading, includes, inheritance, or caching, construct one `Environment` and reuse it. A one-off `render()` call does not retain a cache across calls.
+
+## Escaping
+
+Autoescape defaults to true:
+
+```ts
+await render('{{ html }}', { html: '<b>Bold</b>' })
+// &lt;b&gt;Bold&lt;/b&gt;
 ```
 
-## Error Handling
+Disabling it is appropriate only when every inserted value is already trusted:
 
-```typescript
-try {
-  const html = await render('{{ invalid syntax }', {})
-} catch (error) {
-  console.error('Template error:', error.message)
-}
+```ts
+await render('{{ trusted }}', { trusted: '<b>Bold</b>' }, { autoescape: false })
 ```
 
-## Performance Note
+## Errors
 
-For production, consider using [`compile()`](/binja/api/compile/) for static templates (160x faster) or [`Environment`](/binja/api/environment/) with caching for templates with inheritance.
+Lexing/parsing errors include location metadata where available. Unknown filters/tests and render failures are rejected promises. Use `TemplateNotFoundError` when distinguishing loader failures in `Environment` workflows.
 
-## See Also
+## Choosing another API
 
-- [`compile()`](/binja/api/compile/) - AOT compilation for maximum performance
-- [`Environment`](/binja/api/environment/) - Full-featured template environment
+- Reuse an [`Environment`](/binja/api/environment/) for loaders, caches, custom registries, or many renders.
+- Use [`compile()`](/binja/api/compile/) for a supported static template that must render synchronously.

@@ -1,12 +1,40 @@
-import { compile, Environment, Runtime } from '../src'
+import { cpus, totalmem } from 'node:os'
+import { compile, Environment, Lexer, Runtime } from '../src'
 import * as liquid from '../src/engines/liquid'
 import { rejectattr } from '../src/filters'
 
-interface BenchmarkCase {
+type BenchmarkCase = SyncBenchmarkCase | AsyncBenchmarkCase
+
+interface BenchmarkCaseBase {
   iterations: number
   name: string
-  run: () => unknown | Promise<unknown>
 }
+
+interface SyncBenchmarkCase extends BenchmarkCaseBase {
+  mode: 'sync'
+  run: () => unknown
+}
+
+interface AsyncBenchmarkCase extends BenchmarkCaseBase {
+  mode: 'async'
+  run: () => Promise<unknown>
+}
+
+interface BenchmarkResult {
+  batchMedianMs: number
+  iterations: number
+  maxOpsPerSecond: number
+  medianOpsPerSecond: number
+  minOpsPerSecond: number
+  mode: 'sync' | 'async'
+  name: string
+  relativeStdDev: number
+  samplesMs: number[]
+}
+
+const requestedRounds = Number(Bun.env.BENCH_ROUNDS ?? 7)
+const rounds = Number.isInteger(requestedRounds) && requestedRounds >= 3 ? requestedRounds : 7
+const jsonOutput = process.argv.includes('--json')
 
 const environment = new Environment({ autoescape: false })
 const simpleSource = '<h1>{{ title }}</h1><p>{{ description }}</p>'
@@ -29,81 +57,197 @@ const filterItems = Array.from({ length: 20_000 }, (_, index) => ({
   enabled: index % 2 === 0,
   index,
 }))
+const lexerSource = `${'Static HTML and prose. '.repeat(100)}{{ title }}{% if enabled %}yes{% endif %}`
+const customDelimiterSource = `${'Static HTML and prose. '.repeat(100)}[[ title ]]<% if enabled %>yes<% endif %>`
 
 const cases: BenchmarkCase[] = [
   {
-    name: 'Runtime / simple cached AST',
+    iterations: 10_000,
+    mode: 'sync',
+    name: 'Lexer / default delimiters (2.3K chars)',
+    run: () => new Lexer(lexerSource).tokenize(),
+  },
+  {
+    iterations: 10_000,
+    mode: 'sync',
+    name: 'Lexer / custom delimiters (2.3K chars)',
+    run: () =>
+      new Lexer(customDelimiterSource, {
+        blockEnd: '%>',
+        blockStart: '<%',
+        variableEnd: ']]',
+        variableStart: '[[',
+      }).tokenize(),
+  },
+  {
     iterations: 20_000,
+    mode: 'async',
+    name: 'Runtime / simple cached AST',
     run: () => runtime.render(simpleAst, simpleContext),
   },
   {
-    name: 'Runtime / loop (100 items)',
     iterations: 2_000,
+    mode: 'async',
+    name: 'Runtime / loop (100 items)',
     run: () => runtime.render(loopAst, loopContext),
   },
   {
-    name: 'AOT / simple',
     iterations: 200_000,
+    mode: 'sync',
+    name: 'AOT / simple',
     run: () => simpleAot(simpleContext),
   },
   {
-    name: 'AOT / loop (100 items)',
     iterations: 10_000,
+    mode: 'sync',
+    name: 'AOT / loop (100 items)',
     run: () => loopAot(loopContext),
   },
   {
-    name: 'Liquid / modifiers (100 items)',
     iterations: 2_000,
+    mode: 'async',
+    name: 'Liquid / loop modifiers (100 items)',
     run: () => liquidLoop(loopContext),
   },
   {
-    name: 'Filter / rejectattr (20K items)',
     iterations: 1_000,
+    mode: 'sync',
+    name: 'Filter / rejectattr (20K items)',
     run: () => rejectattr(filterItems, 'enabled', 'eq', true),
   },
 ]
 
 let checksum = 0
+await verifyCorrectness()
 
-console.log(`binja benchmark — Bun ${Bun.version} — ${process.platform}/${process.arch}`)
-console.log('Each result is the median of 5 warmed-up rounds.\n')
-console.log('| Case | ops/s | batch median ms |')
-console.log('|---|---:|---:|')
-
+const results: BenchmarkResult[] = []
 for (const benchmarkCase of cases) {
-  const milliseconds = await measure(benchmarkCase)
-  const operationsPerSecond = benchmarkCase.iterations / (milliseconds / 1_000)
-  console.log(
-    `| ${benchmarkCase.name} | ${Math.round(operationsPerSecond).toLocaleString('en-US')} | ${milliseconds.toFixed(2)} |`
-  )
+  results.push(await measure(benchmarkCase))
 }
 
-// Make the consumption of benchmark outputs observable.
-if (checksum === Number.MIN_SAFE_INTEGER) console.log(checksum)
+const metadata = {
+  arch: process.arch,
+  bun: Bun.version,
+  cpu: cpus()[0]?.model ?? 'unknown',
+  memoryGiB: Number((totalmem() / 1024 ** 3).toFixed(1)),
+  platform: process.platform,
+  rounds,
+}
 
-async function measure(benchmarkCase: BenchmarkCase): Promise<number> {
-  const warmupIterations = Math.min(500, benchmarkCase.iterations)
-  for (let i = 0; i < warmupIterations; i++) {
-    consume(await benchmarkCase.run())
+if (jsonOutput) {
+  console.log(JSON.stringify({ metadata, results, checksum }, null, 2))
+} else {
+  console.log(`binja benchmark — Bun ${metadata.bun} — ${metadata.platform}/${metadata.arch}`)
+  console.log(`${metadata.cpu} — ${metadata.memoryGiB} GiB RAM`)
+  console.log(
+    `Median of ${rounds} warmed rounds. Sync and async cases use separate harnesses; setup/compile time is excluded.\n`
+  )
+  console.log('| Case | Mode | median ops/s | min–max ops/s | RSD | batch median |')
+  console.log('|---|:---:|---:|---:|---:|---:|')
+  for (const result of results) {
+    console.log(
+      `| ${result.name} | ${result.mode} | ${formatInteger(result.medianOpsPerSecond)} | ${formatInteger(result.minOpsPerSecond)}–${formatInteger(result.maxOpsPerSecond)} | ${result.relativeStdDev.toFixed(1)}% | ${result.batchMedianMs.toFixed(2)} ms |`
+    )
+  }
+  console.log('\nUse BENCH_ROUNDS=N to change rounds or --json for machine-readable output.')
+}
+
+async function verifyCorrectness(): Promise<void> {
+  const [runtimeSimple, runtimeLoop, liquidOutput] = await Promise.all([
+    runtime.render(simpleAst, simpleContext),
+    runtime.render(loopAst, loopContext),
+    liquidLoop(loopContext),
+  ])
+  const aotSimple = simpleAot(simpleContext)
+  const aotLoop = loopAot(loopContext)
+  if (runtimeSimple !== aotSimple || runtimeLoop !== aotLoop) {
+    throw new Error('Runtime/AOT correctness check failed; benchmark aborted')
   }
 
-  const samples: number[] = []
-  for (let round = 0; round < 5; round++) {
+  const defaultTokens = new Lexer(lexerSource).tokenize()
+  const customTokens = new Lexer(customDelimiterSource, {
+    blockEnd: '%>',
+    blockStart: '<%',
+    variableEnd: ']]',
+    variableStart: '[[',
+  }).tokenize()
+  if (
+    defaultTokens.length !== customTokens.length ||
+    !liquidOutput.startsWith('item-89') ||
+    !liquidOutput.endsWith('item-10')
+  ) {
+    throw new Error('Lexer/Liquid correctness check failed; benchmark aborted')
+  }
+
+  const filtered = rejectattr(filterItems, 'enabled', 'eq', true) as typeof filterItems
+  if (filtered.length !== 10_000 || filtered.some((item) => item.enabled)) {
+    throw new Error('Filter correctness check failed; benchmark aborted')
+  }
+}
+
+async function measure(benchmarkCase: BenchmarkCase): Promise<BenchmarkResult> {
+  const warmupIterations = Math.min(1_000, Math.max(50, Math.floor(benchmarkCase.iterations / 10)))
+  if (benchmarkCase.mode === 'sync') {
+    for (let index = 0; index < warmupIterations; index++) consume(benchmarkCase.run())
+  } else {
+    for (let index = 0; index < warmupIterations; index++) consume(await benchmarkCase.run())
+  }
+
+  const samplesMs: number[] = []
+  for (let round = 0; round < rounds; round++) {
     const start = performance.now()
-    for (let i = 0; i < benchmarkCase.iterations; i++) {
-      consume(await benchmarkCase.run())
+    if (benchmarkCase.mode === 'sync') {
+      for (let index = 0; index < benchmarkCase.iterations; index++) {
+        consume(benchmarkCase.run())
+      }
+    } else {
+      for (let index = 0; index < benchmarkCase.iterations; index++) {
+        consume(await benchmarkCase.run())
+      }
     }
-    samples.push(performance.now() - start)
+    samplesMs.push(performance.now() - start)
   }
-  samples.sort((left, right) => left - right)
-  return samples[Math.floor(samples.length / 2)]
+
+  const sortedMs = [...samplesMs].sort((left, right) => left - right)
+  const batchMedianMs = median(sortedMs)
+  const opsSamples = samplesMs.map(
+    (milliseconds) => benchmarkCase.iterations / (milliseconds / 1_000)
+  )
+  const meanOps = mean(opsSamples)
+  const deviation = Math.sqrt(mean(opsSamples.map((sample) => (sample - meanOps) ** 2)))
+
+  return {
+    batchMedianMs,
+    iterations: benchmarkCase.iterations,
+    maxOpsPerSecond: Math.max(...opsSamples),
+    medianOpsPerSecond: benchmarkCase.iterations / (batchMedianMs / 1_000),
+    minOpsPerSecond: Math.min(...opsSamples),
+    mode: benchmarkCase.mode,
+    name: benchmarkCase.name,
+    relativeStdDev: meanOps === 0 ? 0 : (deviation / meanOps) * 100,
+    samplesMs,
+  }
 }
 
 function consume(value: unknown): void {
   if (typeof value === 'string') {
-    checksum ^= value.length
-    if (value.length > 0) checksum ^= value.charCodeAt(value.length - 1)
-    return
+    checksum = (checksum + value.length + (value.charCodeAt(value.length - 1) || 0)) >>> 0
+  } else if (Array.isArray(value)) {
+    checksum = (checksum + value.length) >>> 0
   }
-  if (Array.isArray(value)) checksum ^= value.length
+}
+
+function median(sortedValues: number[]): number {
+  const middle = Math.floor(sortedValues.length / 2)
+  return sortedValues.length % 2 === 0
+    ? (sortedValues[middle - 1] + sortedValues[middle]) / 2
+    : sortedValues[middle]
+}
+
+function mean(values: number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
+function formatInteger(value: number): string {
+  return Math.round(value).toLocaleString('en-US')
 }

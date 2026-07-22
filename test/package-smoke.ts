@@ -38,12 +38,16 @@ try {
   await writeFile(
     smokeFile,
     `
-const [root, ai, debug, hono, elysia] = await Promise.all([
+const [root, ai, debug, hono, elysia, engines, handlebars, liquid, twig] = await Promise.all([
   import('binja'),
   import('binja/ai'),
   import('binja/debug'),
   import('binja/hono'),
   import('binja/elysia'),
+  import('binja/engines'),
+  import('binja/engines/handlebars'),
+  import('binja/engines/liquid'),
+  import('binja/engines/twig'),
 ])
 
 const rendered = await root.render('Hello {{ name }}!', { name: 'stable' })
@@ -55,7 +59,27 @@ if (compiledOutput !== 'STABLE') {
   throw new Error(\`Unexpected AOT output: \${compiledOutput}\`)
 }
 
-for (const [name, module] of Object.entries({ root, ai, debug, hono, elysia })) {
+if (await handlebars.render('Hello {{name}}', { name: 'HBS' }) !== 'Hello HBS') {
+  throw new Error('Handlebars subpath failed')
+}
+if (await liquid.render('{{ name | upcase }}', { name: 'liquid' }) !== 'LIQUID') {
+  throw new Error('Liquid subpath failed')
+}
+if (await twig.render('{{ enabled ? "yes" : "no" }}', { enabled: true }) !== 'yes') {
+  throw new Error('Twig subpath failed')
+}
+
+for (const [name, module] of Object.entries({
+  root,
+  ai,
+  debug,
+  hono,
+  elysia,
+  engines,
+  handlebars,
+  liquid,
+  twig,
+})) {
   if (Object.keys(module).length === 0) throw new Error(\`Empty public export: \${name}\`)
 }
 `

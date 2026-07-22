@@ -40,6 +40,9 @@ jobs:
       - name: Run tests with coverage gates
         run: bun run test:coverage
 
+      - name: Run executable examples
+        run: bun run test:examples
+
       - name: Build
         run: bun run build
 
@@ -104,3 +107,6 @@ jobs:
 
       - name: Run sustained concurrency tests
         run: bun run test:soak
+
+      - name: Run extended property, model, and fuzz campaigns
+        run: bun run test:generative

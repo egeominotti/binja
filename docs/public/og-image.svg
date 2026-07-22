@@ -36,15 +36,15 @@
   <text x="80" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="600" fill="#ffffff">for Bun</text>
 
   <!-- Features -->
-  <text x="80" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Jinja2/Django Compatible • 160x Faster with AOT</text>
+  <text x="80" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Jinja/Django-style Runtime and AOT for Bun</text>
   <text x="80" y="460" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">Multi-Engine: Handlebars, Liquid, Twig</text>
 
   <!-- Stats badges -->
   <rect x="80" y="500" width="140" height="50" rx="8" fill="#10b981" opacity="0.2"/>
-  <text x="150" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">2-4x Faster</text>
+  <text x="150" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">Safe Defaults</text>
 
   <rect x="240" y="500" width="140" height="50" rx="8" fill="#10b981" opacity="0.2"/>
-  <text x="310" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">84 Filters</text>
+  <text x="310" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">91 Filters</text>
 
   <rect x="400" y="500" width="160" height="50" rx="8" fill="#10b981" opacity="0.2"/>
   <text x="480" y="533" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#10b981" text-anchor="middle">TypeScript</text>

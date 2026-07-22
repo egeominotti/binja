@@ -20,8 +20,8 @@ export const TWIG_FILTER_MAP: Record<string, string> = {
   number_format: 'floatformat',
   striptags: 'striptags',
   json_encode: 'json',
-  merge: 'concat',
-  keys: 'list',
+  merge: 'merge',
+  keys: 'keys',
   column: 'map',
 }
 
@@ -49,35 +49,11 @@ export class TwigParser extends Parser {
 
     // Handle ternary expressions from ? : tokens
     if (node.type === 'Conditional') {
-      // Already in correct format
       return {
         ...node,
         test: this.transformNode(node.test),
-        body: this.transformNode(node.body),
-        else_: this.transformNode(node.else_),
-      }
-    }
-
-    // Handle null coalesce
-    if (node.type === 'BinOp' && node.operator === '??') {
-      return {
-        type: 'Conditional',
-        test: {
-          type: 'Compare',
-          left: this.transformNode(node.left),
-          ops: [
-            {
-              operator: 'isnot',
-              right: { type: 'Literal', value: null, line: node.line, column: node.column },
-            },
-          ],
-          line: node.line,
-          column: node.column,
-        },
-        body: this.transformNode(node.left),
-        else_: this.transformNode(node.right),
-        line: node.line,
-        column: node.column,
+        trueExpr: this.transformNode(node.trueExpr),
+        falseExpr: this.transformNode(node.falseExpr),
       }
     }
 

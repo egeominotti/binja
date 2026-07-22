@@ -32,6 +32,9 @@ bun test
 ```bash
 bun test test/filters.test.ts
 bun test test/runtime.test.ts
+bun run test:property
+bun run test:model
+bun run test:fuzz
 ```
 
 ## Project Structure
@@ -71,7 +74,7 @@ export const builtinFilters: Record<string, FilterFunction> = {
 }
 ```
 
-2. Add inline version in `src/runtime/index.ts` for performance (optional but recommended).
+2. The registry implementation is the required behavior. Add a runtime fast path only when a representative benchmark demonstrates a material improvement and parity tests cover it.
 
 3. Add tests in `test/filters.test.ts`:
 
@@ -88,7 +91,9 @@ test('myfilter', async () => {
 2. Add AST node type in `src/parser/nodes.ts`
 3. Add parsing logic in `src/parser/index.ts`
 4. Add execution logic in `src/runtime/index.ts`
-5. Add tests
+5. Add or explicitly reject the node in `src/compiler/index.ts` and the CLI flattener
+6. Add runtime/AOT parity and failure-path tests
+7. Update the public syntax and compatibility documentation
 
 ### Adding a New Engine
 
@@ -97,7 +102,8 @@ test('myfilter', async () => {
 3. Create `parser.ts` - converts tokens to binja's common AST
 4. Create `index.ts` with `parse()`, `compile()`, `render()` functions
 5. Register in `src/engines/index.ts`
-6. Add tests in `test/engines.test.ts`
+6. Add package exports, build entrypoints, and package-smoke imports
+7. Add tests in `test/engines.test.ts`
 
 ## Code Style
 
@@ -147,6 +153,8 @@ refactor: simplify parser
 - Tests should be async (render returns Promise)
 - Test file naming: `{feature}.test.ts`
 - Replicate Jinja2's behavior where applicable
+
+Generative tests are part of the release gate. Property tests assert runtime/AOT and security invariants; model tests compare generated stateful command sequences with a reference model; fuzz tests mutate hostile templates and loader names. Use the `BINJA_PROPERTY_SEED`, `BINJA_MODEL_SEED`, or `BINJA_FUZZ_SEED` printed by fast-check to replay a failure.
 
 ```typescript
 import { describe, test, expect } from 'bun:test'

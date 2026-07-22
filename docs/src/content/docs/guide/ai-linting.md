@@ -30,10 +30,14 @@ export ANTHROPIC_API_KEY=sk-ant-...
 # OpenAI
 export OPENAI_API_KEY=sk-...
 
-# Groq (free tier available)
+# Groq
 export GROQ_API_KEY=gsk_...
 
-# Ollama - no key needed, just run: ollama serve
+# Ollama - no key needed; run: ollama serve
+export ANTHROPIC_MODEL=...  # optional model override
+export OPENAI_MODEL=gpt-4o-mini
+export GROQ_MODEL=...       # optional model override
+export OLLAMA_MODEL=llama3.1
 ```
 
 ## CLI Usage
@@ -67,7 +71,7 @@ const result = await lint(templateSource)
 const result = await lint(templateSource, {
   provider: 'anthropic',
   apiKey: 'sk-ant-...',
-  model: 'claude-sonnet-4-20250514'
+  model: process.env.ANTHROPIC_MODEL
 })
 
 // Check results
@@ -112,16 +116,18 @@ console.log(result.provider)    // Which AI was used
 | Unused variables | Variables in context but never used |
 | Complex conditionals | Long chains of `{% elif %}` |
 
-## Provider Comparison
+## Provider selection
 
-| Provider | API Key | Speed | Cost | Best For |
-|----------|---------|-------|------|----------|
-| **Anthropic** | `ANTHROPIC_API_KEY` | Fast | Paid | Best quality |
-| **OpenAI** | `OPENAI_API_KEY` | Fast | Paid | Good quality |
-| **Groq** | `GROQ_API_KEY` | Very Fast | Free tier | Quick checks |
-| **Ollama** | None (local) | Varies | Free | Privacy, offline |
+| Provider | Configuration | Notes |
+|----------|---------------|-------|
+| **Anthropic** | `ANTHROPIC_API_KEY` | Optional SDK: `@anthropic-ai/sdk` |
+| **OpenAI** | `OPENAI_API_KEY` | Optional SDK: `openai` |
+| **Groq** | `GROQ_API_KEY` | OpenAI-compatible HTTP endpoint; model is configurable |
+| **Ollama** | Local server | `OLLAMA_URL` and `OLLAMA_MODEL` are configurable |
 
 Auto-detect priority: Anthropic → OpenAI → Groq → Ollama
+
+When passing `apiKey` explicitly, also pass `provider`; auto-detection cannot safely infer which service a generic key belongs to. AI output is advisory and nondeterministic. Syntax parsing remains deterministic, and malformed provider JSON becomes an AI-analysis warning instead of silently being reported as a clean result. Groq and Ollama requests have a 30-second timeout.
 
 ## Response Format
 
@@ -138,9 +144,9 @@ interface Issue {
   line: number
   column?: number
   type: 'security' | 'performance' | 'accessibility' | 'best-practice'
-  severity: 'error' | 'warning' | 'info'
+  severity: 'error' | 'warning' | 'suggestion'
   message: string
-  fix?: string
+  suggestion?: string
 }
 ```
 
@@ -170,7 +176,7 @@ jobs:
 
       - name: Check for errors
         run: |
-          if jq -e '.errors | length > 0' lint-results.json; then
+          if jq -e 'any(.[].result.errors[]?)' lint-results.json; then
             echo "Template errors found!"
             exit 1
           fi
@@ -187,8 +193,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Start Ollama
 ollama serve
 
-# Pull a model
-ollama pull llama2
+# Pull a model available in your Ollama installation
+ollama pull llama3.1
 
 # Use with binja
 binja lint ./templates --ai=ollama
@@ -200,10 +206,7 @@ binja lint ./templates --ai=ollama
 const result = await lint(template, {
   provider: 'anthropic',
   // Focus on specific categories
-  checks: ['security', 'accessibility'],
-  // Ignore specific rules
-  ignore: ['missing-empty-block'],
-  // Custom severity thresholds
-  minSeverity: 'warning',
+  categories: ['security', 'accessibility'],
+  maxIssues: 20,
 })
 ```

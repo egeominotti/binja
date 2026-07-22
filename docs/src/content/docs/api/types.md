@@ -1,301 +1,114 @@
 ---
 title: TypeScript Types
-description: Type definitions for binja
+description: Public Binja configuration, compiler, cache, AST, and error types.
 ---
 
-binja is written in TypeScript and includes full type definitions.
+Binja ships declarations with every documented package subpath. The installed `dist/*.d.ts` files are authoritative for the exact release.
 
-## Core Types
+## Core configuration
 
-### EnvironmentOptions
-
-```typescript
-interface EnvironmentOptions {
-  /** Template directory path */
-  templates?: string
-
-  /** Enable HTML auto-escaping (default: true) */
-  autoescape?: boolean
-
-  /** Enable template caching (default: true) */
-  cache?: boolean
-
-  /** Maximum cached templates (default: 100) */
-  cacheMaxSize?: number
-
-  /** Timezone for date operations (e.g., 'Europe/Rome') */
-  timezone?: string
-
-  /** Custom filter functions */
-  filters?: Record<string, FilterFunction>
-
-  /** Global variables for all templates */
-  globals?: Record<string, any>
-
-  /** URL resolver for {% url %} tag */
-  urlResolver?: UrlResolver
-
-  /** Static file resolver for {% static %} tag */
-  staticResolver?: StaticResolver
-
-  /** Enable debug panel */
-  debug?: boolean
-
-  /** Debug panel configuration */
-  debugOptions?: DebugOptions
-}
-```
-
-### FilterFunction
-
-```typescript
+```ts
 type FilterFunction = (value: any, ...args: any[]) => any
-```
 
-### UrlResolver
-
-```typescript
-type UrlResolver = (name: string, ...args: any[]) => string
-```
-
-### StaticResolver
-
-```typescript
-type StaticResolver = (path: string) => string
-```
-
-### DebugOptions
-
-```typescript
-interface DebugOptions {
-  /** Use dark theme */
-  dark?: boolean
-
-  /** Start panel collapsed */
-  collapsed?: boolean
-
-  /** Panel position */
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-
-  /** Panel width in pixels */
-  width?: number
-}
-```
-
-## Compile Types
-
-### CompileOptions
-
-```typescript
-interface CompileOptions {
-  /** Enable HTML auto-escaping (default: true) */
+interface EnvironmentOptions {
+  templates?: string
   autoescape?: boolean
-
-  /** Custom filter functions */
   filters?: Record<string, FilterFunction>
-}
-```
-
-### CompileToCodeOptions
-
-```typescript
-interface CompileToCodeOptions {
-  /** Generated function name (default: 'render') */
-  functionName?: string
-
-  /** Enable HTML auto-escaping (default: true) */
-  autoescape?: boolean
-}
-```
-
-### CompiledTemplate
-
-```typescript
-type CompiledTemplate = (context: Record<string, any>) => string
-```
-
-## Render Types
-
-### RenderOptions
-
-```typescript
-interface RenderOptions {
-  /** Enable HTML auto-escaping (default: true) */
-  autoescape?: boolean
-
-  /** Custom filter functions */
-  filters?: Record<string, FilterFunction>
-
-  /** Global variables */
   globals?: Record<string, any>
+  urlResolver?: (name: string, args: any[], kwargs: Record<string, any>) => string
+  staticResolver?: (path: string) => string
+  cache?: boolean
+  cacheMaxSize?: number
+  extensions?: string[]
+  debug?: boolean
+  debugOptions?: PanelOptions
+  timezone?: string
 }
-```
 
-## Cache Types
-
-### CacheStats
-
-```typescript
 interface CacheStats {
-  /** Current number of cached templates */
   size: number
-
-  /** Maximum cache size */
   maxSize: number
-
-  /** Cache hits */
   hits: number
-
-  /** Cache misses */
   misses: number
-
-  /** Hit rate (0-1) */
   hitRate: number
 }
 ```
 
-## AI Linting Types
+`hitRate` is a percentage, not a 0–1 ratio.
 
-### LintOptions
+## AOT
 
-```typescript
-interface LintOptions {
-  /** AI provider */
-  provider?: 'anthropic' | 'openai' | 'groq' | 'ollama'
-
-  /** API key (defaults to environment variable) */
-  apiKey?: string
-
-  /** Model to use */
-  model?: string
-
-  /** Categories to check */
-  checks?: ('security' | 'performance' | 'accessibility' | 'best-practice')[]
-
-  /** Rules to ignore */
-  ignore?: string[]
-
-  /** Minimum severity to report */
-  minSeverity?: 'error' | 'warning' | 'info'
+```ts
+interface CompileOptions {
+  functionName?: string
+  minify?: boolean
+  autoescape?: boolean
 }
+
+interface CompileWithInheritanceOptions extends CompileOptions {
+  templates: string
+  extensions?: string[]
+}
+
+type CompiledTemplate = (context: Record<string, any>) => string
 ```
 
-### LintResult
+The legacy `inlineHelpers` option remains type-compatible but is reserved; code-source APIs return a helper-dependent fragment. Use the CLI for complete ESM generation.
 
-```typescript
-interface LintResult {
-  /** Template is valid (no syntax errors) */
-  valid: boolean
+## Parser and errors
 
-  /** Syntax errors */
-  errors: Issue[]
-
-  /** Warnings (security, performance, etc.) */
-  warnings: Issue[]
-
-  /** Best practice suggestions */
-  suggestions: Issue[]
-
-  /** AI provider used */
-  provider: string
-}
-```
-
-### Issue
-
-```typescript
-interface Issue {
-  /** Line number (1-indexed) */
-  line: number
-
-  /** Column number (optional) */
-  column?: number
-
-  /** Issue category */
-  type: 'security' | 'performance' | 'accessibility' | 'best-practice' | 'syntax'
-
-  /** Severity level */
-  severity: 'error' | 'warning' | 'info'
-
-  /** Human-readable message */
-  message: string
-
-  /** Suggested fix (optional) */
-  fix?: string
-}
-```
-
-## AST Types
-
-### Node
-
-Base type for all AST nodes:
-
-```typescript
-interface Node {
+```ts
+interface BaseNode {
   type: string
-  lineno?: number
-  col_offset?: number
+  line: number
+  column: number
 }
-```
 
-### Common Node Types
-
-```typescript
-interface Template extends Node {
+interface TemplateNode extends BaseNode {
   type: 'Template'
-  body: Node[]
-}
-
-interface Output extends Node {
-  type: 'Output'
-  node: Node
-}
-
-interface If extends Node {
-  type: 'If'
-  test: Node
-  body: Node[]
-  elifs: { test: Node; body: Node[] }[]
-  else_: Node[] | null
-}
-
-interface For extends Node {
-  type: 'For'
-  target: Node
-  iter: Node
-  body: Node[]
-  else_: Node[] | null
-}
-
-interface Block extends Node {
-  type: 'Block'
-  name: string
-  body: Node[]
-}
-
-interface Extends extends Node {
-  type: 'Extends'
-  template: string
-}
-
-interface Include extends Node {
-  type: 'Include'
-  template: string
-  context: Record<string, Node> | null
+  body: ASTNode[]
 }
 ```
 
-## Importing Types
+AST node fields use `line` and `column` (not Python AST names such as `lineno`). Public error exports include:
 
-```typescript
+```ts
+TemplateError
+TemplateSyntaxError
+TemplateRuntimeError
+TemplateNotFoundError
+```
+
+`TemplateNotFoundError` carries the requested template name and allows `ignore missing` to distinguish absence from errors in an existing template.
+
+## Debug types
+
+`binja/debug` exports `DebugData`, `ContextValue`, `QueryInfo`, `QueryStats`, and `PanelOptions`. Debug data includes timings, template chain, context snapshot, filter/test counts, cache counters, queries, and warnings.
+
+## Secondary-engine types
+
+`binja/engines` exports `TemplateEngine`, `MultiEngine`, engine lookup helpers, and named modules. Each engine's `compile()` returns:
+
+```ts
+(context: Record<string, any>) => Promise<string>
+```
+
+This is a parsed-runtime cache, not the synchronous core AOT type.
+
+## Type imports
+
+```ts
 import type {
-  EnvironmentOptions,
-  FilterFunction,
-  CompileOptions,
-  RenderOptions,
+  ASTNode,
   CacheStats,
-  LintResult,
-  Issue,
+  CompileOptions,
+  EnvironmentOptions,
+  ExpressionNode,
+  FilterFunction,
+  TemplateNode,
+  Token,
 } from 'binja'
+
+import type { TemplateEngine } from 'binja/engines'
+import type { DebugData, PanelOptions } from 'binja/debug'
 ```

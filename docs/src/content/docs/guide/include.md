@@ -1,6 +1,6 @@
 ---
-title: Include & Macros
-description: Reusable template components
+title: Includes
+description: Loader-backed reusable template components
 ---
 
 ## Include
@@ -64,11 +64,11 @@ The included template won't have access to parent context.
     </div>
   {% endif %}
   <div class="card-body">
-    {{ content|safe }}
+    {{ content }}
   </div>
   {% if footer %}
     <div class="card-footer">
-      {{ footer|safe }}
+      {{ footer }}
     </div>
   {% endif %}
 </div>
@@ -78,7 +78,7 @@ The included template won't have access to parent context.
 ```jinja
 {% include "components/card.html" with
    title="Welcome"
-   content="<p>Hello, World!</p>"
+   content="Hello, World!"
    class="card-primary"
 %}
 ```
@@ -154,6 +154,16 @@ Include template based on variable:
 {% include "themes/" ~ theme ~ "/header.html" %}
 ```
 
+Dynamic names work in `Environment` runtime mode. They cannot be flattened by `compileWithInheritance()` or the CLI, so AOT checking rejects them.
+
+### Ignore a missing file
+
+```jinja
+{% include "optional/banner.html" ignore missing %}
+```
+
+Only a real `TemplateNotFoundError` is ignored. Syntax errors, unknown filters, and render failures inside an existing include still throw.
+
 ## Organization Tips
 
 ```
@@ -189,3 +199,5 @@ const env = new Environment({
 ```
 
 For frequently-used components, the first include triggers parsing; subsequent includes use the cached AST.
+
+The loader rejects absolute paths, `..` traversal, and symlink escapes outside `EnvironmentOptions.templates`. Include and inheritance cycles are also rejected.

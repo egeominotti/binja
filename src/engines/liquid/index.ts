@@ -5,6 +5,7 @@
 
 import { LiquidLexer } from './lexer'
 import { LiquidParser } from './parser'
+import { Runtime } from '../../runtime'
 import type { TemplateNode } from '../../parser/nodes'
 
 export { LiquidLexer, LiquidTokenType, type LiquidToken } from './lexer'
@@ -26,12 +27,22 @@ export function parse(source: string): TemplateNode {
 export function compile(source: string): (context: Record<string, any>) => Promise<string> {
   const ast = parse(source)
 
-  // Import Runtime lazily to avoid circular deps
-  const { Runtime } = require('../../runtime')
-  const runtime = new Runtime()
+  const runtime = new Runtime({
+    globals: {
+      range(start: any, end: any): number[] {
+        const first = Math.trunc(Number(start))
+        const last = Math.trunc(Number(end))
+        if (!Number.isFinite(first) || !Number.isFinite(last)) return []
+        const step = first <= last ? 1 : -1
+        const length = Math.abs(last - first) + 1
+        if (length > 100_000) throw new RangeError('Liquid range exceeds 100,000 items')
+        return Array.from({ length }, (_, index) => first + index * step)
+      },
+    },
+  })
 
   return async (context: Record<string, any>) => {
-    return runtime.render(ast, context, source)
+    return runtime.render(ast, context)
   }
 }
 

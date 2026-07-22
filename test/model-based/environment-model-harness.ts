@@ -78,6 +78,7 @@ export class RealEnvironment {
       model.maxSize
     )
     expect(stats.size, 'real cache size matches the model').toBe(model.keys.length)
+    expect(this.env.cacheKeys(), 'real LRU order matches the state model').toEqual(model.keys)
     expect(stats.maxSize, 'configured cache bound is stable').toBe(model.maxSize)
     expect(stats.hits, 'real cache hits match the model').toBe(model.hits)
     expect(stats.misses, 'real cache misses match the model').toBe(model.misses)
