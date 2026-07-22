@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 const projectRoot = dirname(import.meta.dir)
@@ -38,6 +38,10 @@ describe('CLI integration', () => {
     const source = join(workspace, 'views', 'card.html')
     const output = join(workspace, 'compiled')
     await mkdir(dirname(source), { recursive: true })
+    // Generated modules import the published package name. Mirror the package
+    // resolution layout so this integration test behaves like a consumer.
+    await mkdir(join(workspace, 'node_modules'), { recursive: true })
+    await symlink(projectRoot, join(workspace, 'node_modules', 'binja'), 'dir')
     await writeFile(source, '{{ items|length }}:{% if value is even %}even{% else %}odd{% endif %}')
 
     const result = await runCli(['compile', source, '-o', output, '--name', 'renderCard'])
