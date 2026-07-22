@@ -38,6 +38,18 @@ describe('CLI integration', () => {
     const source = join(workspace, 'views', 'card.html')
     const output = join(workspace, 'compiled')
     await mkdir(dirname(source), { recursive: true })
+    // Generated modules import the published package name. Mirror package
+    // resolution while testing from source (CI has not built dist yet).
+    const packageDir = join(workspace, 'node_modules', 'binja')
+    await mkdir(packageDir, { recursive: true })
+    await writeFile(
+      join(packageDir, 'package.json'),
+      JSON.stringify({ name: 'binja', type: 'module', main: './index.js' })
+    )
+    await writeFile(
+      join(packageDir, 'index.js'),
+      `export { builtinFilters, builtinTests } from ${JSON.stringify(join(projectRoot, 'src/index.ts'))}`
+    )
     await writeFile(source, '{{ items|length }}:{% if value is even %}even{% else %}odd{% endif %}')
 
     const result = await runCli(['compile', source, '-o', output, '--name', 'renderCard'])
