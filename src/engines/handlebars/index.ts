@@ -5,6 +5,7 @@
 
 import { HandlebarsLexer } from './lexer'
 import { HandlebarsParser } from './parser'
+import { Runtime } from '../../runtime'
 import type { TemplateNode } from '../../parser/nodes'
 
 export { HandlebarsLexer, HbsTokenType, type HbsToken } from './lexer'
@@ -26,12 +27,10 @@ export function parse(source: string): TemplateNode {
 export function compile(source: string): (context: Record<string, any>) => Promise<string> {
   const ast = parse(source)
 
-  // Import Runtime lazily to avoid circular deps
-  const { Runtime } = require('../../runtime')
   const runtime = new Runtime()
 
   return async (context: Record<string, any>) => {
-    return runtime.render(ast, context, source)
+    return runtime.render(ast, context)
   }
 }
 

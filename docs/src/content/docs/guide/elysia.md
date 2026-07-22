@@ -40,7 +40,8 @@ app.use(binja({
   root: './views',           // Template directory
   extension: '.html',        // Default extension
   engine: 'jinja2',          // jinja2 | handlebars | liquid | twig
-  cache: true,               // Cache compiled templates
+  cache: true,               // Cache parsed templates
+  cacheMaxSize: 100,         // Per-adapter LRU bound
   globals: {                 // Global context
     siteName: 'My App',
     year: new Date().getFullYear(),
@@ -57,8 +58,9 @@ app.use(binja({
 | `root` | `string` | `./views` | Template directory |
 | `extension` | `string` | `.html` | Default file extension |
 | `engine` | `string` | `jinja2` | Template engine |
-| `cache` | `boolean` | `true` (prod) | Cache compiled templates |
-| `debug` | `boolean` | `false` | Show error details |
+| `cache` | `boolean` | production only | Cache parsed templates/functions |
+| `cacheMaxSize` | `number` | `100` | Per-adapter LRU bound for core and secondary compiled templates |
+| `debug` | `boolean` | `false` | Enable the core Environment debug panel |
 | `globals` | `object` | `{}` | Global context variables |
 | `layout` | `string` | - | Layout template path |
 | `contentVar` | `string` | `content` | Content variable name |
@@ -82,7 +84,7 @@ const app = new Elysia()
   <title>{{ title }} | {{ siteName }}</title>
 </head>
 <body>
-  {{ content|safe }}
+  {{ content }}
 </body>
 </html>
 ```
@@ -97,6 +99,10 @@ const app = new Elysia()
   }))
   .get('/', ({ render }) => render('index', { name: 'World' }))
 ```
+
+The core adapter marks already-rendered layout content as trusted internally, so use `{{ content }}` without an extra `safe`. For a secondary syntax, choose its explicit raw-output form only for adapter-rendered content, never arbitrary user values.
+
+For `jinja2`, both cache settings use the same configured `Environment`, preserving include and inheritance semantics. Secondary modules use their parsed-function cache and retain their documented loader limitations.
 
 **views/index.html** (Handlebars syntax)
 ```handlebars
@@ -123,6 +129,8 @@ const app = new Elysia()
     return getCacheStats()
   })
 ```
+
+These module-level functions aggregate the Jinja `Environment` caches and secondary-engine compiled caches for every Elysia adapter instance in the process. `clearCache()` clears all of them; keys are diagnostic labels, not stable identifiers.
 
 ## With HTMX
 

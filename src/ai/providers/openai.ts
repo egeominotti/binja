@@ -6,6 +6,7 @@ import type { AIProvider } from '../types'
 
 export function createOpenAIProvider(model?: string, apiKey?: string): AIProvider {
   const key = apiKey || process.env.OPENAI_API_KEY
+  const selectedModel = model || process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
   return {
     name: 'openai',
@@ -19,7 +20,7 @@ export function createOpenAIProvider(model?: string, apiKey?: string): AIProvide
       const client = new OpenAI({ apiKey: key })
 
       const response = await client.chat.completions.create({
-        model: model || 'gpt-4o-mini',
+        model: selectedModel,
         max_tokens: 1500,
         messages: [
           {

@@ -66,9 +66,9 @@ export async function lint(template: string, options: LintOptions = {}): Promise
     // Categorize issues
     for (const issue of issues) {
       if (
-        options.maxIssues &&
+        options.maxIssues !== undefined &&
         result.errors.length + result.warnings.length + result.suggestions.length >=
-          options.maxIssues
+          Math.max(0, Math.trunc(options.maxIssues))
       ) {
         break
       }
@@ -104,7 +104,8 @@ export async function lint(template: string, options: LintOptions = {}): Promise
 /**
  * Parse AI response JSON
  */
-function parseAIResponse(response: string): Issue[] {
+export function parseAIResponse(response: string): Issue[] {
+  let parsed: unknown
   try {
     // Try to extract JSON from response (in case of markdown wrapping)
     let jsonStr = response.trim()
@@ -121,25 +122,33 @@ function parseAIResponse(response: string): Issue[] {
       jsonStr = objectMatch[0]
     }
 
-    const parsed = JSON.parse(jsonStr)
-
-    if (!parsed.issues || !Array.isArray(parsed.issues)) {
-      return []
-    }
-
-    // Validate and normalize issues
-    return parsed.issues
-      .filter((issue: any) => issue && typeof issue === 'object')
-      .map((issue: any) => ({
-        line: typeof issue.line === 'number' ? issue.line : 1,
-        type: normalizeType(issue.type),
-        severity: normalizeSeverity(issue.severity),
-        message: String(issue.message || 'Unknown issue'),
-        suggestion: issue.suggestion ? String(issue.suggestion) : undefined,
-      }))
-  } catch {
-    return []
+    parsed = JSON.parse(jsonStr)
+  } catch (error) {
+    throw new Error('AI provider did not return valid JSON', { cause: error })
   }
+
+  if (
+    parsed === null ||
+    typeof parsed !== 'object' ||
+    !('issues' in parsed) ||
+    !Array.isArray(parsed.issues)
+  ) {
+    throw new Error("AI provider response must contain an 'issues' array")
+  }
+
+  // Validate and normalize issues
+  return parsed.issues
+    .filter((issue: any) => issue && typeof issue === 'object')
+    .map((issue: any) => ({
+      line:
+        typeof issue.line === 'number' && Number.isFinite(issue.line)
+          ? Math.max(1, Math.trunc(issue.line))
+          : 1,
+      type: normalizeType(issue.type),
+      severity: normalizeSeverity(issue.severity),
+      message: String(issue.message || 'Unknown issue'),
+      suggestion: issue.suggestion ? String(issue.suggestion) : undefined,
+    }))
 }
 
 function normalizeType(type: string): Issue['type'] {

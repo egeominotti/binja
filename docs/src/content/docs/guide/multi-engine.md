@@ -1,138 +1,73 @@
 ---
-title: Multi-Engine Overview
-description: Support for multiple template syntaxes through a unified API
+title: Multi-engine overview
+description: Use Binja's documented Handlebars, Liquid, and Twig compatibility subsets.
 ---
 
-binja uniquely supports multiple template engines through a unified API. All engines parse to a common AST and share the same runtime, filters, and optimizations.
+Binja exposes three secondary parsers over the shared runtime. They are compatibility subsets, not embedded copies of the upstream engines.
 
-## Supported Engines
+## Imports
 
-| Engine | Syntax | Use Case |
-|--------|--------|----------|
-| **Jinja2/DTL** | `{{ var }}` `{% if %}` | Default, Python/Django compatibility |
-| **Handlebars** | `{{var}}` `{{#if}}` | JavaScript ecosystem, Ember.js |
-| **Liquid** | `{{ var }}` `{% if %}` | Shopify, Jekyll, static sites |
-| **Twig** | `{{ var }}` `{% if %}` | PHP/Symfony, Drupal, Craft CMS |
-
-## Quick Comparison
-
-| Feature | Jinja2 | Handlebars | Liquid | Twig |
-|---------|--------|------------|--------|------|
-| Variables | `{{ x }}` | `{{x}}` | `{{ x }}` | `{{ x }}` |
-| Conditionals | `{% if %}` | `{{#if}}` | `{% if %}` | `{% if %}` |
-| Loops | `{% for %}` | `{{#each}}` | `{% for %}` | `{% for %}` |
-| Filters | `{{ x\|filter }}` | `{{ x }}` | `{{ x \| filter }}` | `{{ x\|filter }}` |
-| Comments | `{# #}` | `{{! }}` | `{% comment %}` | `{# #}` |
-| Assignment | `{% set %}` | - | `{% assign %}` | `{% set %}` |
-| Unescaped | `{{ x\|safe }}` | `{{{x}}}` | - | `{{ x\|raw }}` |
-
-## Direct Engine Usage
-
-```typescript
-// Import specific engines
+```ts
+import { MultiEngine, detectEngine, getEngine } from 'binja/engines'
 import * as handlebars from 'binja/engines/handlebars'
 import * as liquid from 'binja/engines/liquid'
 import * as twig from 'binja/engines/twig'
-
-// Handlebars
-await handlebars.render('Hello {{name}}!', { name: 'World' })
-
-// Liquid
-await liquid.render('Hello {{ name }}!', { name: 'World' })
-
-// Twig
-await twig.render('Hello {{ name }}!', { name: 'World' })
 ```
 
-## MultiEngine API
+All subpaths are package exports and are covered by the package smoke test.
 
-For dynamic engine selection:
+## Direct rendering
 
-```typescript
-import { MultiEngine } from 'binja/engines'
-
-const engine = new MultiEngine()
-
-// Render with any engine
-await engine.render('Hello {{name}}!', { name: 'World' }, 'handlebars')
-await engine.render('Hello {{ name }}!', { name: 'World' }, 'liquid')
-await engine.render('Hello {{ name }}!', { name: 'World' }, 'twig')
-await engine.render('Hello {{ name }}!', { name: 'World' }, 'jinja2')
+```ts
+await handlebars.render('Hello {{name}}', { name: 'Ada' })
+await liquid.render('Hello {{ name | upcase }}', { name: 'Ada' })
+await twig.render('{{ enabled ? "yes" : "no" }}', { enabled: true })
 ```
 
-## Auto-Detection
+Each module exports `parse`, `compile`, `render`, and an `engine` descriptor. Secondary-engine `compile()` caches parsing but returns an asynchronous render function:
 
-Detect engine from file extension:
-
-```typescript
-import { detectEngine } from 'binja/engines'
-
-const eng = detectEngine('template.hbs')     // Handlebars
-const eng2 = detectEngine('page.liquid')     // Liquid
-const eng3 = detectEngine('page.twig')       // Twig
-const eng4 = detectEngine('page.html')       // Jinja2 (default)
+```ts
+const renderLiquid = liquid.compile('{{ name | upcase }}')
+const output = await renderLiquid({ name: 'Ada' })
 ```
 
-## Shared Features
+It is not the synchronous AOT compiler used by core `compile()`.
 
-All engines benefit from:
+## `MultiEngine`
 
-- **84+ built-in filters** - Same filters work across all engines
-- **Runtime optimizations** - Inline filter execution
-- **AOT compilation** - Pre-compile for performance
-- **Autoescape** - XSS protection by default
-- **Error handling** - Consistent error messages
+```ts
+const engines = new MultiEngine('jinja2')
 
-## Migration Guide
-
-### From Handlebars.js
-
-```handlebars
-{{! Before: Handlebars.js }}
-{{#if user}}
-  Hello {{user.name}}!
-{{/if}}
-
-{{#each items}}
-  <li>{{this}}</li>
-{{/each}}
+await engines.render('Hello {{ name }}', { name: 'Ada' }, 'liquid')
+const renderHbs = engines.compile('{{name}}', 'handlebars')
+await renderHbs({ name: 'Ada' })
 ```
 
-```typescript
-// After: binja
-import * as handlebars from 'binja/engines/handlebars'
+Core aliases are `jinja2`, `jinja`, `dtl`, and `django`. Secondary aliases include `handlebars`/`hbs`, `liquid`, and `twig`.
 
-const html = await handlebars.render(template, {
-  user: { name: 'John' },
-  items: ['Apple', 'Banana']
-})
-```
+`getEngine(nameOrExtension)` and `detectEngine(filePath)` recognize `.hbs`, `.handlebars`, `.liquid`, `.twig`, and `.html.twig`. Unknown or extensionless inputs return `undefined`; the top-level multi-engine `render()` falls back to the core engine when no requested engine resolves.
 
-### From Liquid/Jekyll
+## Tested feature matrix
 
-```liquid
-{% comment %} Before: Liquid/Jekyll {% endcomment %}
-{% if user %}
-  Hello {{ user.name }}!
-{% endif %}
+| Feature | Core | Handlebars subset | Liquid subset | Twig subset |
+|---|---|---|---|---|
+| Nested variables | Yes | Yes | Yes | Yes |
+| Escaped output | Yes | Yes | Yes | Yes |
+| Conditions | `if`/`elif` | `if`/`unless` | `if`/`elsif`/`unless`/`case` | `if`/`elseif`, ternary, `??` |
+| Loops | `for`/`empty` | `each`/`else` | `for`/`else`, modifiers, ranges | Core `for` syntax |
+| Assignment | `set` | No | `assign`, `capture`, counters | `set` |
+| Loader-backed dependencies in direct module API | Core `Environment` only | No | No | No |
 
-{% for item in items %}
-  <li>{{ item }}</li>
-{% endfor %}
-```
+## Shared and non-shared behavior
 
-```typescript
-// After: binja
-import * as liquid from 'binja/engines/liquid'
+The modules share runtime escaping, protected property access, truthiness, built-in filters/tests where their parsers emit those nodes, and render-state isolation. Parser syntax and aliases still differ.
 
-const html = await liquid.render(template, {
-  user: { name: 'John' },
-  items: ['Apple', 'Banana']
-})
-```
+Do not assume every one of Binja's core filters parses naturally in every syntax. For example, Liquid supplies common aliases (`upcase`, `downcase`, `strip`, `size`, `truncate`, `json`), while Twig maps names such as `raw`, `json_encode`, `number_format`, `keys`, and `merge`.
 
-## See Also
+## Loader limitation
 
-- [Handlebars Engine](/binja/guide/handlebars/)
-- [Liquid Engine](/binja/guide/liquid/)
-- [Twig Engine](/binja/guide/twig/)
+The direct secondary-engine APIs accept source strings and do not expose loader/partial registration. A parsed Handlebars partial, Liquid `include`/`render`, or Twig `include`/`extends` therefore fails when it tries to load another template. Use the core `Environment` where compatible core syntax is acceptable, or resolve/compose dependencies in application code.
+
+## Migration rule
+
+Run representative templates in tests before migration. Upstream host objects, plugins, custom helpers, drops, macros, namespaces, and framework integrations are outside the subset unless explicitly documented on the engine page.

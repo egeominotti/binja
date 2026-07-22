@@ -1,241 +1,102 @@
 ---
 title: Environment
-description: API reference for the Environment class
+description: Loader-backed rendering, caching, registries, resolvers, timezone, and debug configuration.
 ---
 
-The `Environment` class provides a full-featured template environment with file loading, caching, inheritance support, and configuration.
+`Environment` owns configuration, a protected file loader, a runtime instance, and an optional LRU AST cache.
 
 ## Constructor
 
-```typescript
-const env = new Environment(options?: EnvironmentOptions)
+```ts
+import { Environment } from 'binja'
+
+const env = new Environment(options)
 ```
 
-## Options
-
-```typescript
+```ts
 interface EnvironmentOptions {
-  // Template directory
   templates?: string
-
-  // Auto-escape HTML (default: true)
+  extensions?: string[]
   autoescape?: boolean
-
-  // Enable template caching (default: true)
-  cache?: boolean
-
-  // LRU cache limit (default: 100)
-  cacheMaxSize?: number
-
-  // Timezone for date/time operations
-  timezone?: string
-
-  // Custom filters
   filters?: Record<string, FilterFunction>
-
-  // Global variables available in all templates
   globals?: Record<string, any>
-
-  // URL resolver for {% url %} tag
-  urlResolver?: (name: string, ...args: any[]) => string
-
-  // Static file resolver for {% static %} tag
+  urlResolver?: (name: string, args: any[], kwargs: Record<string, any>) => string
   staticResolver?: (path: string) => string
-
-  // Enable debug panel
+  cache?: boolean
+  cacheMaxSize?: number
   debug?: boolean
-
-  // Debug panel options
-  debugOptions?: DebugOptions
+  debugOptions?: PanelOptions
+  timezone?: string
 }
 ```
 
-## Basic Usage
+Defaults are `templates: './templates'`, extensions `['.html', '.jinja', '.jinja2', '']`, autoescape/cache enabled, cache size 100, and debug disabled. `cacheMaxSize` must be a positive integer.
 
-```typescript
-import { Environment } from 'binja'
+## Rendering
 
-const env = new Environment({
-  templates: './views',
-  autoescape: true,
-})
-
-// Render a template file
-const html = await env.render('pages/home.html', {
-  title: 'Welcome',
-  user: { name: 'John' }
-})
+```ts
+const html = await env.render('pages/home.html', context)
+const fragment = await env.renderString('Hello {{ name }}', { name: 'Ada' })
 ```
 
-## Methods
+`render()` searches the configured extensions and rejects paths outside `templates`, including symlink escapes. Includes and inheritance use the same loader.
 
-### render(name, context)
+## Registry and resolver methods
 
-Render a template file.
+```ts
+env.addFilter('currency', (value: number) => `€${value.toFixed(2)}`)
+env.addGlobal('siteName', 'Example')
 
-```typescript
-const html = await env.render('pages/home.html', {
-  title: 'Home',
-  items: ['Apple', 'Banana']
-})
+env.addUrl('home', '/')
+env.addUrl('user-detail', '/users/:id')
+env.addUrls({ settings: '/settings', logout: '/logout' })
 ```
 
-### renderString(template, context)
+Custom filters and globals added through these methods affect subsequent renders. The default URL resolver replaces registered positional/named placeholders and URL-encodes values. A missing route returns `#<name>` and emits a warning.
 
-Render a template string.
+## Template compilation/cache
 
-```typescript
-const html = await env.renderString('Hello, {{ name }}!', {
-  name: 'World'
-})
-```
-
-### addFilter(name, fn)
-
-Add a custom filter.
-
-```typescript
-env.addFilter('currency', (value: number) => `$${value.toFixed(2)}`)
-```
-
-### addGlobal(name, value)
-
-Add a global variable.
-
-```typescript
-env.addGlobal('siteName', 'My Website')
-env.addGlobal('currentYear', new Date().getFullYear())
-```
-
-### loadTemplate(name)
-
-Pre-load a template into cache.
-
-```typescript
-// Warm cache at startup
+```ts
+const ast = env.compile('{{ value }}')
 await env.loadTemplate('base.html')
-await env.loadTemplate('pages/home.html')
-```
 
-### cacheSize()
-
-Get number of cached templates.
-
-```typescript
-const size = env.cacheSize()
-console.log(`${size} templates cached`)
-```
-
-### cacheStats()
-
-Get detailed cache statistics.
-
-```typescript
-const stats = env.cacheStats()
-console.log(stats)
-// { size: 10, maxSize: 100, hits: 150, misses: 10, hitRate: 0.94 }
-```
-
-### clearCache()
-
-Clear all cached templates.
-
-```typescript
+env.cacheSize()
+env.cacheKeys()
+env.cacheStats()
 env.clearCache()
 ```
 
-## Configuration Examples
+`compile()` here means source-to-AST, not AOT JavaScript generation. `loadTemplate()` reads and compiles a file, warming the cache when enabled.
 
-### With Custom Filters
+```ts
+interface CacheStats {
+  size: number
+  maxSize: number
+  hits: number
+  misses: number
+  hitRate: number // percentage from 0 to 100
+}
+```
 
-```typescript
+`clearCache()` also resets hit/miss counters.
+`cacheKeys()` returns cached template names from least to most recently used.
+
+## Full example
+
+```ts
 const env = new Environment({
   templates: './views',
-  filters: {
-    currency: (value: number) => `$${value.toFixed(2)}`,
-    highlight: (text: string, term: string) =>
-      text.replace(new RegExp(term, 'gi'), '<mark>$&</mark>')
-  }
+  extensions: ['.html', ''],
+  autoescape: true,
+  cache: true,
+  cacheMaxSize: 200,
+  timezone: 'Europe/Rome',
+  globals: { siteName: 'Example' },
+  filters: { currency: (value: number) => `€${value.toFixed(2)}` },
+  staticResolver: (path) => `/assets/${path}`,
+  urlResolver: (name, args, kwargs) => route(name, args, kwargs),
+  debug: Bun.env.NODE_ENV !== 'production',
 })
 ```
 
-### With Global Variables
-
-```typescript
-const env = new Environment({
-  templates: './views',
-  globals: {
-    siteName: 'My Website',
-    currentYear: new Date().getFullYear(),
-    version: '1.0.0'
-  }
-})
-```
-
-### With URL Resolvers
-
-```typescript
-const env = new Environment({
-  templates: './views',
-  urlResolver: (name: string, ...args: any[]) => {
-    const routes: Record<string, string> = {
-      home: '/',
-      about: '/about',
-      user: '/users/:id',
-    }
-    let url = routes[name] || '#'
-    args.forEach((arg, i) => {
-      url = url.replace(`:${Object.keys(arg)[0]}`, Object.values(arg)[0] as string)
-    })
-    return url
-  },
-  staticResolver: (path: string) => `/static/${path}`
-})
-```
-
-### With Timezone
-
-```typescript
-const env = new Environment({
-  templates: './views',
-  timezone: 'Europe/Rome'  // All dates in Rome timezone
-})
-```
-
-### With Debug Panel
-
-```typescript
-const env = new Environment({
-  templates: './views',
-  debug: process.env.NODE_ENV !== 'production',
-  debugOptions: {
-    dark: true,
-    position: 'bottom-right',
-    collapsed: true
-  }
-})
-```
-
-## Cache Configuration
-
-```typescript
-const env = new Environment({
-  templates: './views',
-  cache: true,           // Enable caching
-  cacheMaxSize: 200,     // LRU cache limit
-})
-
-// Monitor cache performance
-setInterval(() => {
-  const stats = env.cacheStats()
-  if (stats.hitRate < 0.8) {
-    console.warn('Low cache hit rate:', stats.hitRate)
-  }
-}, 60000)
-```
-
-## See Also
-
-- [`render()`](/binja/api/render/) - Simple rendering
-- [`compile()`](/binja/api/compile/) - AOT compilation
-- [Debug Panel](/binja/guide/debug/) - Development tools
+Render-local block, loop, cycle, include, autoescape, and counter state is isolated across concurrent renders even when the same environment is reused.

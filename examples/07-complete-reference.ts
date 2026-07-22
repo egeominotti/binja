@@ -1,22 +1,26 @@
 /**
- * Binja Complete Reference - All Tags, Filters, and Tests
+ * Binja Feature Reference
  *
- * This example demonstrates every feature available in Binja:
- * - All template tags (if, for, set, with, macro, raw, etc.)
- * - All 70+ built-in filters
- * - All 30+ built-in tests
- * - Template inheritance
+ * This executable example demonstrates a broad selection of supported core
+ * tags, filters, and tests. The exported registries and documentation are the
+ * authoritative complete lists.
+ *
+ * Covered here:
+ * - Core tags such as if, for, set, with, raw, and autoescape
+ * - Representative built-in filters and tests
  * - Whitespace control
  * - UTF-8 support
  */
 
 import { Environment } from '../src'
+import { builtinFilters } from '../src/filters'
+import { builtinTests } from '../src/tests'
 
 async function main() {
   const env = new Environment({ autoescape: true })
 
   console.log('='.repeat(60))
-  console.log('BINJA COMPLETE REFERENCE')
+  console.log('BINJA FEATURE REFERENCE')
   console.log('='.repeat(60))
 
   // ============================================================
@@ -38,7 +42,7 @@ Nested: {{ data.users[0].name }}
   }))
 
   // ============================================================
-  // 2. ALL STRING FILTERS (22 filters)
+  // 2. STRING FILTERS
   // ============================================================
   console.log('\n=== 2. STRING FILTERS ===\n')
 
@@ -145,7 +149,7 @@ divisibleby 5: {{ twelve|divisibleby:5 }}
   }))
 
   // ============================================================
-  // 4. ALL LIST/ARRAY FILTERS (25 filters)
+  // 4. LIST/ARRAY FILTERS
   // ============================================================
   console.log('\n=== 4. LIST/ARRAY FILTERS ===\n')
 
@@ -240,7 +244,7 @@ timeuntil (future): {{ future|timeuntil }}
   }))
 
   // ============================================================
-  // 6. DEFAULT/CONDITIONAL FILTERS (5 filters)
+  // 6. DEFAULT/CONDITIONAL FILTERS
   // ============================================================
   console.log('\n=== 6. DEFAULT/CONDITIONAL FILTERS ===\n')
 
@@ -274,7 +278,7 @@ yesno (null): {{ maybe|yesno:"Active,Inactive,Unknown" }}
   }))
 
   // ============================================================
-  // 7. URL & JSON FILTERS (5 filters)
+  // 7. URL & JSON FILTERS
   // ============================================================
   console.log('\n=== 7. URL & JSON FILTERS ===\n')
 
@@ -296,7 +300,7 @@ pprint: {{ data|pprint }}
   }))
 
   // ============================================================
-  // 8. MISC FILTERS (4 filters)
+  // 8. MISC FILTERS
   // ============================================================
   console.log('\n=== 8. MISC FILTERS ===\n')
 
@@ -352,7 +356,7 @@ unordered_list: {{ nested|unordered_list }}
   }))
 
   // ============================================================
-  // 10. ALL BUILT-IN TESTS (28 tests)
+  // 10. BUILT-IN TESTS
   // ============================================================
   console.log('\n=== 10. BUILT-IN TESTS ===\n')
 
@@ -489,38 +493,9 @@ Items: {{ items|join:", " }}
   }))
 
   // ============================================================
-  // 13. MACROS
+  // 13. RAW BLOCKS
   // ============================================================
-  console.log('\n=== 13. MACROS ===\n')
-
-  const macros = `
---- Basic Macro ---
-{% macro button(text, type="primary") %}
-<button class="btn btn-{{ type }}">{{ text }}</button>
-{% endmacro %}
-
-{{ button("Click me") }}
-{{ button("Delete", "danger") }}
-{{ button("Cancel", "secondary") }}
-
---- Macro with Caller ---
-{% macro card(title) %}
-<div class="card">
-  <h3>{{ title }}</h3>
-  <div class="content">{{ caller() }}</div>
-</div>
-{% endmacro %}
-
-{% call card("Welcome") %}
-  This is the card content with <strong>HTML</strong>.
-{% endcall %}
-`
-  console.log(await env.renderString(macros, {}))
-
-  // ============================================================
-  // 14. RAW BLOCKS
-  // ============================================================
-  console.log('\n=== 14. RAW BLOCKS ===\n')
+  console.log('\n=== 13. RAW BLOCKS ===\n')
 
   const rawBlocks = `
 --- Raw Block (no parsing) ---
@@ -536,9 +511,9 @@ This {{ status }} be parsed!
   console.log(await env.renderString(rawBlocks, { status: 'WILL' }))
 
   // ============================================================
-  // 15. WHITESPACE CONTROL
+  // 14. WHITESPACE CONTROL
   // ============================================================
-  console.log('\n=== 15. WHITESPACE CONTROL ===\n')
+  console.log('\n=== 14. WHITESPACE CONTROL ===\n')
 
   const whitespace = `
 --- Without Control ---
@@ -559,9 +534,9 @@ Items:
   }))
 
   // ============================================================
-  // 16. COMMENTS
+  // 15. COMMENTS
   // ============================================================
-  console.log('\n=== 16. COMMENTS ===\n')
+  console.log('\n=== 15. COMMENTS ===\n')
 
   const comments = `
 Before comment
@@ -576,9 +551,9 @@ End
   console.log(await env.renderString(comments, {}))
 
   // ============================================================
-  // 17. UTF-8 SUPPORT
+  // 16. UTF-8 SUPPORT
   // ============================================================
-  console.log('\n=== 17. UTF-8 SUPPORT ===\n')
+  console.log('\n=== 16. UTF-8 SUPPORT ===\n')
 
   const utf8 = `
 --- International Characters ---
@@ -609,9 +584,9 @@ Length: {{ chinese|length }} characters
   }))
 
   // ============================================================
-  // 18. AUTOESCAPE
+  // 17. AUTOESCAPE
   // ============================================================
-  console.log('\n=== 18. AUTOESCAPE ===\n')
+  console.log('\n=== 17. AUTOESCAPE ===\n')
 
   const autoescape = `
 --- Default (escaped) ---
@@ -636,9 +611,9 @@ Escaped: {{ dangerous }}
   }))
 
   // ============================================================
-  // 19. COMPLEX REAL-WORLD EXAMPLE
+  // 18. COMPLEX REAL-WORLD EXAMPLE
   // ============================================================
-  console.log('\n=== 19. COMPLEX REAL-WORLD EXAMPLE ===\n')
+  console.log('\n=== 18. COMPLEX REAL-WORLD EXAMPLE ===\n')
 
   const realWorld = `
 <!DOCTYPE html>
@@ -764,48 +739,28 @@ Escaped: {{ dangerous }}
   // SUMMARY
   // ============================================================
   console.log('\n' + '='.repeat(60))
-  console.log('REFERENCE COMPLETE - ALL FEATURES INCLUDED')
+  console.log('FEATURE REFERENCE COMPLETE')
   console.log('='.repeat(60))
   console.log(`
-FILTERS (70 total):
-  String (22): upper, lower, capitalize, capfirst, title, trim, striptags,
-               escape, e, safe, escapejs, forceescape, linebreaks, linebreaksbr,
-               truncatechars, truncatewords, wordcount, center, ljust, rjust,
-               cut, slugify, wordwrap, indent, format, string, linenumbers
-  Number (8):  abs, round, int, float, floatformat, add, divisibleby, filesizeformat
-  List (25):   length, length_is, first, last, join, slice, reverse, sort,
-               unique, make_list, dictsort, dictsortreversed, columns, batch,
-               groupby, map, select, reject, selectattr, rejectattr, attr,
-               max, min, sum, list
-  Date (4):    date, time, timesince, timeuntil
-  Default (5): default, d, default_if_none, yesno, pluralize
-  URL (2):     urlencode, urlize
-  JSON (3):    json, tojson, pprint
-  Misc (4):    random, phone2numeric, unordered_list
+FILTER REGISTRY: ${Object.keys(builtinFilters).length} entries, including aliases
+TEST REGISTRY:   ${Object.keys(builtinTests).length} entries, including aliases
 
-TESTS (28 total):
-  Number (12): even, odd, divisibleby, number, integer, float,
-               gt, ge, lt, le, greaterthan, lessthan
-  Type (10):   defined, undefined, none, None, boolean, string,
-               mapping, iterable, sequence, callable
-  String (2):  upper, lower
-  Collection (2): empty, in
-  Equality (4): eq, ne, sameas, equalto
-  Truthiness (4): truthy, falsy, true, false
-
-TAGS:
+TAGS DEMONSTRATED:
   {{ }}          Variable output
   {% if %}       Conditionals (if/elif/else/endif)
   {% for %}      Loops (for/else/endfor) with loop variables
   {% set %}      Variable assignment
   {% with %}     Scoped variables
-  {% macro %}    Reusable template functions
-  {% call %}     Call macros with caller()
   {% raw %}      Raw content (no parsing)
   {% autoescape %} Control HTML escaping
   {# #}          Comments
   {%- -%}        Whitespace control
+
+See README.md and docs/ for the complete tested compatibility scope.
 `)
 }
 
-main().catch(console.error)
+main().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

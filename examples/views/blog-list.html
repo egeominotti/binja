@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }} - {{ siteName }}</title>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  {% for post in posts %}
+    <article>
+      <h2><a href="/blog/{{ post.id }}">{{ post.title }}</a></h2>
+      <p>By {{ post.author }} · {{ post.views }} views</p>
+    </article>
+  {% else %}
+    <p>No posts found.</p>
+  {% endfor %}
+  <p>Page {{ pagination.current }} of {{ pagination.total }}</p>
+</body>
+</html>

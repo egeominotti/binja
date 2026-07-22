@@ -40,6 +40,30 @@
       "require": "./dist/adapters/elysia.js",
       "types": "./dist/adapters/elysia.d.ts",
       "bun": "./dist/adapters/elysia.js"
+    },
+    "./engines": {
+      "import": "./dist/engines/index.js",
+      "require": "./dist/engines/index.js",
+      "types": "./dist/engines/index.d.ts",
+      "bun": "./dist/engines/index.js"
+    },
+    "./engines/handlebars": {
+      "import": "./dist/engines/handlebars/index.js",
+      "require": "./dist/engines/handlebars/index.js",
+      "types": "./dist/engines/handlebars/index.d.ts",
+      "bun": "./dist/engines/handlebars/index.js"
+    },
+    "./engines/liquid": {
+      "import": "./dist/engines/liquid/index.js",
+      "require": "./dist/engines/liquid/index.js",
+      "types": "./dist/engines/liquid/index.d.ts",
+      "bun": "./dist/engines/liquid/index.js"
+    },
+    "./engines/twig": {
+      "import": "./dist/engines/twig/index.js",
+      "require": "./dist/engines/twig/index.js",
+      "types": "./dist/engines/twig/index.d.ts",
+      "bun": "./dist/engines/twig/index.js"
     }
   },
   "files": [
@@ -49,18 +73,22 @@
   ],
   "scripts": {
     "build": "bun run build:js && bun run build:types && bun run build:clean",
-    "build:js": "rm -rf ./dist && bun build ./src/index.ts ./src/cli.ts ./src/debug/index.ts ./src/ai/index.ts ./src/adapters/hono.ts ./src/adapters/elysia.ts --root ./src --outdir ./dist --target bun --minify --splitting --sourcemap=external --chunk-naming 'chunks/[name]-[hash].[ext]' --external @anthropic-ai/sdk --external openai",
+    "build:js": "rm -rf ./dist && bun build ./src/index.ts ./src/cli.ts ./src/debug/index.ts ./src/ai/index.ts ./src/adapters/hono.ts ./src/adapters/elysia.ts ./src/engines/index.ts ./src/engines/handlebars/index.ts ./src/engines/liquid/index.ts ./src/engines/twig/index.ts --root ./src --outdir ./dist --target bun --minify --splitting --sourcemap=external --chunk-naming 'chunks/[name]-[hash].[ext]' --external @anthropic-ai/sdk --external openai",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir ./dist",
-    "build:clean": "rm -rf dist/native dist/lexer/hybrid.* && find dist -name '*.d.ts.map' -delete",
+    "build:clean": "find dist -name '*.d.ts.map' -delete",
     "test": "bun test",
     "test:coverage": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov && bun run test/coverage-gate.ts",
+    "test:property": "BINJA_PROPERTY_RUNS=1000 bun test test/property-based",
     "test:model": "bun test test/model-based",
+    "test:fuzz": "BINJA_FUZZ_RUNS=5000 bun test test/fuzz --timeout 60000",
+    "test:generative": "bun run test:property && bun run test:model && bun run test:fuzz",
+    "test:examples": "bun run test/examples-smoke.ts",
     "test:package": "bun run test/package-smoke.ts",
     "test:soak": "bun test test/soak --dots",
     "test:stress": "bun test --rerun-each=2 --randomize --dots",
     "benchmark": "bun run benchmark/index.ts",
     "dev": "bun --watch src/index.ts",
-    "typecheck": "tsc -p tsconfig.test.json",
+    "typecheck": "tsc -p tsconfig.test.json && tsc -p tsconfig.examples.json",
     "check": "biome check --error-on-warnings src test benchmark",
     "check:fix": "biome check --write src test benchmark",
     "lint": "biome lint --error-on-warnings src test benchmark",
@@ -110,10 +138,18 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=0.30.0",
+    "elysia": ">=1.0.0",
+    "hono": ">=4.0.0",
     "openai": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "elysia": {
+      "optional": true
+    },
+    "hono": {
       "optional": true
     },
     "openai": {

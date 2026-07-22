@@ -42,7 +42,8 @@ app.use(binja({
   root: './views',           // Template directory
   extension: '.html',        // Default extension
   engine: 'jinja2',          // jinja2 | handlebars | liquid | twig
-  cache: true,               // Cache compiled templates
+  cache: true,               // Cache parsed templates
+  cacheMaxSize: 100,         // Per-adapter LRU bound
   globals: {                 // Global context
     siteName: 'My App',
     year: new Date().getFullYear(),
@@ -59,8 +60,9 @@ app.use(binja({
 | `root` | `string` | `./views` | Template directory |
 | `extension` | `string` | `.html` | Default file extension |
 | `engine` | `string` | `jinja2` | Template engine |
-| `cache` | `boolean` | `true` (prod) | Cache compiled templates |
-| `debug` | `boolean` | `false` | Show error details |
+| `cache` | `boolean` | production only | Cache parsed templates/functions |
+| `cacheMaxSize` | `number` | `100` | Per-adapter LRU bound for core and secondary compiled templates |
+| `debug` | `boolean` | `false` | Core debug panel and escaped adapter error details |
 | `globals` | `object` | `{}` | Global context variables |
 | `layout` | `string` | - | Layout template path |
 | `contentVar` | `string` | `content` | Content variable name |
@@ -84,7 +86,7 @@ app.get('/', (c) => c.render('pages/home', { title: 'Home' }))
   <title>{{ title }} | {{ siteName }}</title>
 </head>
 <body>
-  {{ content|safe }}
+  {{ content }}
 </body>
 </html>
 ```
@@ -111,6 +113,10 @@ app.use(binja({
 }))
 ```
 
+The core adapter marks already-rendered layout content as trusted internally, so the layout should use `{{ content }}` without adding `safe`. Secondary syntaxes do not share that wrapper contract; use their explicit raw-output form only for adapter-rendered content and never for arbitrary user values.
+
+For `jinja2`, cached and uncached modes both use one configured `Environment`; includes and inheritance therefore keep the same behavior. Secondary modules cache parsed render functions and retain the limitations documented on their engine pages.
+
 ## Cache Management
 
 ```typescript
@@ -129,6 +135,8 @@ app.get('/admin/cache-stats', (c) => {
   // { size: 10, keys: ['jinja2:./views/index.html', ...] }
 })
 ```
+
+These module-level functions aggregate the Jinja `Environment` caches and secondary-engine compiled caches for every Hono adapter instance in the process. `clearCache()` clears all of them; keys are diagnostic labels, not stable identifiers.
 
 ## With HTMX
 

@@ -4,7 +4,7 @@
  */
 import { TokenType } from '../lexer'
 import type { Token } from '../lexer'
-import { TemplateSyntaxError } from '../errors'
+import { TemplateSyntaxError, findSimilar } from '../errors'
 import type {
   ASTNode,
   TemplateNode,
@@ -17,6 +17,8 @@ import type {
   IncludeNode,
   SetNode,
   WithNode,
+  AutoescapeNode,
+  SpacelessNode,
   LoadNode,
   UrlNode,
   StaticNode,
@@ -46,6 +48,34 @@ import type {
   DebugNode,
   TemplatetagNode,
 } from './nodes'
+
+const KNOWN_TAGS = [
+  'if',
+  'for',
+  'block',
+  'extends',
+  'include',
+  'set',
+  'with',
+  'load',
+  'url',
+  'static',
+  'now',
+  'comment',
+  'spaceless',
+  'autoescape',
+  'cycle',
+  'firstof',
+  'ifchanged',
+  'regroup',
+  'widthratio',
+  'lorem',
+  'csrf_token',
+  'debug',
+  'templatetag',
+  'ifequal',
+  'ifnotequal',
+]
 
 export class Parser {
   private tokens: Token[]
@@ -148,10 +178,10 @@ export class Parser {
         return this.parseNow(start)
       case 'comment':
         return this.parseComment(start)
-      case 'spaceless':
       case 'autoescape':
-      case 'verbatim':
-        return this.parseSimpleBlock(start, tagName.value)
+        return this.parseAutoescape(start)
+      case 'spaceless':
+        return this.parseSpaceless(start)
       // Django additional tags
       case 'cycle':
         return this.parseCycle(start)
@@ -177,9 +207,12 @@ export class Parser {
       case 'ifnotequal':
         return this.parseIfequal(start, true)
       default:
-        // Unknown tag - skip to end
-        this.skipToBlockEnd()
-        return null
+        throw new TemplateSyntaxError(`Unknown template tag '${tagName.value}'`, {
+          line: tagName.line,
+          column: tagName.column,
+          source: this.source,
+          suggestion: findSimilar(tagName.value, KNOWN_TAGS) ?? undefined,
+        })
     }
   }
 
@@ -195,7 +228,12 @@ export class Parser {
 
     // Parse body until elif/else/endif
     while (!this.isAtEnd()) {
-      if (this.checkBlockTag('elif') || this.checkBlockTag('else') || this.checkBlockTag('endif')) {
+      if (
+        this.checkBlockTag('elif') ||
+        this.checkBlockTag('elseif') ||
+        this.checkBlockTag('else') ||
+        this.checkBlockTag('endif')
+      ) {
         break
       }
       const node = this.parseStatement()
@@ -203,7 +241,7 @@ export class Parser {
     }
 
     // Parse elif chains
-    while (this.checkBlockTag('elif')) {
+    while (this.checkBlockTag('elif') || this.checkBlockTag('elseif')) {
       this.advance() // {%
       this.advance() // elif
       const elifTest = this.parseExpression()
@@ -213,6 +251,7 @@ export class Parser {
       while (!this.isAtEnd()) {
         if (
           this.checkBlockTag('elif') ||
+          this.checkBlockTag('elseif') ||
           this.checkBlockTag('else') ||
           this.checkBlockTag('endif')
         ) {
@@ -584,23 +623,50 @@ export class Parser {
     return null
   }
 
-  private parseSimpleBlock(_start: Token, tagName: string): ASTNode | null {
-    this.skipToBlockEnd()
-
-    // Skip until end tag
-    const endTag = `end${tagName}`
-    while (!this.isAtEnd()) {
-      if (this.checkBlockTag(endTag)) break
-      this.advance()
+  private parseAutoescape(start: Token): AutoescapeNode {
+    const mode = this.expect(TokenType.NAME)
+    const normalized = mode.value.toLowerCase()
+    if (!['true', 'false', 'on', 'off'].includes(normalized)) {
+      throw new TemplateSyntaxError("autoescape expects 'true'/'false' or 'on'/'off'", {
+        line: mode.line,
+        column: mode.column,
+        source: this.source,
+      })
     }
+    this.expect(TokenType.BLOCK_END)
 
-    if (this.checkBlockTag(endTag)) {
-      this.advance() // {%
-      this.advance() // endtag
-      this.expect(TokenType.BLOCK_END)
+    const body: ASTNode[] = []
+    while (!this.isAtEnd() && !this.checkBlockTag('endautoescape')) {
+      const node = this.parseStatement()
+      if (node) body.push(node)
     }
+    this.expectBlockTag('endautoescape')
 
-    return null
+    return {
+      type: 'Autoescape',
+      enabled: normalized === 'true' || normalized === 'on',
+      body,
+      line: start.line,
+      column: start.column,
+    }
+  }
+
+  private parseSpaceless(start: Token): SpacelessNode {
+    this.expect(TokenType.BLOCK_END)
+
+    const body: ASTNode[] = []
+    while (!this.isAtEnd() && !this.checkBlockTag('endspaceless')) {
+      const node = this.parseStatement()
+      if (node) body.push(node)
+    }
+    this.expectBlockTag('endspaceless')
+
+    return {
+      type: 'Spaceless',
+      body,
+      line: start.line,
+      column: start.column,
+    }
   }
 
   // ==================== Django Additional Tags ====================
@@ -626,6 +692,14 @@ export class Parser {
     }
 
     this.expect(TokenType.BLOCK_END)
+
+    if (values.length === 0) {
+      throw new TemplateSyntaxError("'cycle' requires at least one value", {
+        line: start.line,
+        column: start.column,
+        source: this.source,
+      })
+    }
 
     return {
       type: 'Cycle',
@@ -820,7 +894,26 @@ export class Parser {
   }
 
   private parseTemplatetag(start: Token): TemplatetagNode {
-    const tagType = this.expect(TokenType.NAME).value as TemplatetagNode['tagType']
+    const token = this.expect(TokenType.NAME)
+    const validTypes: TemplatetagNode['tagType'][] = [
+      'openblock',
+      'closeblock',
+      'openvariable',
+      'closevariable',
+      'openbrace',
+      'closebrace',
+      'opencomment',
+      'closecomment',
+    ]
+    if (!validTypes.includes(token.value as TemplatetagNode['tagType'])) {
+      throw new TemplateSyntaxError(`Unknown templatetag value '${token.value}'`, {
+        line: token.line,
+        column: token.column,
+        source: this.source,
+        suggestion: findSimilar(token.value, validTypes) ?? undefined,
+      })
+    }
+    const tagType = token.value as TemplatetagNode['tagType']
     this.expect(TokenType.BLOCK_END)
 
     return {
@@ -887,7 +980,22 @@ export class Parser {
   }
 
   private parseConditional(): ExpressionNode {
-    let expr = this.parseOr()
+    let expr = this.parseNullCoalesce()
+
+    // Twig-style ternary: condition ? trueValue : falseValue
+    if (this.match(TokenType.QUESTION)) {
+      const trueExpr = this.parseExpression()
+      this.expect(TokenType.COLON)
+      const falseExpr = this.parseConditional()
+      return {
+        type: 'Conditional',
+        test: expr,
+        trueExpr,
+        falseExpr,
+        line: expr.line,
+        column: expr.column,
+      } as ConditionalNode
+    }
 
     // Ternary: expr if test else other
     if (this.check(TokenType.NAME) && this.peek().value === 'if') {
@@ -908,6 +1016,21 @@ export class Parser {
     }
 
     return expr
+  }
+
+  private parseNullCoalesce(): ExpressionNode {
+    const left = this.parseOr()
+    if (!this.match(TokenType.NULLCOALESCE)) return left
+
+    const right = this.parseNullCoalesce()
+    return {
+      type: 'BinaryOp',
+      operator: '??',
+      left,
+      right,
+      line: left.line,
+      column: left.column,
+    } as BinaryOpNode
   }
 
   private parseOr(): ExpressionNode {
@@ -1005,8 +1128,18 @@ export class Parser {
 
           // Parse test name
           const testToken = this.expect(TokenType.NAME)
-          const testName = testToken.value
+          let testName = testToken.value
           const args: ExpressionNode[] = []
+
+          // Twig spells this two-word test as `is divisible by(3)`.
+          if (
+            testName === 'divisible' &&
+            this.check(TokenType.NAME) &&
+            this.peek().value === 'by'
+          ) {
+            this.advance()
+            testName = 'divisibleby'
+          }
 
           // Parse optional arguments: is testname(arg1, arg2)
           if (this.match(TokenType.LPAREN)) {
@@ -1361,15 +1494,6 @@ export class Parser {
     const token = this.expect(TokenType.NAME)
     if (token.value !== name) {
       throw this.error(`Expected '${name}', got '${token.value}'`)
-    }
-  }
-
-  private skipToBlockEnd(): void {
-    while (!this.isAtEnd() && !this.check(TokenType.BLOCK_END)) {
-      this.advance()
-    }
-    if (this.check(TokenType.BLOCK_END)) {
-      this.advance()
     }
   }
 

@@ -162,19 +162,22 @@ env.addFilter('relative_time', (date: Date) => {
 {{ post.created_at|relative_time }}  {# 2 hours ago #}
 ```
 
-### Async Filters
+### Asynchronous data
 
 ```typescript
-env.addFilter('translate', async (text: string, lang: string) => {
-  const response = await fetch(`/api/translate?text=${text}&lang=${lang}`)
-  const data = await response.json()
-  return data.translated
+const response = await fetch(`/api/translate?text=${text}&lang=${lang}`)
+const data = await response.json()
+
+const html = await env.render('page.html', {
+  translatedText: data.translated,
 })
 ```
 
 ```jinja
-{{ "Hello"|translate:"es" }}  {# Hola #}
+{{ translatedText }}
 ```
+
+Filter functions are synchronous. A Promise-returning filter is rejected with a runtime error so a Promise object cannot silently leak into rendered output. Resolve asynchronous data before calling `render()`.
 
 ## Best Practices
 

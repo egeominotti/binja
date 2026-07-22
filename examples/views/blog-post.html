@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title }} - {{ siteName }}</title>
+</head>
+<body>
+  <article>
+    <h1>{{ post.title }}</h1>
+    <p>By {{ post.author }} · {{ post.date|date:"Y-m-d" }} · {{ post.views }} views</p>
+    <ul>
+      {% for tag in post.tags %}<li>{{ tag }}</li>{% endfor %}
+    </ul>
+  </article>
+  <h2>Related posts</h2>
+  {% for related in relatedPosts %}
+    <a href="/blog/{{ related.id }}">{{ related.title }}</a>
+  {% endfor %}
+  <h2>Comments</h2>
+  {% for comment in comments %}
+    <p><strong>{{ comment.author }}</strong>: {{ comment.text }}</p>
+  {% endfor %}
+</body>
+</html>

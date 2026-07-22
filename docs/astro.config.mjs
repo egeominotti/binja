@@ -39,7 +39,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'binja',
-      description: 'High-performance Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT.',
+      description: 'Bun-first Jinja/Django-style templates with runtime rendering, AOT compilation, adapters, and tested engine subsets.',
       logo: {
         src: './src/assets/logo.svg',
         replacesTitle: false,
@@ -87,14 +87,14 @@ export default defineConfig({
             { label: 'Variables & Expressions', link: '/guide/variables/' },
             { label: 'Control Flow', link: '/guide/control-flow/' },
             { label: 'Template Inheritance', link: '/guide/inheritance/' },
-            { label: 'Include & Macros', link: '/guide/include/' },
+            { label: 'Includes', link: '/guide/include/' },
           ],
         },
         {
           label: 'Filters & Tests',
           items: [
-            { label: 'Built-in Filters (84)', link: '/guide/filters/' },
-            { label: 'Built-in Tests (28)', link: '/guide/tests/' },
+            { label: 'Built-in Filters (91 entries)', link: '/guide/filters/' },
+            { label: 'Built-in Tests (35 entries)', link: '/guide/tests/' },
             { label: 'Custom Filters', link: '/guide/custom-filters/' },
           ],
         },
@@ -120,6 +120,7 @@ export default defineConfig({
             { label: 'AOT Compilation', link: '/guide/aot/' },
             { label: 'Benchmarks', link: '/guide/benchmarks/' },
             { label: 'Caching', link: '/guide/caching/' },
+            { label: 'Generative Testing', link: '/guide/testing/' },
           ],
         },
         {
@@ -197,7 +198,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'description',
-            content: 'The fastest Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT compilation. Multi-engine support: Handlebars, Liquid, Twig.',
+            content: 'Bun-first Jinja/Django-style templates with runtime rendering, AOT compilation, Hono/Elysia adapters, and tested Handlebars, Liquid, and Twig subsets.',
           },
         },
         {
@@ -261,7 +262,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:description',
-            content: 'Jinja2/Django compatible template engine. 2-4x faster than Nunjucks, 160x faster with AOT. Multi-engine support for Handlebars, Liquid, Twig.',
+            content: 'Bun-first Jinja/Django-style template engine with runtime and AOT modes plus documented Handlebars, Liquid, and Twig subsets.',
           },
         },
         {
@@ -332,7 +333,7 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'twitter:description',
-            content: 'Jinja2/Django compatible. 2-4x faster than Nunjucks, 160x with AOT. Multi-engine: Handlebars, Liquid, Twig.',
+            content: 'Bun-first Jinja/Django-style templates with runtime and AOT modes, adapters, and tested secondary-engine subsets.',
           },
         },
         {
@@ -374,12 +375,10 @@ export default defineConfig({
             '@type': 'SoftwareApplication',
             name: 'binja',
             alternateName: 'Binja Template Engine',
-            description: 'High-performance Jinja2/Django template engine for Bun. 2-4x faster than Nunjucks, 160x faster with AOT compilation. Multi-engine support.',
+            description: 'Bun-first Jinja/Django-style template engine with runtime rendering, AOT compilation, adapters, and tested engine subsets.',
             applicationCategory: 'DeveloperApplication',
             operatingSystem: 'Cross-platform',
-            softwareVersion: '0.9.1',
-            datePublished: '2024-01-01',
-            dateModified: '2025-01-30',
+            softwareVersion: '0.9.3',
             license: 'https://opensource.org/licenses/BSD-3-Clause',
             offers: {
               '@type': 'Offer',
@@ -401,11 +400,6 @@ export default defineConfig({
             programmingLanguage: ['TypeScript', 'JavaScript'],
             runtimePlatform: 'Bun',
             keywords: ['template engine', 'jinja2', 'django', 'bun', 'typescript', 'nunjucks alternative', 'handlebars', 'liquid', 'twig'],
-            aggregateRating: {
-              '@type': 'AggregateRating',
-              ratingValue: '5',
-              ratingCount: '1',
-            },
           }),
         },
         // JSON-LD Structured Data - WebSite

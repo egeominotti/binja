@@ -15,19 +15,19 @@ describe('Django Extra Filters', () => {
 
     test('escapes single quotes', async () => {
       const result = await render('{{ value|addslashes }}', { value: "it's a test" })
-      expect(result).toBe("it\\'s a test")
+      expect(result).toBe('it\\&#x27;s a test')
     })
 
     test('escapes double quotes', async () => {
       const result = await render('{{ value|addslashes }}', { value: 'say "hello"' })
-      expect(result).toBe('say \\"hello\\"')
+      expect(result).toBe('say \\&quot;hello\\&quot;')
     })
 
     test('handles mixed escapes', async () => {
       const result = await render('{{ value|addslashes }}', {
         value: 'it\'s "quoted" with \\backslash',
       })
-      expect(result).toBe('it\\\'s \\"quoted\\" with \\\\backslash')
+      expect(result).toBe('it\\&#x27;s \\&quot;quoted\\&quot; with \\\\backslash')
     })
   })
 
@@ -230,9 +230,12 @@ describe('Django Extra Tags', () => {
   describe('{% csrf_token %}', () => {
     test('outputs hidden input', async () => {
       const env = new Environment({ autoescape: false })
-      const result = await env.renderString('{% csrf_token %}')
+      const result = await env.renderString('{% csrf_token %}', {
+        csrf_token: 'token"<&',
+      })
       expect(result).toContain('<input type="hidden" name="csrfmiddlewaretoken"')
-      expect(result).toContain('value=')
+      expect(result).toContain('value="token&quot;&lt;&amp;"')
+      expect(await env.renderString('{% csrf_token %}')).toBe('')
     })
   })
 

@@ -108,4 +108,7 @@ User: {{ user.name }} ({{ user.age }} years old)
   console.log('Available engines:', engine.listEngines().join(', '))
 }
 
-main().catch(console.error)
+main().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

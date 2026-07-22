@@ -1,209 +1,104 @@
 ---
 title: FAQ
-description: Frequently asked questions about binja
+description: Compatibility, performance, caching, security, and API answers.
 ---
 
 ## General
 
-### What is binja?
+### What is Binja?
 
-binja is a high-performance Jinja2/Django Template Language engine built for the Bun runtime. It implements a broad compatible subset and is optimized for Bun.
+A Bun-first TypeScript template engine with a Jinja/Django-style core, static AOT compiler, Hono/Elysia adapters, and explicit Handlebars/Liquid/Twig subsets.
 
-### Why "binja"?
+### Does it run on Node.js?
 
-**B**un + J**inja** = **binja**. It's a Jinja2 implementation optimized for Bun.
+The package targets Bun `>=1.3.14` and uses Bun APIs such as `Bun.file` and `Bun.escapeHTML`. Node.js is not a supported runtime target.
 
-### Does binja work with Node.js?
+### Is it fully compatible with Django or Jinja2?
 
-No, binja requires the [Bun](https://bun.sh) runtime. It uses Bun-specific APIs for maximum performance.
-
-### Is binja production-ready?
-
-binja has a large automated suite, including example-based, regression, concurrency, property-based, and model-based tests. As with any template migration, validate your own templates before deploying.
+No. It implements a broad, tested subset. Python extensions, every upstream tag/filter, and exact coercion/escaping edge cases are outside the guarantee. Migrate with fixture tests rather than syntax assumptions.
 
 ## Performance
 
-### How much faster is binja?
+### How fast is it?
 
-- **Runtime mode:** 2-4x faster than Nunjucks
-- **AOT mode:** 160x faster than Nunjucks
+The repository publishes current local microbenchmark numbers with hardware, Bun version, warmup, samples, ranges, and variability. It no longer publishes unsupported universal ratios against another engine. See [Benchmarks](/binja/guide/benchmarks/) and re-run the harness on the deployment target.
 
-See [Benchmarks](/binja/guide/benchmarks/) for detailed numbers.
+### When should I use AOT?
 
-### When should I use AOT compilation?
+Use core `compile()` for a static template supported by the AOT compiler and a synchronous hot path. Use `compileWithInheritance()` when every dependency name is literal. Use `Environment` for dynamic template names, loader-backed rendering, custom filters, URL/static resolvers, or runtime-only tags.
 
-Use AOT (`compile()`) for:
-- Static templates without inheritance
-- Maximum performance requirements
-- Production deployments
+### Does caching change semantics?
 
-Use Runtime (`render()`) for:
-- Templates with `{% extends %}` or `{% include %}`
-- Development with frequent template changes
-- Dynamic template loading
+It should not. `Environment` caches immutable parsed ASTs while render-local state remains isolated. The core Hono/Elysia adapters use `Environment` in both cached and uncached modes, so inheritance/includes behave consistently.
 
-### Does caching help performance?
+## Filters and tests
 
-Yes, significantly. Enable caching with:
+### How many are included?
 
-```typescript
+The public registries expose 91 filter entries and 35 test entries in this release. Counts include aliases. Inspect `Object.keys(builtinFilters)` and `Object.keys(builtinTests)` for the exact installed version.
+
+### Can I add filters?
+
+Yes, through `Environment`:
+
+```ts
 const env = new Environment({
-  cache: true,
-  cacheMaxSize: 100, // Adjust based on your template count
+  filters: { currency: (value: number) => `€${value.toFixed(2)}` },
 })
 ```
 
-## Compatibility
+Plain AOT `compile()` uses the built-in registry and does not accept that environment registry.
 
-### Is binja compatible with Django templates?
+## Templates and loaders
 
-binja supports a broad Django Template Language (DTL) subset:
+### Are inheritance and includes supported?
 
-- Common tags: `{% if %}`, `{% for %}`, `{% block %}`, `{% extends %}`, etc.
-- A large filter set including `upper`, `lower`, `date`, and `truncatechars`
-- Loop variables: `forloop.counter`, `forloop.first`, `forloop.last`
-- Template inheritance
+Yes through the core `Environment`. The loader is root-contained, detects cycles, supports context overrides, and distinguishes a missing template from failures inside an existing include.
 
-### Is binja compatible with Jinja2?
+Direct Handlebars/Liquid/Twig modules accept strings and do not expose a partial/template loader, so their external dependency syntax is not supported through those APIs.
 
-Yes, binja supports Jinja2 syntax:
-- `{% set %}` statements
-- `{% raw %}` blocks
-- `loop.index`, `loop.first`, `loop.last`
-- Ternary expressions: `{{ value if condition else default }}`
-- String concatenation: `{{ "a" ~ "b" }}`
+### Why did `ignore missing` still throw?
 
-### Can I use existing Django/Jinja2 templates?
+It intentionally suppresses only `TemplateNotFoundError`. A syntax error, unknown filter, or runtime error inside an existing included template is not “missing” and remains visible.
 
-In most cases, yes. Simply copy your templates and they should work. Some advanced features may need minor adjustments.
+## Secondary engines
 
-## Features
+### Do all core filters work in every syntax?
 
-### What filters are included?
+They share the runtime registry, but parser syntax and aliases differ. Liquid and Twig map documented aliases; Handlebars does not expose a general Binja pipe-filter syntax. Test the specific template rather than assuming registry reachability.
 
-binja includes 84 built-in filters covering:
-- String manipulation (26 filters)
-- Number formatting (9 filters)
-- List/Array operations (22 filters)
-- Date/Time formatting (4 filters)
-- Safety/Encoding (13 filters)
-- Default values (4 filters)
+### Is secondary `compile()` AOT?
 
-See [Built-in Filters](/binja/guide/filters/) for the complete list.
-
-### Can I add custom filters?
-
-Yes:
-
-```typescript
-const env = new Environment({
-  filters: {
-    currency: (value) => `$${value.toFixed(2)}`,
-    highlight: (text, term) => text.replace(term, `<mark>${term}</mark>`)
-  }
-})
-```
-
-### Does binja support template inheritance?
-
-Yes, full support for Django-style template inheritance:
-
-```jinja
-{% extends "base.html" %}
-{% block content %}...{% endblock %}
-```
-
-### What about includes?
-
-Yes:
-
-```jinja
-{% include "header.html" %}
-{% include "card.html" with title="Hello" %}
-```
-
-## Multi-Engine
-
-### What template engines does binja support?
-
-- **Jinja2/DTL** (default)
-- **Handlebars**
-- **Liquid** (Shopify)
-- **Twig** (PHP/Symfony)
-
-### Do all engines share the same filters?
-
-Yes, all 84+ built-in filters work across all engines.
-
-### Can I use different engines in the same project?
-
-Yes:
-
-```typescript
-import * as handlebars from 'binja/engines/handlebars'
-import * as liquid from 'binja/engines/liquid'
-import { render } from 'binja' // Jinja2
-
-await handlebars.render('{{name}}', { name: 'World' })
-await liquid.render('{{ name }}', { name: 'World' })
-await render('{{ name }}', { name: 'World' })
-```
+No. It caches parsing and returns `(context) => Promise<string>`. Only the core `compile()` returns a synchronous AOT function.
 
 ## Security
 
-### Is autoescape enabled by default?
+### Is autoescape enabled?
 
-Yes, autoescape is enabled by default, protecting against XSS attacks:
+Yes by default. `safe`, triple Handlebars output, Twig `raw`, and `autoescape false` are explicit trust assertions, not sanitizers.
 
-```typescript
-await render('{{ script }}', {
-  script: '<script>alert("xss")</script>'
-})
-// Output: &lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;
-```
+### How should I embed JSON?
 
-### How do I output raw HTML?
+Prefer `json_script`, then parse the inert element's `textContent`. `json`/`tojson` are also HTML-safe, but do not add a redundant `safe` to untrusted input.
 
-Use the `|safe` filter:
+### Does `{% csrf_token %}` provide CSRF protection?
 
-```jinja
-{{ trusted_html|safe }}
-```
+No. It only renders an escaped token supplied as `csrf_token` or `csrfToken`. The host application must generate and validate the token.
 
-Only use this with trusted content!
+### Is debug mode safe in production?
+
+No. Although displayed text is escaped, the panel can disclose context values, SQL, query parameters, templates, and errors.
 
 ## Troubleshooting
 
-### Template not found error
+### A template is not found
 
-Ensure your `templates` path is correct:
+Paths are relative to `EnvironmentOptions.templates`, and extensions are tried in configured order. Absolute paths, `..` traversal, and symlink escapes are rejected.
 
-```typescript
-const env = new Environment({
-  templates: './views', // Relative to working directory
-})
-```
+### A compiled CLI module cannot resolve `binja`
 
-### Filter not working
+Generated modules intentionally import the package registries. Ensure `binja` is installed/resolvable from the output module's project.
 
-Check filter syntax. Django-style uses colons:
+### I see double escaping
 
-```jinja
-{{ text|truncatechars:20 }}
-```
-
-Jinja2-style uses parentheses:
-
-```jinja
-{{ text|truncate(20) }}
-```
-
-Both work in binja.
-
-### Double escaping
-
-If you see `&amp;lt;` instead of `&lt;`, you're escaping twice. Use `|safe` on pre-escaped content:
-
-```jinja
-{{ already_escaped_html|safe }}
-```
+Find where already-escaped text was converted back to a plain string. Do not broadly add `safe`; preserve a trusted safe-string wrapper only at the sanitization boundary.

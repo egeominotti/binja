@@ -23,6 +23,8 @@ import type {
   IfNode,
   ForNode,
   WithNode,
+  AutoescapeNode,
+  SpacelessNode,
 } from '../parser/nodes'
 
 export interface TemplateLoader {
@@ -150,6 +152,11 @@ class TemplateFlattener {
         this.collectBlocks(withNode.body)
         break
       }
+      case 'Autoescape':
+      case 'Spaceless': {
+        this.collectBlocks((node as AutoescapeNode | SpacelessNode).body)
+        break
+      }
       case 'Block': {
         const blockNode = node as BlockNode
         this.collectBlocks(blockNode.body)
@@ -230,6 +237,13 @@ class TemplateFlattener {
           body: this.processNodes(withNode.body),
         }
       }
+      case 'Autoescape':
+      case 'Spaceless': {
+        return {
+          ...node,
+          body: this.processNodes((node as AutoescapeNode | SpacelessNode).body),
+        } as AutoescapeNode | SpacelessNode
+      }
       default:
         return node
     }
@@ -285,6 +299,14 @@ class TemplateFlattener {
             ...withNode,
             body: this.replaceBlockSuper(withNode.body, parentBody),
           })
+          break
+        }
+        case 'Autoescape':
+        case 'Spaceless': {
+          result.push({
+            ...node,
+            body: this.replaceBlockSuper((node as AutoescapeNode | SpacelessNode).body, parentBody),
+          } as AutoescapeNode | SpacelessNode)
           break
         }
         default:
@@ -417,6 +439,12 @@ class StaticChecker {
       case 'With': {
         const withNode = node as WithNode
         const result = this.checkNodes(withNode.body)
+        if (!result.canFlatten) return result
+        break
+      }
+      case 'Autoescape':
+      case 'Spaceless': {
+        const result = this.checkNodes((node as AutoescapeNode | SpacelessNode).body)
         if (!result.canFlatten) return result
         break
       }

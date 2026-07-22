@@ -141,6 +141,33 @@ describe('Algorithm model invariants', () => {
     expect(await new Runtime().render(ast, { items: [first, second] })).toBe('changed')
     expect(await new Runtime().render(ast, { items: [undefined, undefined] })).toBe('changed')
   })
+
+  test('ifchanged treats Map and Set insertion order as non-semantic', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.uniqueArray(fc.integer(), { minLength: 2, maxLength: 20 }),
+        async (values) => {
+          const reversed = [...values].reverse()
+          const setPair = [new Set(values), new Set(reversed)]
+          const mapPair = [
+            new Map(values.map((value) => [value, `value:${value}`])),
+            new Map(reversed.map((value) => [value, `value:${value}`])),
+          ]
+          const source =
+            '{% for item in items %}{% ifchanged item %}changed{% endifchanged %}{% endfor %}'
+          const ast = new Environment().compile(source)
+
+          expect(await new Runtime().render(ast, { items: setPair }), 'Set equality').toBe(
+            'changed'
+          )
+          expect(await new Runtime().render(ast, { items: mapPair }), 'Map equality').toBe(
+            'changed'
+          )
+        }
+      ),
+      { numRuns: 200 }
+    )
+  })
 })
 
 function compare(left: number, operator: string, right: number): boolean {

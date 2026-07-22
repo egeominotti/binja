@@ -93,7 +93,7 @@ const env = new Environment({
 
 **Jinja2 style (parentheses):**
 ```jinja
-{{ text|truncate(20) }}
+{{ text|truncatechars(20) }}
 ```
 
 Both work in binja.
@@ -104,10 +104,10 @@ Both work in binja.
 
 **Cause:** Content is being escaped twice.
 
-**Solution:** Use `|safe` on already-escaped content:
+**Solution:** Keep trusted sanitized HTML wrapped as a safe value at the application boundary instead of repeatedly converting it to plain strings. Do not broadly add `safe` to suppress the symptom: it is a trust assertion, not a sanitizer.
 
 ```jinja
-{{ already_escaped_html|safe }}
+{{ application_sanitized_html|safe }}
 ```
 
 ## Performance Issues
@@ -119,7 +119,7 @@ Both work in binja.
 1. **Use AOT compilation for static templates:**
    ```typescript
    const template = compile(templateString)
-   const html = template(context) // Much faster
+   const html = template(context) // Parsing moved to build/startup time
    ```
 
 2. **Enable caching:**

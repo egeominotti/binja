@@ -1,206 +1,103 @@
 ---
 title: CLI
-description: Command-line interface for template compilation and linting
+description: Compile, validate, watch, and lint Binja templates.
 ---
 
-binja includes a CLI tool for template pre-compilation, validation, and linting.
+The `binja` executable is included in the package:
 
-## Installation
-
-The CLI is included with binja:
-
-```bash
-bun add binja
+```sh
+bunx binja --help
+bunx binja --version
 ```
 
-Run with:
+## Compile
 
-```bash
-bunx binja <command>
-# or
-bun x binja <command>
+```sh
+binja compile <source-file-or-directory> -o <output-directory>
 ```
 
-## Commands
+| Option | Effect |
+|---|---|
+| `-o, --output <dir>` | Required output directory |
+| `-n, --name <identifier>` | Function name for a single-file compile |
+| `-m, --minify` | Remove generated formatting newlines |
+| `-e, --ext <csv>` | Extensions; default `.html,.jinja,.jinja2` |
+| `-v, --verbose` | Print every compiled path |
+| `-w, --watch` | Recompile changed files; directory only |
 
-### compile
-
-Compile templates to JavaScript for production.
-
-```bash
-binja compile ./templates -o ./dist
+```sh
+binja compile ./views -o ./compiled --verbose
+binja compile ./views/card.html -o ./compiled --name renderCard
+binja compile ./views -o ./compiled --ext html,twig
 ```
 
-**Options:**
+The compiler parses each template, verifies static flattenability, resolves literal `extends`/`include` dependencies beneath the source root, generates AOT code, and writes an ESM module. Dynamic dependency names fail because they cannot be resolved at build time.
 
-| Option | Description |
-|--------|-------------|
-| `-o, --output <dir>` | Output directory |
-| `-w, --watch` | Watch for changes |
-| `--minify` | Minify output |
+Generated modules:
 
-**Example:**
+- import `builtinFilters` and `builtinTests` from `binja`;
+- include protected lookup, output, truthiness, iteration, and dispatch helpers;
+- export the generated function as `render` and as the default export.
 
-```bash
-# Compile all templates
-binja compile ./views -o ./dist/templates
+```ts
+import renderCard, { render } from './compiled/card.js'
 
-# Watch mode
-binja compile ./views -o ./dist/templates --watch
+renderCard({ title: 'Status' })
+render({ title: 'Status' })
 ```
 
-### check
+If any file in a directory fails, successful siblings may already have been written, but the command exits non-zero.
 
-Validate templates for syntax errors.
+## Check
 
-```bash
-binja check ./templates
+```sh
+binja check <source-file-or-directory>
 ```
 
-**Options:**
+`check` does more than parse: it verifies that dependencies are statically flattenable, performs flattening, and asks the AOT compiler to generate code. Dynamic includes/extends, missing dependencies, unsupported AOT nodes, and syntax errors produce a non-zero exit.
 
-| Option | Description |
-|--------|-------------|
-| `--strict` | Fail on warnings |
-| `--format <type>` | Output format (text, json) |
+`check` currently emits terminal text; it does not support `--strict` or JSON output.
 
-**Example:**
+## Watch
 
-```bash
-# Check all templates
-binja check ./views
+Both forms are equivalent:
 
-# JSON output for CI
-binja check ./views --format json
+```sh
+binja watch ./views -o ./compiled
+binja compile ./views -o ./compiled --watch
 ```
 
-### watch
+Watch mode requires a directory and recompiles changed files with one of the selected extensions. It does not remove an output when a source file is deleted.
 
-Watch templates and recompile on changes.
+## Lint
 
-```bash
-binja watch ./templates -o ./dist
+```sh
+binja lint <source-file-or-directory>
+binja lint ./views --format=json
 ```
 
-### lint
+Without AI, lint performs syntax validation. Optional AI analysis supports:
 
-Check templates for issues (syntax, security, best practices).
-
-```bash
-binja lint ./templates
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--ai` | Enable AI-powered analysis |
-| `--ai=<provider>` | Use specific AI provider |
-| `--format <type>` | Output format (text, json) |
-
-**Example:**
-
-```bash
-# Syntax check only
-binja lint ./views
-
-# With AI analysis (auto-detect provider)
+```sh
 binja lint ./views --ai
-
-# With specific AI provider
 binja lint ./views --ai=anthropic
 binja lint ./views --ai=openai
-binja lint ./views --ai=ollama
 binja lint ./views --ai=groq
-
-# JSON output for CI/CD
-binja lint ./views --ai --format=json
+binja lint ./views --ai=ollama
 ```
 
-## CI/CD Integration
+`--format=json` is the exact option form. AI providers require their documented credentials/runtime and optional SDK where applicable.
 
-### GitHub Actions
+Lint exits non-zero for errors. Warnings and suggestions alone do not currently change the exit code.
+
+## Path and code safety
+
+Dependency resolution rejects paths and symlinks outside the source directory. Generated function names are sanitized for directory compiles and validated by the compiler; an unsafe explicit `--name` fails rather than becoming injected JavaScript.
+
+## CI example
 
 ```yaml
-name: Template Check
-
-on: [push, pull_request]
-
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Check templates
-        run: bunx binja check ./templates --format json
-```
-
-### With AI Linting
-
-```yaml
-name: Template Lint
-
-on: [push, pull_request]
-
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Lint templates
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: bunx binja lint ./templates --ai --format json
-```
-
-## Exit Codes
-
-| Code | Description |
-|------|-------------|
-| `0` | Success |
-| `1` | Error (syntax error, file not found) |
-| `2` | Warnings (with --strict) |
-
-## Compiled Output
-
-When using `compile`, templates are converted to JavaScript:
-
-**Input:** `views/user.html`
-```jinja
-<h1>{{ name|upper }}</h1>
-<p>Email: {{ email }}</p>
-```
-
-**Output:** `dist/user.js`
-```javascript
-export function render(ctx) {
-  let __out = '';
-  __out += '<h1>';
-  __out += escape(ctx.name.toUpperCase());
-  __out += '</h1>\n<p>Email: ';
-  __out += escape(ctx.email);
-  __out += '</p>';
-  return __out;
-}
-```
-
-## Using Compiled Templates
-
-```typescript
-import { render as renderUser } from './dist/user.js'
-
-const html = renderUser({
-  name: 'john',
-  email: 'john@example.com'
-})
+- run: bun install --frozen-lockfile
+- run: bunx binja check ./views
+- run: bunx binja lint ./views --format=json
 ```

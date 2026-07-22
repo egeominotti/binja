@@ -108,6 +108,17 @@ export class TemplateRuntimeError extends Error {
   }
 }
 
+/** A template loader could not resolve a requested template. */
+export class TemplateNotFoundError extends Error {
+  public templateName: string
+
+  constructor(templateName: string) {
+    super(`Template not found: ${templateName}`)
+    this.name = 'TemplateNotFoundError'
+    this.templateName = templateName
+  }
+}
+
 /**
  * Format error with source context and suggestions
  */

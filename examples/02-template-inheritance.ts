@@ -125,4 +125,7 @@ Final: \${{ final_price|floatformat:2 }}`;
   console.log(html);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

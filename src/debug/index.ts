@@ -139,26 +139,28 @@ export function debugMiddleware(_env: Environment, options: DebugRenderOptions =
      */
     hono() {
       return async (c: any, next: () => Promise<void>) => {
-        await next()
+        return withDebugCollection(async (collector) => {
+          collector.captureContext({})
+          collector.setMode('runtime')
+          collector.startRender()
+          await next()
+          collector.endRender()
 
-        const contentType = c.res.headers.get('content-type') || ''
-        if (!contentType.includes('text/html')) return
+          const contentType = c.res.headers.get('content-type') || ''
+          if (!contentType.includes('text/html')) return
 
-        const body = await c.res.text()
-        const collector = startDebugCollection()
-        collector.captureContext({})
-        collector.setMode('runtime')
-        collector.endRender()
-        const data = endDebugCollection()!
+          const body = await c.res.text()
+          const data = collector.getData()
 
-        const panel = generateDebugPanel(data, options.panel)
-        const newBody = body.includes('</body>')
-          ? body.replace('</body>', `${panel}</body>`)
-          : body + panel
+          const panel = generateDebugPanel(data, options.panel)
+          const newBody = body.includes('</body>')
+            ? body.replace('</body>', `${panel}</body>`)
+            : body + panel
 
-        c.res = new Response(newBody, {
-          status: c.res.status,
-          headers: c.res.headers,
+          c.res = new Response(newBody, {
+            status: c.res.status,
+            headers: c.res.headers,
+          })
         })
       }
     },
@@ -169,17 +171,19 @@ export function debugMiddleware(_env: Environment, options: DebugRenderOptions =
     express() {
       return (_req: any, res: any, next: () => void) => {
         const originalSend = res.send.bind(res)
+        const collector = startDebugCollection()
+        collector.captureContext({})
+        collector.setMode('runtime')
+        collector.startRender()
 
         res.send = (body: string) => {
+          collector.endRender()
           const contentType = res.get('Content-Type') || ''
           if (!contentType.includes('text/html') || typeof body !== 'string') {
+            endDebugCollection()
             return originalSend(body)
           }
 
-          const collector = startDebugCollection()
-          collector.captureContext({})
-          collector.setMode('runtime')
-          collector.endRender()
           const data = endDebugCollection()!
 
           const panel = generateDebugPanel(data, options.panel)

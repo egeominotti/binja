@@ -19,6 +19,8 @@ export enum LiquidTokenType {
   COMMA = 'COMMA',
   LBRACKET = 'LBRACKET',
   RBRACKET = 'RBRACKET',
+  LPAREN = 'LPAREN',
+  RPAREN = 'RPAREN',
   RANGE = 'RANGE', // ..
   EQUALS = 'EQUALS', // =
   EQ = 'EQ', // ==
@@ -244,6 +246,18 @@ export class LiquidLexer {
     if (c === '[') {
       this.advance()
       this.addToken(LiquidTokenType.LBRACKET, '[')
+      return
+    }
+
+    if (c === '(') {
+      this.advance()
+      this.addToken(LiquidTokenType.LPAREN, '(')
+      return
+    }
+
+    if (c === ')') {
+      this.advance()
+      this.addToken(LiquidTokenType.RPAREN, ')')
       return
     }
 

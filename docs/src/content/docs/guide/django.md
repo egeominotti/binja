@@ -44,7 +44,7 @@ binja implements a broad Django-compatible template subset for JavaScript/TypeSc
 
 ## Loop Variables
 
-Django's `forloop` variables are fully supported:
+The following Django-style `forloop` variables are supported:
 
 | Variable | Description |
 |----------|-------------|
@@ -67,7 +67,7 @@ Django's `forloop` variables are fully supported:
 
 ## Filters
 
-All Django built-in filters are supported. See [Built-in Filters](/binja/guide/filters/).
+Binja provides a broad filter registry, not every Django filter or exact edge-case behavior. See [Built-in Filters](/binja/guide/filters/).
 
 ### Filter Syntax
 
@@ -88,21 +88,16 @@ const env = new Environment({
   templates: './templates',
 
   // URL resolver for {% url %} tag
-  urlResolver: (name: string, ...args: any[]) => {
+  urlResolver: (name: string, args: any[], kwargs: Record<string, any>) => {
     const routes: Record<string, string> = {
       home: '/',
       about: '/about/',
       user_profile: '/users/:id/',
     }
     let url = routes[name] || '#'
-    // Replace URL parameters
-    args.forEach((arg) => {
-      if (typeof arg === 'object') {
-        Object.entries(arg).forEach(([key, value]) => {
-          url = url.replace(`:${key}`, String(value))
-        })
-      }
-    })
+    for (const [key, value] of Object.entries(kwargs)) {
+      url = url.replace(`:${key}`, encodeURIComponent(String(value)))
+    }
     return url
   },
 
@@ -128,22 +123,21 @@ Usage:
 </form>
 ```
 
-Configure CSRF token:
+Supply the request's CSRF token in render context:
 
 ```typescript
-const env = new Environment({
-  templates: './templates',
-  globals: {
-    csrf_token: 'your-csrf-token-here'
-  }
+await env.render('form.html', {
+  csrf_token: requestCsrfToken,
 })
 ```
+
+The tag escapes the token and renders nothing when absent. Binja does not generate or validate CSRF tokens; use the host framework's CSRF middleware.
 
 ## Migration from Django
 
 ### 1. Copy Templates
 
-Django templates should work with minimal changes:
+Copy the templates, then run compatibility checks and fixture tests. Custom tags, filters, internationalization, context processors, and unsupported syntax require migration work:
 
 ```bash
 cp -r django_project/templates ./templates
@@ -168,7 +162,7 @@ const env = new Environment({
   autoescape: true,  // Same as Django default
 
   // Set up URL/static resolvers
-  urlResolver: (name, ...args) => { /* your logic */ },
+  urlResolver: (name, args, kwargs) => { /* your logic */ },
   staticResolver: (path) => `/static/${path}`,
 
   // Global context (like Django context processors)

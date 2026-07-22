@@ -2,8 +2,11 @@
  * Template execution context
  * Manages variable scope and provides DTL-compatible forloop object
  *
- * OPTIMIZED: Uses plain objects instead of Map for faster property access
+ * Scopes use null-prototype objects so template names never resolve through
+ * Object.prototype.
  */
+
+import { isSafePropertyKey } from '../security'
 
 export interface ForLoop {
   counter: number // 1-indexed (DTL)
@@ -22,6 +25,7 @@ export interface ForLoop {
   depth0: number // nesting depth 0-indexed
   cycle: (...args: any[]) => any
   changed: (value: any) => boolean
+  parentloop?: ForLoop
   previtem?: any
   nextitem?: any
 }
@@ -37,7 +41,7 @@ function createForLoop(
   items: any[],
   index: number,
   depth: number,
-  lastCycleValue: { value: any },
+  changedState: { initialized: boolean; value: any },
   parentloop?: ForLoop
 ): ForLoopInternal {
   const length = items.length
@@ -73,38 +77,37 @@ function createForLoop(
       return args[this._idx % args.length]
     },
     changed: (value: any) => {
-      const changed = value !== lastCycleValue.value
-      lastCycleValue.value = value
+      const changed = !changedState.initialized || value !== changedState.value
+      changedState.initialized = true
+      changedState.value = value
       return changed
     },
   } as ForLoopInternal
 
   if (parentloop) {
-    ;(forloop as any).parentloop = parentloop
+    forloop.parentloop = parentloop
   }
 
   return forloop
 }
 
 export class Context {
-  // Use plain objects for scopes - faster than Map for small key counts
+  // Null-prototype scopes avoid inherited names such as constructor/toString.
   private scopes: Record<string, any>[] = []
   private parent: Context | null = null
   private _forloopStack: ForLoop[] = []
-  private _lastCycleValue = { value: null as any }
   // Cache for current forloop (hot path optimization)
   private _currentForloop: ForLoop | null = null
-  // Cache the current scope for faster set() operations
+  // Cache the current scope used by set() operations.
   private _currentScope: Record<string, any>
   // Cache the nearest scope index for each resolved name. A fresh cache is used
   // at each scope depth, so shadowing and pop() restore the correct bindings.
   private _lookupCache: Record<string, number> = Object.create(null)
   private _lookupCacheStack: Array<Record<string, number>> = []
 
-  // Optimized: use object spread instead of Object.create(null) + assign - 10-15% faster
   constructor(data: Record<string, any> = {}, parent: Context | null = null) {
     this.parent = parent
-    this._currentScope = { ...data }
+    this._currentScope = Object.assign(Object.create(null), data)
     this.scopes.push(this._currentScope)
   }
 
@@ -113,6 +116,7 @@ export class Context {
     if (name === 'forloop' || name === 'loop') {
       return this._currentForloop
     }
+    if (!isSafePropertyKey(name)) return undefined
 
     const scopeIndex = this.resolveScope(name)
     return scopeIndex >= 0
@@ -129,12 +133,12 @@ export class Context {
   }
 
   has(name: string): boolean {
+    if (!isSafePropertyKey(name)) return false
     return this.resolveScope(name) >= 0 || (this.parent ? this.parent.has(name) : false)
   }
 
-  // Optimized: use object spread - 10-15% faster than Object.create(null) + assign
   push(data: Record<string, any> = {}): void {
-    this._currentScope = { ...data }
+    this._currentScope = Object.assign(Object.create(null), data)
     this.scopes.push(this._currentScope)
     this._lookupCacheStack.push(this._lookupCache)
     this._lookupCache = Object.create(null)
@@ -153,7 +157,7 @@ export class Context {
     if (cached !== undefined) return cached
 
     for (let i = this.scopes.length - 1; i >= 0; i--) {
-      if (name in this.scopes[i]) {
+      if (Object.hasOwn(this.scopes[i], name)) {
         this._lookupCache[name] = i
         return i
       }
@@ -173,7 +177,10 @@ export class Context {
     const parentloop =
       this._forloopStack.length > 0 ? this._forloopStack[this._forloopStack.length - 1] : undefined
 
-    const forloop = createForLoop(items, index, depth, this._lastCycleValue, parentloop)
+    // changed() state belongs to this loop, not the whole Context. Otherwise a
+    // nested or later loop can inherit another loop's last value.
+    const changedState = { initialized: false, value: undefined as any }
+    const forloop = createForLoop(items, index, depth, changedState, parentloop)
     this._forloopStack.push(forloop)
     this._currentForloop = forloop
     return forloop

@@ -1,177 +1,115 @@
 ---
 title: Debug Panel
-description: Development tools similar to Django Debug Toolbar
+description: Request-local template, context, cache, filter/test, and query telemetry for development.
 ---
 
-binja includes a professional debug panel for development, similar to Django Debug Toolbar.
+## Enable through `Environment`
 
-## Enable Debug Panel
-
-```typescript
+```ts
 const env = new Environment({
-  templates: './templates',
-  debug: true,  // Enable debug panel
+  templates: './views',
+  debug: Bun.env.NODE_ENV !== 'production',
+  debugOptions: {
+    position: 'bottom',
+    height: 300,
+    open: false,
+    dark: true,
+  },
 })
 
-// Debug panel is automatically injected into HTML responses
 const html = await env.render('page.html', context)
 ```
 
-## Features
+Automatic injection occurs only when the rendered string looks like a complete HTML document (`<html`, `<body`, or `<!DOCTYPE`).
 
-### Performance Metrics
+## Collected data
 
-- **Lexer timing** - How long tokenization took
-- **Parser timing** - How long AST generation took
-- **Render timing** - How long template execution took
-- **Visual bars** - Proportional timing display
+- lexer, parser, render, and total timing;
+- root, inheritance, and include template chain where observed;
+- a depth-limited context snapshot with circular-reference handling;
+- filter and test usage counts;
+- cache hits and misses;
+- manually or automatically recorded database/query telemetry;
+- collector warnings.
 
-### Template Chain
+Each injected panel gets a unique DOM ID, so multiple panels do not collide.
 
-See the full template hierarchy:
+## Panel options
 
-```
-page.html
-  └── extends: layouts/base.html
-        └── include: components/header.html
-        └── include: components/footer.html
-```
-
-### Context Inspector
-
-Expandable tree view of all context variables:
-
-```
-context
-├── user
-│   ├── name: "John"
-│   ├── email: "john@example.com"
-│   └── is_admin: true
-├── items: Array(3)
-└── title: "Home"
+```ts
+interface PanelOptions {
+  position?: 'bottom' | 'right' | 'popup' // default: bottom
+  height?: number                         // default: 300
+  width?: number                          // default: 400
+  open?: boolean                          // default: false
+  dark?: boolean                          // default: true
+}
 ```
 
-### Filter Usage
+The panel supports tab switching, bottom/right docking, popup mode, close/reopen, and resizing for docked modes.
 
-Track which filters were used:
+## Explicit debug rendering
 
-| Filter | Count |
-|--------|-------|
-| `upper` | 3 |
-| `truncatechars` | 2 |
-| `date` | 1 |
+```ts
+import {
+  createDebugRenderer,
+  renderStringWithDebug,
+  renderWithDebug,
+} from 'binja/debug'
 
-### Cache Stats
+await renderWithDebug(env, 'page.html', context, {
+  htmlOnly: true,
+  panel: { position: 'right' },
+})
 
-Monitor template cache performance:
+await renderStringWithDebug(env, source, context)
 
-- **Size** - Number of cached templates
-- **Hit rate** - Cache efficiency percentage
-- **Hits/Misses** - Raw counts
+const debug = createDebugRenderer(env)
+await debug.render('page.html', context)
+```
 
-### Warnings
+## Request middleware
 
-Optimization suggestions:
+```ts
+import { debugMiddleware } from 'binja/debug'
 
-- Unused variables in context
-- Heavy operations in loops
-- Missing `{% empty %}` blocks
+app.use(debugMiddleware(env).hono())
+// or an Express-style middleware:
+app.use(debugMiddleware(env).express())
+```
 
-## Configuration
+Collection begins before the downstream request handler, allowing query wrappers invoked during the request to reach the same request-local collector.
 
-```typescript
-const env = new Environment({
-  templates: './templates',
-  debug: true,
-  debugOptions: {
-    dark: true,              // Dark theme (default: false)
-    collapsed: true,         // Start collapsed (default: false)
-    position: 'bottom-right', // Panel position
-    width: 420,              // Panel width in pixels
-  }
+## Query telemetry
+
+`binja/debug` exports `recordQuery`, Prisma helpers, a Drizzle logger/wrapper, Bun SQL wrappers, and generic query wrappers. Integrations record only while a collector is active.
+
+```ts
+import { recordQuery } from 'binja/debug'
+
+recordQuery({
+  sql: 'select * from users where id = ?',
+  params: [id],
+  duration: 3.2,
+  rows: 1,
+  source: 'custom',
 })
 ```
 
-### Options
+## Direct collection
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `dark` | `boolean` | `false` | Dark/light theme |
-| `collapsed` | `boolean` | `false` | Start collapsed |
-| `position` | `string` | `'bottom-right'` | Panel position |
-| `width` | `number` | `400` | Panel width (px) |
+```ts
+import { withDebugCollection } from 'binja/debug'
 
-### Position Values
-
-- `top-left`
-- `top-right`
-- `bottom-left`
-- `bottom-right`
-
-## Environment-Based Toggle
-
-```typescript
-const env = new Environment({
-  templates: './templates',
-  debug: process.env.NODE_ENV !== 'production',
+const data = await withDebugCollection(async (collector) => {
+  collector.captureContext(context)
+  collector.startRender()
+  await env.render('page.html', context)
+  collector.endRender()
+  return collector.getData()
 })
 ```
 
-Or with Bun:
+## Production warning
 
-```typescript
-const env = new Environment({
-  templates: './templates',
-  debug: Bun.env.NODE_ENV !== 'production',
-})
-```
-
-## Panel Interaction
-
-The debug panel is:
-
-- **Draggable** - Click and drag the header
-- **Collapsible** - Click sections to expand/collapse
-- **Resizable** - Drag panel edges
-- **Dismissible** - Close button hides until next render
-
-## Programmatic Access
-
-Access debug data without the panel:
-
-```typescript
-import { DebugCollector } from 'binja/debug'
-
-const collector = new DebugCollector()
-
-// Render with collector
-const html = await env.render('page.html', context, { collector })
-
-// Access debug data
-console.log(collector.timing)
-// { lexer: 0.5, parser: 1.2, render: 2.3 }
-
-console.log(collector.context)
-// { user: { name: 'John' }, ... }
-
-console.log(collector.filters)
-// { upper: 3, date: 1 }
-```
-
-## Production Warning
-
-The debug panel should **never** be enabled in production:
-
-```typescript
-// Good - environment-based
-debug: process.env.NODE_ENV !== 'production'
-
-// Bad - always on
-debug: true
-```
-
-The debug panel:
-- Exposes internal template structure
-- Shows context variables (may contain sensitive data)
-- Adds overhead to every render
-- Injects HTML/CSS/JS into responses
+Debug data can reveal secrets, personal data, SQL text/parameters, template names, and stack details. Escaping prevents HTML injection into the panel, but it does not prevent information disclosure. Keep the feature disabled in production and avoid placing credentials in render contexts.

@@ -17,10 +17,14 @@
       },
       "peerDependencies": {
         "@anthropic-ai/sdk": ">=0.30.0",
+        "elysia": ">=1.0.0",
+        "hono": ">=4.0.0",
         "openai": ">=4.0.0",
       },
       "optionalPeers": [
         "@anthropic-ai/sdk",
+        "elysia",
+        "hono",
         "openai",
       ],
     },

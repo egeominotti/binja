@@ -233,7 +233,7 @@ describe('Extended Filters', () => {
   describe('pprint', () => {
     test('pretty prints object', async () => {
       const result = await render('{{ obj|pprint }}', { obj: { a: 1 } })
-      expect(result).toContain('"a"')
+      expect(result).toContain('&quot;a&quot;')
       expect(result).toContain('1')
     })
   })

@@ -7,6 +7,7 @@
 
 import { Elysia } from 'elysia'
 import { binja } from '../src/adapters/elysia'
+import packageJson from '../package.json' with { type: 'json' }
 
 // Sample data
 const posts = [
@@ -133,7 +134,7 @@ const app = new Elysia()
   .get('/about', ({ render }) => {
     return render('about', {
       title: 'About',
-      version: '0.9.0',
+      version: packageJson.version,
       description: 'A demo blog built with Elysia and binja templates.',
       team: [
         { name: 'Alice', role: 'Developer' },
@@ -164,17 +165,19 @@ const app = new Elysia()
     })
   })
 
-  .listen(3001)
+  .listen(Number(Bun.env.BINJA_EXAMPLE_PORT ?? 3001))
+
+const port = app.server?.port ?? 3001
 
 console.log(`
 🚀 Elysia + binja blog running!
 
-  http://localhost:3001/
-  http://localhost:3001/blog
-  http://localhost:3001/blog/1
-  http://localhost:3001/categories
-  http://localhost:3001/search?q=binja
-  http://localhost:3001/api/posts (JSON)
+  http://localhost:${port}/
+  http://localhost:${port}/blog
+  http://localhost:${port}/blog/1
+  http://localhost:${port}/categories
+  http://localhost:${port}/search?q=binja
+  http://localhost:${port}/api/posts (JSON)
 
 Press Ctrl+C to stop.
 `)

@@ -27,7 +27,7 @@ const DEFAULT_OPTIONS: Required<PanelOptions> = {
 
 export function generateDebugPanel(data: DebugData, options: PanelOptions = {}): string {
   const opts = { ...DEFAULT_OPTIONS, ...options }
-  const id = `binja-dbg-${Date.now()}`
+  const id = `binja-dbg-${crypto.randomUUID()}`
   const c = opts.dark ? darkTheme : lightTheme
 
   return `

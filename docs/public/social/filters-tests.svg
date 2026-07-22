@@ -41,12 +41,12 @@
   <text x="180" y="275" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="700" fill="#ffffff">Filters &amp; Tests</text>
 
   <!-- Section description -->
-  <text x="80" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">84 built-in filters and 28 tests for transforming</text>
+  <text x="80" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">91 filter entries and 35 tests, including aliases</text>
   <text x="80" y="400" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#94a3b8">and validating your template data.</text>
 
   <!-- Stats badges -->
   <rect x="80" y="460" width="180" height="55" rx="10" fill="#10b981" opacity="0.2"/>
-  <text x="170" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">84 Filters</text>
+  <text x="170" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">91 Filters</text>
 
   <rect x="280" y="460" width="180" height="55" rx="10" fill="#10b981" opacity="0.2"/>
   <text x="370" y="495" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="#10b981" text-anchor="middle">28 Tests</text>

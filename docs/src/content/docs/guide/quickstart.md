@@ -11,11 +11,11 @@ description: Get up and running with binja in 5 minutes
 import { render } from 'binja'
 
 // Render a template string
-const html = await render('Hello, {{ name }}!', { name: 'World' })
+const greeting = await render('Hello, {{ name }}!', { name: 'World' })
 // Output: Hello, World!
 
 // With filters
-const html = await render('{{ title|upper|truncatechars:20 }}', {
+const heading = await render('{{ title|upper|truncatechars:20 }}', {
   title: 'Welcome to our amazing website'
 })
 // Output: WELCOME TO OUR AMAZI...
@@ -40,9 +40,9 @@ const html = await env.render('pages/home.html', {
 })
 ```
 
-### AOT Compilation (Production)
+### AOT compilation
 
-For maximum performance, use `compile()` to pre-compile templates:
+Use `compile()` when a supported static template needs a reusable synchronous render function:
 
 ```typescript
 import { compile } from 'binja'
@@ -50,7 +50,7 @@ import { compile } from 'binja'
 // Compile once at startup
 const renderUser = compile('<h1>{{ name|upper }}</h1>')
 
-// Use many times (sync, extremely fast!)
+// Use many times (synchronous)
 const html = renderUser({ name: 'john' })
 // Output: <h1>JOHN</h1>
 ```
@@ -154,5 +154,5 @@ const app = new Elysia()
 ## Next Steps
 
 - [Variables & Expressions](/binja/guide/variables/) - Learn template syntax
-- [Filters](/binja/guide/filters/) - 84 built-in filters
-- [AOT Compilation](/binja/guide/aot/) - Maximum performance
+- [Filters](/binja/guide/filters/) - 91 registry entries, including aliases
+- [AOT Compilation](/binja/guide/aot/) - Synchronous rendering for supported static templates

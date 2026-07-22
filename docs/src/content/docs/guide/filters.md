@@ -1,11 +1,11 @@
 ---
-title: Built-in Filters (84)
-description: Complete reference for all 84 built-in filters
+title: Built-in Filters (91 registry entries)
+description: Reference for Binja's built-in filters and aliases
 ---
 
-binja includes **84 built-in filters** covering both Jinja2 and Django Template Language.
+`builtinFilters` currently exposes **91 registry entries**, including aliases such as `e`, `d`, and `tojson`. The tables group related public names; the registry exported by the installed package is authoritative.
 
-## String Filters (26)
+## String filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -36,7 +36,7 @@ binja includes **84 built-in filters** covering both Jinja2 and Django Template 
 | `format` | sprintf-style format | `{{ "Hi %s"\|format:name }}` |
 | `stringformat` | Python % format | `{{ 5\|stringformat:"03d" }}` → `005` |
 
-## Number Filters (9)
+## Number filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -50,7 +50,7 @@ binja includes **84 built-in filters** covering both Jinja2 and Django Template 
 | `filesizeformat` | Human file size | `{{ 1048576\|filesizeformat }}` → `1.0 MB` |
 | `get_digit` | Get Nth digit | `{{ 12345\|get_digit:2 }}` → `4` |
 
-## List/Array Filters (22)
+## List/array filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -77,7 +77,7 @@ binja includes **84 built-in filters** covering both Jinja2 and Django Template 
 | `selectattr` | Filter by attr test | `{{ items\|selectattr:"active" }}` |
 | `rejectattr` | Reject by attr test | `{{ items\|rejectattr:"hidden" }}` |
 
-## Math Filters (4)
+## Math filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -86,7 +86,7 @@ binja includes **84 built-in filters** covering both Jinja2 and Django Template 
 | `sum` | Sum of values | `{{ items\|sum }}` |
 | `attr` | Get attribute | `{{ item\|attr:"name" }}` |
 
-## Date/Time Filters (4)
+## Date/time filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -103,7 +103,7 @@ const env = new Environment({
 })
 ```
 
-## Safety & Encoding Filters (13)
+## Safety and encoding filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -116,12 +116,12 @@ const env = new Environment({
 | `iriencode` | IRI encode | `{{ url\|iriencode }}` |
 | `urlize` | URLs to links | `{{ text\|urlize }}` |
 | `urlizetrunc` | URLs to links (truncated) | `{{ text\|urlizetrunc:15 }}` |
-| `json` / `tojson` | JSON stringify | `{{ data\|json }}` |
+| `json` / `tojson` | HTML-safe JSON serialization | `{{ data\|json }}` |
 | `json_script` | Safe JSON in script | `{{ data\|json_script:"id" }}` |
-| `pprint` | Pretty print | `{{ data\|pprint }}` |
-| `xmlattr` | Dict to XML attrs | `{{ attrs\|xmlattr }}` |
+| `pprint` | Pretty print as normally escaped text | `{{ data\|pprint }}` |
+| `xmlattr` | Validate names and generate escaped XML/HTML attrs | `{{ attrs\|xmlattr }}` |
 
-## Default/Conditional Filters (4)
+## Default/conditional filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -130,12 +130,23 @@ const env = new Environment({
 | `yesno` | Boolean to text | `{{ true\|yesno:"Yes,No" }}` → `Yes` |
 | `pluralize` | Pluralize suffix | `{{ count\|pluralize }}` → `s` |
 
-## Misc Filters (2)
+## Mapping and miscellaneous filters
 
 | Filter | Description | Example |
 |--------|-------------|---------|
 | `items` | Dict to pairs | `{% for k,v in dict\|items %}` |
+| `keys` | Mapping keys | `{% for key in dict\|keys %}` |
+| `merge` | Merge mappings/arrays | `{{ left\|merge:right }}` |
 | `unordered_list` | Nested list to HTML | `{{ items\|unordered_list }}` |
+
+## Validation and safety notes
+
+- `batch`, `columns`, and `wordwrap` reject non-positive step/width values instead of looping forever.
+- Attribute-oriented filters use protected property lookup and cannot read blocked prototype primitives.
+- `json`/`tojson` and `json_script` escape HTML-significant JSON characters; do not append `safe` to untrusted serialization manually.
+- `safe` and `safeseq` are trust assertions. They do not sanitize input.
+- HTML-producing filters escape untrusted text before marking their generated markup safe.
+- `xmlattr` rejects invalid attribute names and escapes values.
 
 ## Filter Chaining
 
@@ -145,4 +156,12 @@ Filters can be chained together:
 {{ name|lower|capitalize|truncatechars:20 }}
 {{ items|sort|reverse|join:", " }}
 {{ price|floatformat:2|default:"N/A" }}
+```
+
+## Programmatic registry
+
+```ts
+import { builtinFilters } from 'binja'
+
+const names = Object.keys(builtinFilters) // 91 in this release
 ```

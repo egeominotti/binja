@@ -1,1254 +1,448 @@
 <h1 align="center">binja</h1>
 
 <p align="center">
-  <strong>High-performance Jinja2/Django template engine for Bun - 2-4x faster than Nunjucks</strong>
+  <strong>A Bun-first Jinja/Django-style template engine with runtime rendering, AOT compilation, framework adapters, and tested Handlebars, Liquid, and Twig subsets.</strong>
 </p>
 
 <p align="center">
-  <a href="https://egeominotti.github.io/binja/"><strong>📚 Documentation</strong></a> •
-  <a href="#installation">Installation</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#framework-adapters">Hono/Elysia</a> •
-  <a href="#multi-engine-support">Multi-Engine</a> •
-  <a href="#filters-84-built-in">Filters</a>
+  <a href="https://egeominotti.github.io/binja/"><strong>Documentation</strong></a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#execution-modes">Execution modes</a> ·
+  <a href="#security-model">Security</a>
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/binja"><img src="https://img.shields.io/npm/v/binja?label=npm&color=10b981" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/binja"><img src="https://img.shields.io/npm/dm/binja?color=10b981" alt="npm downloads"></a>
   <a href="https://github.com/egeominotti/binja/actions"><img src="https://github.com/egeominotti/binja/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/egeominotti/binja/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg" alt="BSD-3-Clause License"></a>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white" alt="Bun" />
-  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django Compatible" />
-</p>
+Binja targets Bun `>=1.3.14` and TypeScript. The default engine implements a broad, tested Jinja/Django-compatible subset; it is not a byte-for-byte replacement for Python Jinja2 or Django Templates. The Handlebars, Liquid, and Twig modules are compatibility subsets implemented over the same AST/runtime and should not be treated as drop-in replacements for their upstream engines.
 
----
+## Highlights
 
-## Why binja?
-
-| Feature | Binja | Other JS engines |
-|---------|-----------|------------------|
-| **Runtime Performance** | ✅ 2-4x faster | ❌ |
-| **AOT Compilation** | ✅ 160x faster | ❌ |
-| **Multi-Engine** | ✅ Jinja2, Handlebars, Liquid, Twig | ❌ |
-| **Framework Adapters** | ✅ Hono, Elysia | ❌ |
-| Django DTL Compatible | ✅ Broad support | ❌ Partial |
-| Jinja2 Compatible | ✅ Extensive subset | ⚠️ Limited |
-| Template Inheritance | ✅ | ⚠️ |
-| 84 Built-in Filters | ✅ | ❌ |
-| 28 Built-in Tests | ✅ | ❌ |
-| Debug Panel | ✅ | ❌ |
-| CLI Tool | ✅ | ⚠️ |
-| Autoescape by Default | ✅ | ❌ |
-| TypeScript | ✅ Native | ⚠️ |
-| Bun Optimized | ✅ | ❌ |
-
----
-
-## Benchmarks
-
-Tested on Mac Studio M1 Max, Bun 1.3.5.
-
-### Two Rendering Modes
-
-| Mode | Function | Best For | vs Nunjucks |
-|------|----------|----------|-------------|
-| **Runtime** | `render()` | Development | **2-4x faster** |
-| **AOT** | `compile()` | Production | **160x faster** |
-
-### Runtime Performance (vs Nunjucks)
-
-| Benchmark | binja | Nunjucks | Speedup |
-|-----------|-------|----------|---------|
-| Simple Template | 371K ops/s | 96K ops/s | **3.9x** |
-| Complex Template | 44K ops/s | 23K ops/s | **2.0x** |
-| Multiple Filters | 246K ops/s | 63K ops/s | **3.9x** |
-| Nested Loops | 76K ops/s | 26K ops/s | **3.0x** |
-| Conditionals | 84K ops/s | 25K ops/s | **3.4x** |
-| HTML Escaping | 985K ops/s | 242K ops/s | **4.1x** |
-| Large Dataset | 9.6K ops/s | 6.6K ops/s | **1.5x** |
-
-### AOT Compilation (Maximum Performance)
-
-| Benchmark | binja AOT | binja Runtime | Speedup |
-|-----------|-----------|---------------|---------|
-| Simple Template | **14.3M ops/s** | 371K ops/s | 39x |
-| Complex Template | **1.07M ops/s** | 44K ops/s | 24x |
-| Nested Loops | **1.75M ops/s** | 76K ops/s | 23x |
-
----
+- Escaping is enabled by default, with explicit safe-string handling and HTML-safe JSON helpers.
+- `Environment` loads templates with LRU caching, inheritance, includes, extension lookup, and root containment.
+- `compile()` produces synchronous render functions for the supported static AOT subset.
+- Hono and Elysia adapters support the core engine and the three secondary syntax modules.
+- The package exposes 91 filter registry entries and 35 test registry entries, including aliases.
+- The CLI checks AOT compatibility and generates executable ESM modules.
+- Debug tooling records lexer, parser, render, filter/test, template, cache, and optional query telemetry.
 
 ## Installation
 
-```bash
+```sh
 bun add binja
 ```
 
----
+## Quick start
 
-## Quick Start
+```ts
+import { Environment, render } from 'binja'
 
-```typescript
-import { render } from 'binja'
-
-// Simple rendering
-const html = await render('Hello, {{ name }}!', { name: 'World' })
-// Output: Hello, World!
-
-// With filters
-const html = await render('{{ title|upper|truncatechars:20 }}', {
-  title: 'Welcome to our amazing website'
-})
-// Output: WELCOME TO OUR AMAZI...
-```
-
-### Using Environment
-
-```typescript
-import { Environment } from 'binja'
+const greeting = await render('Hello, {{ name }}!', { name: 'World' })
 
 const env = new Environment({
-  templates: './templates',  // Template directory
-  autoescape: true,          // XSS protection (default: true)
+  templates: './views',
+  autoescape: true,
+  cache: true,
+  cacheMaxSize: 100,
+  timezone: 'Europe/Rome',
+  globals: { siteName: 'Example' },
 })
 
-// Load and render template file
 const html = await env.render('pages/home.html', {
-  user: { name: 'John', email: 'john@example.com' },
-  items: ['Apple', 'Banana', 'Cherry']
+  user: { name: 'Ada' },
+  items: ['one', 'two'],
 })
 ```
 
-### AOT Compilation (Maximum Performance)
+`render()` and `Environment.renderString()` are asynchronous. The function returned by `compile()` is synchronous:
 
-For production, use `compile()` for **160x faster** rendering:
-
-```typescript
+```ts
 import { compile } from 'binja'
 
-// Compile once at startup
-const renderUser = compile('<h1>{{ name|upper }}</h1>')
-
-// Use many times (sync, extremely fast!)
-const html = renderUser({ name: 'john' })
-// Output: <h1>JOHN</h1>
+const renderCard = compile('<h2>{{ title|upper }}</h2>')
+const html = renderCard({ title: 'Status' })
 ```
 
-Production example:
+## Execution modes
 
-```typescript
-import { compile } from 'binja'
+| API | Result | Loader support | Best fit |
+|---|---|---|---|
+| `render(source, context, options?)` | `Promise<string>` | Uses a one-off environment configured by `options`; no cache survives the call | One-off source strings |
+| `Environment.renderString(source, context?)` | `Promise<string>` | Includes and inheritance use that environment's loader | Configured source strings |
+| `Environment.render(name, context?)` | `Promise<string>` | Yes; root-contained file loader and optional LRU cache | File templates and dynamic template names |
+| `compile(source, options?)` | `(context) => string` | No runtime loading | Static templates on a hot path |
+| `compileWithInheritance(name, options)` | `Promise<(context) => string>` | Static `extends`/`include` resolved at compile time | AOT file templates with literal dependencies |
+| CLI `compile` | Importable ESM module | Static `extends`/`include` flattened at build time | Build pipelines |
 
-// Pre-compile all templates at server startup
-const templates = {
-  home: compile(await Bun.file('./views/home.html').text()),
-  user: compile(await Bun.file('./views/user.html').text()),
-}
+Runtime and AOT share the same visible semantics for their common supported subset: Python-style `True`/`False`, Jinja truthiness, autoescape blocks, filters/tests, comparisons, loops, `set`, `with`, and `spaceless`.
 
-// Rendering is now synchronous and extremely fast
-app.get('/', () => templates.home({ title: 'Welcome' }))
-app.get('/user/:id', ({ params }) => templates.user({ id: params.id }))
-```
+The AOT compiler intentionally rejects runtime-only nodes such as dynamic includes, dynamic inheritance, URL/static resolvers, and unsupported tags. Use `Environment` when template names are dynamic.
 
----
+## Core syntax
 
-## Features
+### Variables and expressions
 
-### Variables
-
-```django
+```jinja
 {{ user.name }}
-{{ user.email|lower }}
 {{ items.0 }}
 {{ data['key'] }}
+{{ title|default:'Untitled'|upper }}
+{{ 'active' if enabled else 'disabled' }}
+{{ value ?? fallback }}
 ```
 
-### Conditionals
+Property reads block prototype-escape primitives such as `constructor`, `prototype`, and `__proto__`. Object membership uses own properties only.
 
-```django
+### Conditions
+
+```jinja
 {% if user.is_admin %}
-  <span class="badge">Admin</span>
+  Admin
 {% elif user.is_staff %}
-  <span class="badge">Staff</span>
+  Staff
 {% else %}
-  <span class="badge">User</span>
+  User
 {% endif %}
 ```
 
 ### Loops
 
-```django
+```jinja
 {% for item in items %}
-  <div class="{{ loop.first ? 'first' : '' }}">
-    {{ loop.index }}. {{ item.name }}
-  </div>
+  {{ loop.index }}. {{ item.name }}
 {% empty %}
-  <p>No items found.</p>
+  No items
 {% endfor %}
 ```
 
-#### Loop Variables
+Jinja aliases (`loop.index`, `loop.index0`, `loop.first`, `loop.last`, `loop.length`, `loop.revindex`) and Django aliases (`forloop.counter`, `counter0`, `first`, `last`, `revcounter`, `revcounter0`, `parentloop`) are available.
 
-| Variable | Description |
-|----------|-------------|
-| `loop.index` / `forloop.counter` | Current iteration (1-indexed) |
-| `loop.index0` / `forloop.counter0` | Current iteration (0-indexed) |
-| `loop.first` / `forloop.first` | True if first iteration |
-| `loop.last` / `forloop.last` | True if last iteration |
-| `loop.length` / `forloop.length` | Total number of items |
-| `loop.parent` / `forloop.parentloop` | Parent loop context |
+### Assignment and local scopes
 
-### Template Inheritance
-
-**base.html**
-```django
-<!DOCTYPE html>
-<html>
-<head>
-  <title>{% block title %}Default Title{% endblock %}</title>
-</head>
-<body>
-  {% block content %}{% endblock %}
-</body>
-</html>
-```
-
-**page.html**
-```django
-{% extends "base.html" %}
-
-{% block title %}My Page{% endblock %}
-
-{% block content %}
-  <h1>Welcome!</h1>
-  <p>This is my page content.</p>
-{% endblock %}
-```
-
-### Include
-
-```django
-{% include "components/header.html" %}
-{% include "components/card.html" with title="Hello" %}
-```
-
-### Set Variables
-
-```django
-{% set greeting = "Hello, " ~ user.name %}
-{{ greeting }}
-
-{% with total = price * quantity %}
-  Total: ${{ total }}
+```jinja
+{% set total = price * quantity %}
+{% with label=product.name amount=total %}
+  {{ label }}: {{ amount }}
 {% endwith %}
 ```
 
----
+### Escaping controls
 
-## Filters (84 Built-in)
+```jinja
+{% autoescape false %}
+  {{ trusted_fragment }}
+{% endautoescape %}
 
-binja includes **84 built-in filters** covering both Jinja2 and Django Template Language.
+{% spaceless %}
+  <div> <span>{{ value }}</span> </div>
+{% endspaceless %}
+```
 
-### String Filters (26)
+Only disable escaping for values already trusted by the application.
 
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `upper` | Uppercase | `{{ "hello"\|upper }}` → `HELLO` |
-| `lower` | Lowercase | `{{ "HELLO"\|lower }}` → `hello` |
-| `capitalize` | First letter uppercase | `{{ "hello"\|capitalize }}` → `Hello` |
-| `capfirst` | First char uppercase | `{{ "hello"\|capfirst }}` → `Hello` |
-| `title` | Title case | `{{ "hello world"\|title }}` → `Hello World` |
-| `trim` | Strip whitespace | `{{ "  hi  "\|trim }}` → `hi` |
-| `striptags` | Remove HTML tags | `{{ "<p>Hi</p>"\|striptags }}` → `Hi` |
-| `slugify` | URL-friendly slug | `{{ "Hello World!"\|slugify }}` → `hello-world` |
-| `truncatechars` | Truncate to N chars | `{{ "hello"\|truncatechars:3 }}` → `hel...` |
-| `truncatewords` | Truncate to N words | `{{ "a b c d"\|truncatewords:2 }}` → `a b...` |
-| `truncatechars_html` | Truncate preserving HTML | `{{ "<b>hi</b> world"\|truncatechars_html:5 }}` |
-| `truncatewords_html` | Truncate words in HTML | `{{ "<p>a b c</p>"\|truncatewords_html:2 }}` |
-| `wordcount` | Count words | `{{ "hello world"\|wordcount }}` → `2` |
-| `wordwrap` | Wrap at N chars | `{{ text\|wordwrap:40 }}` |
-| `center` | Center in N chars | `{{ "hi"\|center:10 }}` → `    hi    ` |
-| `ljust` | Left justify | `{{ "hi"\|ljust:10 }}` → `hi        ` |
-| `rjust` | Right justify | `{{ "hi"\|rjust:10 }}` → `        hi` |
-| `cut` | Remove substring | `{{ "hello"\|cut:"l" }}` → `heo` |
-| `replace` | Replace substring | `{{ "hello"\|replace:"l","x" }}` → `hexxo` |
-| `indent` | Indent lines | `{{ text\|indent:4 }}` |
-| `linebreaks` | Newlines to `<p>/<br>` | `{{ text\|linebreaks }}` |
-| `linebreaksbr` | Newlines to `<br>` | `{{ text\|linebreaksbr }}` |
-| `linenumbers` | Add line numbers | `{{ code\|linenumbers }}` |
-| `addslashes` | Escape quotes | `{{ "it's"\|addslashes }}` → `it\'s` |
-| `format` | sprintf-style format | `{{ "Hi %s"\|format:name }}` |
-| `stringformat` | Python % format | `{{ 5\|stringformat:"03d" }}` → `005` |
+## Template loading, inheritance, and includes
 
-### Number Filters (9)
+```jinja
+{# pages/home.html #}
+{% extends 'layouts/base.html' %}
 
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `abs` | Absolute value | `{{ -5\|abs }}` → `5` |
-| `int` | Convert to integer | `{{ "42"\|int }}` → `42` |
-| `float` | Convert to float | `{{ "3.14"\|float }}` → `3.14` |
-| `round` | Round number | `{{ 3.7\|round }}` → `4` |
-| `add` | Add number | `{{ 5\|add:3 }}` → `8` |
-| `divisibleby` | Check divisibility | `{{ 10\|divisibleby:2 }}` → `true` |
-| `floatformat` | Format decimal places | `{{ 3.14159\|floatformat:2 }}` → `3.14` |
-| `filesizeformat` | Human file size | `{{ 1048576\|filesizeformat }}` → `1.0 MB` |
-| `get_digit` | Get Nth digit | `{{ 12345\|get_digit:2 }}` → `4` |
+{% block title %}Home{% endblock %}
 
-### List/Array Filters (22)
+{% block content %}
+  {% include 'partials/card.html' with item=featured %}
+{% endblock %}
+```
 
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `length` | List length | `{{ items\|length }}` → `3` |
-| `length_is` | Check length | `{{ items\|length_is:3 }}` → `true` |
-| `first` | First item | `{{ items\|first }}` |
-| `last` | Last item | `{{ items\|last }}` |
-| `join` | Join with separator | `{{ items\|join:", " }}` → `a, b, c` |
-| `slice` | Slice list | `{{ items\|slice:":2" }}` |
-| `reverse` | Reverse list | `{{ items\|reverse }}` |
-| `sort` | Sort list | `{{ items\|sort }}` |
-| `unique` | Remove duplicates | `{{ items\|unique }}` |
-| `batch` | Group into batches | `{{ items\|batch:2 }}` |
-| `columns` | Split into columns | `{{ items\|columns:3 }}` |
-| `dictsort` | Sort dict by key | `{{ dict\|dictsort }}` |
-| `dictsortreversed` | Sort dict reversed | `{{ dict\|dictsortreversed }}` |
-| `groupby` | Group by attribute | `{{ items\|groupby:"category" }}` |
-| `random` | Random item | `{{ items\|random }}` |
-| `list` | Convert to list | `{{ value\|list }}` |
-| `make_list` | String to char list | `{{ "abc"\|make_list }}` → `['a','b','c']` |
-| `map` | Map attribute | `{{ items\|map:"name" }}` |
-| `select` | Filter by test | `{{ items\|select:"even" }}` |
-| `reject` | Reject by test | `{{ items\|reject:"none" }}` |
-| `selectattr` | Filter by attr test | `{{ items\|selectattr:"active" }}` |
-| `rejectattr` | Reject by attr test | `{{ items\|rejectattr:"hidden" }}` |
-
-### Math Filters (4)
-
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `max` | Maximum value | `{{ items\|max }}` |
-| `min` | Minimum value | `{{ items\|min }}` |
-| `sum` | Sum of values | `{{ items\|sum }}` |
-| `attr` | Get attribute | `{{ item\|attr:"name" }}` |
-
-### Date/Time Filters (4)
-
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `date` | Format date | `{{ now\|date:"Y-m-d" }}` → `2024-01-15` |
-| `time` | Format time | `{{ now\|time:"H:i" }}` → `14:30` |
-| `timesince` | Time since date | `{{ past\|timesince }}` → `2 days ago` |
-| `timeuntil` | Time until date | `{{ future\|timeuntil }}` → `in 3 hours` |
-
-#### Timezone Support
-
-```typescript
+```ts
 const env = new Environment({
-  timezone: 'Europe/Rome'  // All dates in Rome timezone
+  templates: './views',
+  extensions: ['.html', '.jinja', '.jinja2', ''],
+  cache: true,
+})
+
+await env.render('pages/home.html', { featured })
+```
+
+Template names are resolved beneath `templates`; lexical traversal and symlink escapes are rejected. Inheritance/include cycles are detected. `{% include ... ignore missing %}` suppresses only an actual `TemplateNotFoundError`, not parser or render failures inside an included template.
+
+For static AOT inheritance:
+
+```ts
+import { compileWithInheritance } from 'binja'
+
+const renderPage = await compileWithInheritance('pages/home.html', {
+  templates: './views',
 })
 ```
 
-### Safety & Encoding Filters (13)
+All referenced template names must be string literals for compile-time flattening.
 
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `escape` / `e` | HTML escape | `{{ html\|escape }}` |
-| `forceescape` | Force HTML escape | `{{ html\|forceescape }}` |
-| `safe` | Mark as safe | `{{ html\|safe }}` |
-| `safeseq` | Mark sequence safe | `{{ items\|safeseq }}` |
-| `escapejs` | JS string escape | `{{ text\|escapejs }}` |
-| `urlencode` | URL encode | `{{ url\|urlencode }}` |
-| `iriencode` | IRI encode | `{{ url\|iriencode }}` |
-| `urlize` | URLs to links | `{{ text\|urlize }}` |
-| `urlizetrunc` | URLs to links (truncated) | `{{ text\|urlizetrunc:15 }}` |
-| `json` / `tojson` | JSON stringify | `{{ data\|json }}` |
-| `json_script` | Safe JSON in script | `{{ data\|json_script:"id" }}` |
-| `pprint` | Pretty print | `{{ data\|pprint }}` |
-| `xmlattr` | Dict to XML attrs | `{{ attrs\|xmlattr }}` |
+## Environment configuration
 
-### Default/Conditional Filters (4)
+```ts
+const env = new Environment({
+  templates: './views',
+  extensions: ['.html', '.jinja', '.jinja2', ''],
+  autoescape: true,
+  cache: true,
+  cacheMaxSize: 100,
+  timezone: 'UTC',
+  debug: false,
+  debugOptions: { dark: true, collapsed: true },
+  globals: { siteName: 'Example' },
+  filters: {
+    currency: (value: number) => `€${value.toFixed(2)}`,
+  },
+  urlResolver: (name, args, kwargs) => resolveRoute(name, args, kwargs),
+  staticResolver: (file) => `/assets/${file}`,
+})
 
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `default` / `d` | Default value | `{{ missing\|default:"N/A" }}` |
-| `default_if_none` | Default if null | `{{ val\|default_if_none:"None" }}` |
-| `yesno` | Boolean to text | `{{ true\|yesno:"Yes,No" }}` → `Yes` |
-| `pluralize` | Pluralize suffix | `{{ count\|pluralize }}` → `s` |
+env.addFilter('double', (value: number) => value * 2)
+env.addGlobal('release', 'canary')
+env.addUrl('user-detail', '/users/:id')
 
-### Misc Filters (2)
+env.cacheSize()
+env.cacheKeys() // LRU order, oldest to newest
+env.cacheStats() // { size, maxSize, hits, misses, hitRate }
+env.clearCache()
+```
 
-| Filter | Description | Example |
-|--------|-------------|---------|
-| `items` | Dict to pairs | `{% for k,v in dict\|items %}` |
-| `unordered_list` | Nested list to HTML | `{{ items\|unordered_list }}` |
+`cacheMaxSize` must be a positive integer. Cache state belongs to the `Environment`; render-local cycle, counter, block, and include state is isolated across concurrent requests.
 
----
+## Filters and tests
 
-## Tests (is operator)
+The public registries currently contain 91 filter entries and 35 test entries. Counts include aliases such as `e`, `d`, `tojson`, `null`, and `equalto`; consumers should inspect the exported registries rather than assuming that each entry is a distinct algorithm.
 
-Tests check values using the `is` operator (Jinja2 syntax):
+```ts
+import { builtinFilters, builtinTests } from 'binja'
 
-```django
-{% if value is defined %}...{% endif %}
-{% if num is even %}...{% endif %}
-{% if num is divisibleby(3) %}...{% endif %}
+console.log(Object.keys(builtinFilters))
+console.log(Object.keys(builtinTests))
+```
+
+Important filter groups include:
+
+- strings and formatting: `upper`, `lower`, `capitalize`, `title`, `trim`, `replace`, `format`, `truncatechars`, `truncatewords`, `wordwrap`, `indent`;
+- collections: `length`, `first`, `last`, `join`, `slice`, `sort`, `unique`, `batch`, `columns`, `groupby`, `map`, `select`, `reject`, `selectattr`, `rejectattr`;
+- mappings: `items`, `keys`, `merge`, `dictsort`, `attr`, `xmlattr`;
+- numbers and dates: `abs`, `round`, `int`, `float`, `sum`, `min`, `max`, `date`, `time`, `timesince`, `timeuntil`;
+- escaping and serialization: `escape`, `forceescape`, `safe`, `escapejs`, `urlencode`, `json`, `tojson`, `json_script`.
+
+Tests cover type checks, equality/order comparisons, defined/null checks, collection semantics, case checks, membership, truthiness, and boolean aliases:
+
+```jinja
+{% if value is defined and value is not none %}...{% endif %}
+{% if count is divisibleby(3) %}...{% endif %}
 {% if items is empty %}...{% endif %}
 ```
 
-### Built-in Tests
+See the documentation site for the full registry tables.
 
-| Test | Description |
-|------|-------------|
-| `divisibleby(n)` | Divisible by n |
-| `even` / `odd` | Even/odd integer |
-| `number` / `integer` / `float` | Type checks |
-| `defined` / `undefined` | Variable exists |
-| `none` | Is null |
-| `empty` | Empty array/string/object |
-| `truthy` / `falsy` | Truthiness checks |
-| `string` / `mapping` / `iterable` | Type checks |
-| `gt(n)` / `lt(n)` / `ge(n)` / `le(n)` | Comparisons |
-| `eq(v)` / `ne(v)` / `sameas(v)` | Equality |
-| `upper` / `lower` | String case checks |
+## Django-style facilities
 
-```typescript
-import { builtinTests } from 'binja'
+The core parser/runtime supports a tested subset including:
 
-// All 28 built-in tests
-console.log(Object.keys(builtinTests))
-// ['divisibleby', 'even', 'odd', 'number', 'integer', 'float',
-//  'defined', 'undefined', 'none', 'boolean', 'string', 'mapping',
-//  'iterable', 'sequence', 'callable', 'upper', 'lower', 'empty',
-//  'in', 'eq', 'ne', 'sameas', 'equalto', 'truthy', 'falsy', ...]
-```
+- `{% load %}` as a compatibility no-op;
+- `{% url %}` and `{% static %}` through configured resolvers;
+- `{% csrf_token %}` using `csrf_token` or `csrfToken` from context;
+- `cycle`, `firstof`, `ifchanged`, `ifequal`, `ifnotequal`, `lorem`, `regroup`, `templatetag`, `widthratio`, and `debug`.
 
----
+`{% csrf_token %}` renders nothing when no token is supplied. Binja does not generate, validate, rotate, or store CSRF tokens; the host framework must do that work.
 
-## Multi-Engine Support
+## Secondary engine subsets
 
-Binja supports multiple template engines through a unified API. All engines parse to a common AST and share the same runtime, filters, and optimizations.
+Use the documented package subpaths:
 
-### Supported Engines
-
-| Engine | Syntax | Use Case |
-|--------|--------|----------|
-| **Jinja2/DTL** | `{{ var }}` `{% if %}` | Default, Python/Django compatibility |
-| **Handlebars** | `{{var}}` `{{#if}}` | JavaScript ecosystem, Ember.js |
-| **Liquid** | `{{ var }}` `{% if %}` | Shopify, Jekyll, static sites |
-| **Twig** | `{{ var }}` `{% if %}` | PHP/Symfony, Drupal, Craft CMS |
-
-### Usage
-
-```typescript
-// Direct engine imports
+```ts
+import { MultiEngine } from 'binja/engines'
 import * as handlebars from 'binja/engines/handlebars'
 import * as liquid from 'binja/engines/liquid'
 import * as twig from 'binja/engines/twig'
-
-// Handlebars
-await handlebars.render('Hello {{name}}!', { name: 'World' })
-await handlebars.render('{{#each items}}{{this}}{{/each}}', { items: ['a', 'b'] })
-await handlebars.render('{{{html}}}', { html: '<b>unescaped</b>' })
-
-// Liquid (Shopify)
-await liquid.render('Hello {{ name }}!', { name: 'World' })
-await liquid.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b'] })
-await liquid.render('{% assign x = "value" %}{{ x }}', {})
-
-// Twig (Symfony)
-await twig.render('Hello {{ name }}!', { name: 'World' })
-await twig.render('{% for item in items %}{{ item }}{% endfor %}', { items: ['a', 'b'] })
-await twig.render('{{ name|upper }}', { name: 'world' })
 ```
 
-### MultiEngine API
+| Capability | Handlebars subset | Liquid subset | Twig subset |
+|---|---|---|---|
+| Variables / nested paths | Yes | Yes | Yes |
+| Escaped output | `{{x}}` | `{{ x }}` | `{{ x }}` |
+| Explicit raw output | `{{{x}}}` | `safe` filter where appropriate | `raw` filter alias |
+| Conditions | `if`, `unless`, `else` | `if`, `elsif`, `unless`, `case` | `if`, `elseif`, `else`, ternary, `??` |
+| Loops | `each` + metadata | `for`, `else`, `limit`, `offset`, `reversed`, ranges | Core `for` syntax |
+| Assignment | No | `assign`, `capture`, increment/decrement counters | `set` |
+| Loader-backed partials/includes | Not exposed by string API | Not exposed by string API | Not exposed by string API |
 
-```typescript
-import { MultiEngine } from 'binja/engines'
+Notable boundaries:
 
-const engine = new MultiEngine()
+- Handlebars custom helper registration and partial registration are not exposed; inside `with`/`each`, use the supported `this` paths.
+- Liquid implements common syntax and filter aliases, not Shopify objects, theme filesystem semantics, drops, or the complete upstream tag/filter set. Unsupported tags fail explicitly. `break`/`continue` are currently rejected.
+- Twig supports common expression/filter syntax but not PHP/Symfony extensions, functions, macros, namespaces, or loader integration through the string-only Twig API.
+- `MultiEngine.compile()` returns a cached parsed-runtime function with an asynchronous result; only the core `compile()` API is synchronous AOT.
 
-// Render with any engine
-await engine.render('Hello {{name}}!', { name: 'World' }, 'handlebars')
-await engine.render('Hello {{ name }}!', { name: 'World' }, 'liquid')
-await engine.render('Hello {{ name }}!', { name: 'World' }, 'twig')
-await engine.render('Hello {{ name }}!', { name: 'World' }, 'jinja2')
+## Hono and Elysia adapters
 
-// Auto-detect from file extension
-import { detectEngine } from 'binja/engines'
-const eng = detectEngine('template.hbs')     // Returns Handlebars engine
-const eng2 = detectEngine('page.liquid')     // Returns Liquid engine
-const eng3 = detectEngine('page.twig')       // Returns Twig engine
-```
-
-### Engine Feature Matrix
-
-| Feature | Jinja2 | Handlebars | Liquid | Twig |
-|---------|--------|------------|--------|------|
-| Variables | `{{ x }}` | `{{x}}` | `{{ x }}` | `{{ x }}` |
-| Conditionals | `{% if %}` | `{{#if}}` | `{% if %}` | `{% if %}` |
-| Loops | `{% for %}` | `{{#each}}` | `{% for %}` | `{% for %}` |
-| Filters | `{{ x\|filter }}` | `{{ x }}` | `{{ x \| filter }}` | `{{ x\|filter }}` |
-| Raw output | `{% raw %}` | - | `{% raw %}` | `{% raw %}` |
-| Comments | `{# #}` | `{{! }}` | `{% comment %}` | `{# #}` |
-| Assignment | `{% set %}` | - | `{% assign %}` | `{% set %}` |
-| Unescaped | `{{ x\|safe }}` | `{{{x}}}` | - | `{{ x\|raw }}` |
-
----
-
-## Framework Adapters
-
-Binja provides first-class integration with Bun's most popular web frameworks.
-
-### Hono
-
-```typescript
+```ts
 import { Hono } from 'hono'
 import { binja } from 'binja/hono'
 
 const app = new Hono()
-
-// Add binja middleware
-app.use(binja({
-  root: './views',           // Template directory
-  extension: '.html',        // Default extension
-  engine: 'jinja2',          // jinja2 | handlebars | liquid | twig
-  cache: true,               // Cache compiled templates
-  globals: { siteName: 'My App' },  // Global context
-  layout: 'layouts/base',    // Optional layout template
-}))
-
-// Render templates with c.render()
-app.get('/', (c) => c.render('index', { title: 'Home' }))
-app.get('/users/:id', async (c) => {
-  const user = await getUser(c.req.param('id'))
-  return c.render('users/profile', { user })
-})
-
-export default app
-```
-
-### Elysia
-
-```typescript
-import { Elysia } from 'elysia'
-import { binja } from 'binja/elysia'
-
-const app = new Elysia()
-  // Add binja plugin
-  .use(binja({
+app.use(
+  binja({
     root: './views',
     extension: '.html',
     engine: 'jinja2',
     cache: true,
-    globals: { siteName: 'My App' },
+    globals: { siteName: 'Example' },
     layout: 'layouts/base',
-  }))
-  // Render templates with render()
-  .get('/', ({ render }) => render('index', { title: 'Home' }))
-  .get('/users/:id', async ({ render, params }) => {
-    const user = await getUser(params.id)
-    return render('users/profile', { user })
+    contentVar: 'content',
   })
-  .listen(3000)
+)
 
-console.log('Server running at http://localhost:3000')
+app.get('/', (c) => c.render('home', { title: 'Home' }))
 ```
 
-### Adapter Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `root` | `string` | `./views` | Template directory |
-| `extension` | `string` | `.html` | Default file extension |
-| `engine` | `string` | `jinja2` | Template engine (`jinja2`, `handlebars`, `liquid`, `twig`) |
-| `cache` | `boolean` | `true` (prod) | Cache compiled templates |
-| `debug` | `boolean` | `false` | Show error details |
-| `globals` | `object` | `{}` | Global context variables |
-| `layout` | `string` | - | Layout template path |
-| `contentVar` | `string` | `content` | Content variable name in layout |
-
-### Cache Management
-
-```typescript
-import { clearCache, getCacheStats } from 'binja/hono'
-// or
-import { clearCache, getCacheStats } from 'binja/elysia'
-
-// Clear all cached templates
-clearCache()
-
-// Get cache statistics
-const stats = getCacheStats()
-console.log(stats) // { size: 10, keys: ['jinja2:./views/index.html', ...] }
-```
-
----
-
-## Django Compatibility
-
-binja supports a broad Django-compatible template subset:
-
-```django
-{# Django-style comments #}
-
-{% load static %}  {# Supported (no-op) #}
-
-{% url 'home' %}
-{% static 'css/style.css' %}
-
-{% csrf_token %}
-
-{{ forloop.counter }}
-{{ forloop.first }}
-{{ forloop.parentloop.counter }}
-```
-
-### Django-Specific Tags
-
-| Tag | Description | Example |
-|-----|-------------|---------|
-| `{% csrf_token %}` | CSRF token input | `<input type="hidden" ...>` |
-| `{% cycle %}` | Cycle through values | `{% cycle 'odd' 'even' %}` |
-| `{% firstof %}` | First truthy value | `{% firstof var1 var2 "default" %}` |
-| `{% ifchanged %}` | Output on change | `{% ifchanged %}{{ item }}{% endifchanged %}` |
-| `{% ifequal %}` | Equality check | `{% ifequal a b %}equal{% endifequal %}` |
-| `{% lorem %}` | Lorem ipsum text | `{% lorem 3 p %}` |
-| `{% regroup %}` | Group list by attr | `{% regroup list by attr as grouped %}` |
-| `{% templatetag %}` | Literal tag chars | `{% templatetag openblock %}` → `{%` |
-| `{% widthratio %}` | Calculate ratio | `{% widthratio value max 100 %}` |
-| `{% debug %}` | Debug context | Outputs context as JSON |
-
----
-
-## Configuration
-
-```typescript
-const env = new Environment({
-  // Template directory
-  templates: './templates',
-
-  // Auto-escape HTML (default: true)
-  autoescape: true,
-
-  // Cache settings
-  cache: true,          // Enable template caching (default: true)
-  cacheMaxSize: 100,    // LRU cache limit (default: 100)
-
-  // Timezone for date/time operations
-  // All date filters and {% now %} tag will use this timezone
-  timezone: 'Europe/Rome',  // or 'UTC', 'America/New_York', etc.
-
-  // Custom filters
-  filters: {
-    currency: (value: number) => `$${value.toFixed(2)}`,
-    highlight: (text: string, term: string) =>
-      text.replace(new RegExp(term, 'gi'), '<mark>$&</mark>')
-  },
-
-  // Global variables available in all templates
-  globals: {
-    site_name: 'My Website',
-    current_year: new Date().getFullYear()
-  },
-
-  // URL resolver for {% url %} tag
-  urlResolver: (name: string, ...args: any[]) => {
-    const routes = { home: '/', about: '/about', user: '/users/:id' }
-    return routes[name] || '#'
-  },
-
-  // Static file resolver for {% static %} tag
-  staticResolver: (path: string) => `/static/${path}`
-})
-
-// Cache monitoring
-env.cacheSize()    // Number of cached templates
-env.cacheStats()   // { size, maxSize, hits, misses, hitRate }
-env.clearCache()   // Clear cache and reset stats
-```
-
----
-
-## Debug Panel
-
-Binja includes a professional debug panel for development, similar to Django Debug Toolbar:
-
-```typescript
-const env = new Environment({
-  templates: './templates',
-  debug: true,  // Enable debug panel
-  debugOptions: {
-    dark: true,
-    position: 'bottom-right',
-  },
-})
-
-// Debug panel is automatically injected into HTML responses
-const html = await env.render('page.html', context)
-```
-
-### Features
-
-- **Performance Metrics** - Lexer, Parser, Render timing with visual bars
-- **Template Chain** - See extends/include hierarchy
-- **Context Inspector** - Expandable tree view of all context variables
-- **Filter Usage** - Which filters were used and how many times
-- **Cache Stats** - Hit/miss rates
-- **Warnings** - Optimization suggestions
-
-### Options
-
-```typescript
-debugOptions: {
-  dark: true,                    // Dark/light theme
-  collapsed: true,               // Start collapsed
-  position: 'bottom-right',      // Panel position
-  width: 420,                    // Panel width
-}
-```
-
----
-
-## CLI Tool
-
-Binja includes a CLI for template pre-compilation and linting:
-
-```bash
-# Compile all templates to JavaScript
-binja compile ./templates -o ./dist
-
-# Check templates for errors
-binja check ./templates
-
-# Watch mode for development
-binja watch ./templates -o ./dist
-
-# Lint templates (syntax check)
-binja lint ./templates
-
-# Lint with AI analysis (requires API key)
-binja lint ./templates --ai
-
-# Lint with specific AI provider
-binja lint ./templates --ai=ollama
-```
-
-### Pre-compiled Templates
-
-```typescript
-// Generated: dist/home.js
-import { render } from './dist/home.js'
-
-const html = render({ title: 'Home', items: [...] })
-```
-
----
-
-## AI-Powered Linting (Optional)
-
-Binja includes an optional AI-powered linting module that detects security issues, performance problems, accessibility concerns, and best practice violations.
-
-### Installation
-
-The AI module is opt-in. Install the SDK for your preferred provider:
-
-```bash
-# For Claude (Anthropic)
-bun add @anthropic-ai/sdk
-
-# For OpenAI
-bun add openai
-
-# For Ollama (local) - no package needed
-# For Groq - no package needed
-```
-
-### Configuration
-
-Set the API key for your provider:
-
-```bash
-# Anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# OpenAI
-export OPENAI_API_KEY=sk-...
-
-# Groq (free tier available)
-export GROQ_API_KEY=gsk_...
-
-# Ollama - no key needed, just run: ollama serve
-```
-
-### Usage
-
-#### CLI
-
-```bash
-# Lint with AI (auto-detect provider)
-binja lint ./templates --ai
-
-# Use specific provider
-binja lint ./templates --ai=anthropic
-binja lint ./templates --ai=openai
-binja lint ./templates --ai=ollama
-binja lint ./templates --ai=groq
-
-# JSON output for CI/CD
-binja lint ./templates --ai --format=json
-```
-
-#### Programmatic
-
-```typescript
-import { lint } from 'binja/ai'
-
-// Auto-detect provider from environment
-const result = await lint(template)
-
-// Specify provider and API key directly
-const result = await lint(template, {
-  provider: 'anthropic',
-  apiKey: 'sk-ant-...',
-  model: 'claude-sonnet-4-20250514'
-})
-
-// Check results
-console.log(result.errors)      // Syntax errors
-console.log(result.warnings)    // Security, performance issues
-console.log(result.suggestions) // Best practice recommendations
-console.log(result.provider)    // Which AI was used
-```
-
-### What It Detects
-
-| Category | Examples |
-|----------|----------|
-| **Security** | XSS vulnerabilities, `\|safe` on user input, sensitive data exposure |
-| **Performance** | Heavy filters in loops, repeated calculations |
-| **Accessibility** | Missing alt text, forms without labels |
-| **Best Practices** | `{% for %}` without `{% empty %}`, deep nesting |
-
-### Provider Comparison
-
-| Provider | API Key | Speed | Cost |
-|----------|---------|-------|------|
-| **Anthropic** | `ANTHROPIC_API_KEY` | Fast | Paid |
-| **OpenAI** | `OPENAI_API_KEY` | Fast | Paid |
-| **Groq** | `GROQ_API_KEY` | Very Fast | Free tier |
-| **Ollama** | None (local) | Varies | Free |
-
-Auto-detect priority: Anthropic → OpenAI → Groq → Ollama
-
----
-
-## Raw/Verbatim Tag
-
-Output template syntax without processing:
-
-```django
-{% raw %}
-  {{ this will not be processed }}
-  {% neither will this %}
-{% endraw %}
-
-{# Or Django-style #}
-{% verbatim %}
-  {{ raw output }}
-{% endverbatim %}
-```
-
----
-
-## Custom Filters
-
-```typescript
-const env = new Environment({
-  filters: {
-    // Simple filter
-    double: (value: number) => value * 2,
-
-    // Filter with argument
-    repeat: (value: string, times: number = 2) => value.repeat(times),
-
-    // Async filter
-    translate: async (value: string, lang: string) => {
-      return await translateAPI(value, lang)
-    }
-  }
-})
-```
-
-Usage:
-```django
-{{ 5|double }}           → 10
-{{ "hi"|repeat:3 }}      → hihihi
-{{ "Hello"|translate:"es" }} → Hola
-```
-
----
-
-## Security
-
-### XSS Protection
-
-Autoescape is enabled by default. All variables are HTML-escaped:
-
-```typescript
-await render('{{ script }}', {
-  script: '<script>alert("xss")</script>'
-})
-// Output: &lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;
-```
-
-### Marking Safe Content
-
-```django
-{{ trusted_html|safe }}
-```
-
----
-
-## Performance Tips
-
-1. **Use AOT in Production** - `compile()` is 160x faster than Nunjucks
-2. **Pre-compile at Startup** - Compile templates once, use many times
-3. **Reuse Environment** - For templates with `{% extends %}`, create once
-4. **LRU Cache** - Templates cached with LRU eviction (default: 100, prevents memory leaks)
-5. **Monitor Cache** - Use `env.cacheStats()` to optimize `cacheMaxSize`
-
-```typescript
-import { compile } from 'binja'
-
-// Best: AOT compilation for static templates
-const templates = {
-  home: compile(await Bun.file('./views/home.html').text()),
-  user: compile(await Bun.file('./views/user.html').text()),
-}
-
-// Sync rendering, extremely fast
-app.get('/', () => templates.home({ title: 'Home' }))
-app.get('/user/:id', () => templates.user({ id: params.id }))
-```
-
-For templates with inheritance (`{% extends %}`):
-
-```typescript
-import { Environment } from 'binja'
-
-// Environment with cache for inherited templates
-const env = new Environment({ templates: './views', cache: true })
-
-// Pre-warm cache at startup
-await env.loadTemplate('base.html')
-await env.loadTemplate('home.html')
-```
-
----
-
-## API Reference
-
-### `render(template, context)` - Runtime Mode
-
-Render a template string with context (async, easy development).
-
-```typescript
-import { render } from 'binja'
-
-const html = await render('Hello {{ name }}', { name: 'World' })
-```
-
-### `compile(template, options?)` - AOT Mode
-
-Compile a template to an optimized function (sync, **160x faster**).
-
-```typescript
-import { compile } from 'binja'
-
-// Compile once
-const renderGreeting = compile('<h1>{{ name|upper }}</h1>')
-
-// Use many times (sync!)
-const html = renderGreeting({ name: 'world' }) // <h1>WORLD</h1>
-```
-
-**Supported:** Variables, filters, conditions, loops, set/with, comments.
-**Not supported:** `{% extends %}`, `{% include %}` (use Environment for these).
-
-### `compileToCode(template, options?)`
-
-Generate JavaScript code string for build tools.
-
-```typescript
-import { compileToCode } from 'binja'
-
-const code = compileToCode('<h1>{{ title }}</h1>', {
-  functionName: 'renderHeader'
-})
-
-// Save to file for bundling
-await Bun.write('./compiled/header.js', code)
-```
-
-### `Environment`
-
-Create a configured template environment.
-
-```typescript
-const env = new Environment(options)
-
-// Rendering
-env.render(name, context)      // Render template file
-env.renderString(str, context) // Render template string
-
-// Configuration
-env.addFilter(name, fn)        // Add custom filter
-env.addGlobal(name, value)     // Add global variable
-
-// Cache Management (LRU with configurable max size)
-env.loadTemplate(name)         // Pre-load template (cache warming)
-env.cacheSize()                // Get number of cached templates
-env.cacheStats()               // Get { size, maxSize, hits, misses, hitRate }
-env.clearCache()               // Clear all cached templates and reset stats
-```
-
----
-
-## Examples
-
-### Elysia Integration
-
-```typescript
+```ts
 import { Elysia } from 'elysia'
-import { Environment } from 'binja'
+import { binja } from 'binja/elysia'
 
-// Development with debug panel
-const templates = new Environment({
+new Elysia()
+  .use(binja({ root: './views', cache: true }))
+  .get('/', ({ render }) => render('home', { title: 'Home' }))
+```
+
+For the core engine, cached and uncached adapter modes both use `Environment`, so includes and inheritance keep the same semantics. Adapter template and layout paths remain contained under `root`.
+
+## CLI
+
+```sh
+# Generate importable ESM modules; static includes/inheritance are flattened.
+binja compile ./views -o ./compiled
+
+# Compile one template with a stable function name.
+binja compile ./views/card.html -o ./compiled --name renderCard
+
+# Validate syntax, flattenability, and AOT code generation.
+binja check ./views
+
+# Syntax lint, optionally emitted as JSON.
+binja lint ./views
+binja lint ./views --format=json
+
+# Recompile a directory on changes.
+binja watch ./views -o ./compiled
+```
+
+Generated modules import `builtinFilters` and `builtinTests` from `binja` and export both `render` and a default function. Dynamic include/extends expressions are rejected because they cannot be flattened at build time. A failed directory compile/check exits non-zero.
+
+AI linting is optional. Use `--ai` or `--ai=<anthropic|openai|groq|ollama>` and configure the corresponding provider. Provider SDKs are optional peer dependencies.
+
+## Debug tooling
+
+```ts
+const env = new Environment({
   templates: './views',
   debug: Bun.env.NODE_ENV !== 'production',
-  debugOptions: { dark: true },
-  globals: {
-    site_name: 'My App',
-    current_year: new Date().getFullYear()
-  }
-})
-
-const app = new Elysia()
-  // HTML helper
-  .decorate('html', (name: string, ctx: object) => templates.render(name, ctx))
-
-  // Routes
-  .get('/', async ({ html }) => {
-    return new Response(await html('home.html', {
-      title: 'Welcome',
-      features: ['Fast', 'Secure', 'Easy']
-    }), {
-      headers: { 'Content-Type': 'text/html' }
-    })
-  })
-
-  .get('/users/:id', async ({ html, params }) => {
-    const user = await getUser(params.id)
-    return new Response(await html('user/profile.html', { user }), {
-      headers: { 'Content-Type': 'text/html' }
-    })
-  })
-
-  .listen(3000)
-
-console.log('Server running at http://localhost:3000')
-```
-
-### Elysia Plugin
-
-```typescript
-import { Elysia } from 'elysia'
-import { Environment } from 'binja'
-
-// Create reusable plugin
-const jinjaPlugin = (options: { templates: string }) => {
-  const env = new Environment(options)
-
-  return new Elysia({ name: 'jinja' })
-    .derive(async () => ({
-      render: async (name: string, context: object = {}) => {
-        const html = await env.render(name, context)
-        return new Response(html, {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' }
-        })
-      }
-    }))
-}
-
-// Use in app
-const app = new Elysia()
-  .use(jinjaPlugin({ templates: './views' }))
-  .get('/', ({ render }) => render('index.html', { title: 'Home' }))
-  .get('/about', ({ render }) => render('about.html'))
-  .listen(3000)
-```
-
-### Elysia + HTMX
-
-```typescript
-import { Elysia } from 'elysia'
-import { Environment } from 'binja'
-
-const templates = new Environment({ templates: './views' })
-
-const app = new Elysia()
-  // Full page
-  .get('/', async () => {
-    const html = await templates.render('index.html', {
-      items: await getItems()
-    })
-    return new Response(html, {
-      headers: { 'Content-Type': 'text/html' }
-    })
-  })
-
-  // HTMX partial - returns only the component
-  .post('/items', async ({ body }) => {
-    const item = await createItem(body)
-    const html = await templates.renderString(`
-      <li id="item-{{ item.id }}" class="item">
-        {{ item.name }}
-        <button hx-delete="/items/{{ item.id }}" hx-target="#item-{{ item.id }}" hx-swap="outerHTML">
-          Delete
-        </button>
-      </li>
-    `, { item })
-    return new Response(html, {
-      headers: { 'Content-Type': 'text/html' }
-    })
-  })
-
-  .delete('/items/:id', async ({ params }) => {
-    await deleteItem(params.id)
-    return new Response('', { status: 200 })
-  })
-
-  .listen(3000)
-```
-
-### Hono Integration
-
-```typescript
-import { Hono } from 'hono'
-import { Environment } from 'binja'
-
-const app = new Hono()
-
-// Development with debug panel
-const templates = new Environment({
-  templates: './views',
-  debug: process.env.NODE_ENV !== 'production',
-  debugOptions: { dark: true, position: 'bottom-right' }
-})
-
-app.get('/', async (c) => {
-  const html = await templates.render('index.html', {
-    title: 'Home',
-    user: c.get('user')
-  })
-  return c.html(html)
-})
-
-app.get('/products', async (c) => {
-  const products = await getProducts()
-  return c.html(await templates.render('products/list.html', { products }))
+  debugOptions: { dark: true, position: 'bottom-right' },
 })
 ```
 
-### Email Templates
+The HTML panel can expose context values, template names, errors, and database-query details. Enable it only in trusted development environments and avoid collecting secrets. Helpers for Hono/Express middleware plus Prisma, Drizzle, Bun SQL, and generic query wrappers are exported from `binja/debug`.
 
-```typescript
-const env = new Environment({ templates: './emails' })
+## Security model
 
-const html = await env.render('welcome.html', {
-  user: { name: 'John', email: 'john@example.com' },
-  activation_link: 'https://example.com/activate/xyz'
-})
+Templates are trusted application code. Context values, route/template names, JSON payloads, debug data, and generated attribute values are treated as untrusted.
 
-await sendEmail({
-  to: user.email,
-  subject: 'Welcome!',
-  html
+- Autoescape is on by default. `safe` is an explicit trust assertion; never apply it to unsanitized input.
+- `json`/`tojson` escape characters that could terminate an HTML script element. Prefer `json_script` for inert JSON data blocks.
+- `escapejs` escapes JavaScript string content, but it does not make arbitrary code generation safe.
+- `xmlattr` validates attribute names and escapes values.
+- Template property resolution blocks common JavaScript prototype-escape primitives.
+- File loaders and adapters reject traversal and symlink escapes outside their configured roots.
+- Debug panels and `{% debug %}` are development tools and can reveal sensitive context.
+- CSRF protection belongs to the host application; the tag only renders a supplied token.
+
+Safe JSON example:
+
+```jinja
+{{ payload|json_script:'bootstrap-data' }}
+<script>
+  const payload = JSON.parse(document.getElementById('bootstrap-data').textContent)
+</script>
+```
+
+## AOT code generation API
+
+`compileToCode()` and `compileWithInheritanceToCode()` return low-level function source that expects Binja runtime helpers in scope. They are useful for build-tool integrations that provide that helper contract. For a directly importable module with the correct helpers and built-in registries, use the CLI.
+
+```ts
+import { compileToCode } from 'binja'
+
+const functionSource = compileToCode('{{ title }}', {
+  functionName: 'renderTitle',
+  autoescape: true,
+  minify: false,
 })
 ```
 
-### PDF Generation
+Function names are validated before code generation.
 
-```typescript
-import { Environment } from 'binja'
+## Benchmarks
 
-const templates = new Environment({ templates: './templates' })
+The repository harness measures separate synchronous and asynchronous paths, performs correctness checks, excludes setup/compile time, consumes outputs, warms each case, and reports medians, min/max, and relative standard deviation.
 
-// Render invoice HTML
-const html = await templates.render('invoice.html', {
-  invoice: {
-    number: 'INV-2024-001',
-    date: new Date(),
-    customer: { name: 'Acme Corp', address: '123 Main St' },
-    items: [
-      { name: 'Service A', qty: 2, price: 100 },
-      { name: 'Service B', qty: 1, price: 250 }
-    ],
-    total: 450
-  }
-})
+Latest local audit run (2026-07-23, Apple M1 Max, 32 GiB, macOS arm64, Bun 1.3.14, 15 warmed rounds):
 
-// Use with any PDF library (puppeteer, playwright, etc.)
-const pdf = await generatePDF(html)
+| Case | Mode | Median ops/s | Min–max ops/s | RSD |
+|---|:---:|---:|---:|---:|
+| Lexer, default delimiters (2.3K chars) | sync | 207,164 | 188,383–218,412 | 4.5% |
+| Lexer, custom delimiters (2.3K chars) | sync | 209,161 | 196,276–212,770 | 2.6% |
+| Runtime, simple cached AST | async | 2,420,551 | 1,443,419–2,554,591 | 11.4% |
+| Runtime, loop over 100 items | async | 59,213 | 49,758–62,054 | 5.3% |
+| AOT, simple | sync | 10,008,841 | 8,418,069–10,499,377 | 6.6% |
+| AOT, loop over 100 items | sync | 124,117 | 119,064–125,873 | 1.7% |
+| Liquid loop modifiers, 100 items | async | 185,745 | 167,322–200,620 | 5.5% |
+| `rejectattr`, 20K items | sync | 6,013 | 5,870–6,089 | 1.0% |
+
+These are local microbenchmarks, not universal throughput guarantees and not a cross-engine comparison. Re-run on the target deployment and compare only identical workloads:
+
+```sh
+bun run benchmark
+BENCH_ROUNDS=15 bun run benchmark -- --json
 ```
 
-### Static Site Generator
+## Package exports
 
-```typescript
-import { Environment } from 'binja'
-import { readdir, writeFile, mkdir } from 'fs/promises'
-
-const env = new Environment({ templates: './src/templates' })
-
-// Build all pages
-const pages = [
-  { template: 'index.html', output: 'dist/index.html', data: { title: 'Home' } },
-  { template: 'about.html', output: 'dist/about.html', data: { title: 'About' } },
-  { template: 'contact.html', output: 'dist/contact.html', data: { title: 'Contact' } }
-]
-
-await mkdir('dist', { recursive: true })
-
-for (const page of pages) {
-  const html = await env.render(page.template, page.data)
-  await writeFile(page.output, html)
-  console.log(`Built: ${page.output}`)
-}
+```text
+binja
+binja/ai
+binja/debug
+binja/hono
+binja/elysia
+binja/engines
+binja/engines/handlebars
+binja/engines/liquid
+binja/engines/twig
 ```
 
----
+Every documented subpath is exercised by the package smoke test.
 
-## Acknowledgments
+## Development
 
-binja is inspired by and aims to be compatible with:
+```sh
+bun install
+bun run typecheck
+bun run check
+bun run test:coverage
+bun run build
+bun run test:package
+bun run benchmark
+cd docs && bun run build
+```
 
-- **[Jinja2](https://jinja.palletsprojects.com/)** - The original Python template engine by Pallets Projects (BSD-3-Clause)
-- **[Django Template Language](https://docs.djangoproject.com/en/stable/ref/templates/language/)** - Django's built-in template system (BSD-3-Clause)
-
----
+Repository-specific maintenance guidance is in [`AGENTS.md`](./AGENTS.md). The reusable audit workflow is in [`SKILL.md`](./SKILL.md).
 
 ## License
 
-BSD-3-Clause
-
-See [LICENSE](./LICENSE) for details.
-
----
-
-<p align="center">
-  Made with ❤️ for the Bun ecosystem
-</p>
+BSD-3-Clause. See [`LICENSE`](./LICENSE).

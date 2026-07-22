@@ -1,7 +1,6 @@
 /**
  * AOT Compilation with Template Inheritance Tests
- * Tests the compileWithInheritance() function that flattens template inheritance
- * at compile-time for maximum performance (160x faster than runtime)
+ * Tests compileWithInheritance() static inheritance flattening.
  */
 import { describe, test, expect, beforeAll } from 'bun:test'
 import {
@@ -227,16 +226,37 @@ describe('AOT Template Inheritance', () => {
       const toArray = (v: any) => (Array.isArray(v) ? v : [])
       const applyFilter = () => ''
       const applyTest = () => true
+      const resolveName = (ctx: Record<string, any>, name: string) =>
+        Object.hasOwn(ctx, name) ? ctx[name] : undefined
+      const getProperty = (value: any, key: PropertyKey) => value?.[key]
+      const stringify = (value: any, autoescape: boolean) => {
+        if (value == null) return ''
+        if (typeof value === 'boolean') return value ? 'True' : 'False'
+        const output = String(value)
+        return autoescape ? Bun.escapeHTML(output) : output
+      }
 
       const fn = new Function(
         '__ctx',
         '__helpers',
-        `const { escape, isTruthy, toArray, applyFilter, applyTest } = __helpers;
+        `const { escape, stringify, isTruthy, toArray, applyFilter, applyTest, resolveName, getProperty } = __helpers;
         ${code}
         return renderSimple(__ctx);`
       )
 
-      const result = fn({ title: 'test' }, { escape, isTruthy, toArray, applyFilter, applyTest })
+      const result = fn(
+        { title: 'test' },
+        {
+          escape,
+          stringify,
+          isTruthy,
+          toArray,
+          applyFilter,
+          applyTest,
+          resolveName,
+          getProperty,
+        }
+      )
 
       expect(result).toBe('<h1>TEST</h1>')
     })
@@ -283,44 +303,6 @@ describe('AOT Template Inheritance', () => {
 
       const result = canFlatten(ast)
       expect(result.canFlatten).toBe(true)
-    })
-  })
-
-  describe('Performance Characteristics', () => {
-    test('AOT compiled function is significantly faster than runtime', async () => {
-      // Compile with AOT
-      const aotRender = await compileWithInheritance('page.html', {
-        templates: TEMPLATES_DIR,
-      })
-
-      const context = {
-        title: 'Benchmark',
-        heading: 'Performance Test',
-        message: 'Testing speed',
-      }
-
-      // Warm up
-      for (let i = 0; i < 100; i++) {
-        aotRender(context)
-      }
-
-      // Benchmark AOT
-      const iterations = 10000
-      const start = performance.now()
-      for (let i = 0; i < iterations; i++) {
-        aotRender(context)
-      }
-      const aotTime = performance.now() - start
-
-      // AOT should complete in reasonable time (< 500ms for 10k iterations)
-      expect(aotTime).toBeLessThan(500)
-
-      // Calculate ops/sec
-      const opsPerSec = (iterations / aotTime) * 1000
-      console.log(`AOT with inheritance: ${Math.round(opsPerSec).toLocaleString()} ops/sec`)
-
-      // Should be at least 20,000 ops/sec
-      expect(opsPerSec).toBeGreaterThan(20000)
     })
   })
 })

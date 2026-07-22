@@ -66,7 +66,7 @@ Apply filters with the pipe character:
 
 **Jinja2-style (parentheses):**
 ```jinja
-{{ text|truncate(20) }}
+{{ text|truncatechars(20) }}
 {{ text|replace("old", "new") }}
 ```
 

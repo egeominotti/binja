@@ -1,128 +1,58 @@
 ---
 title: Benchmarks
-description: Detailed performance benchmarks comparing binja to other template engines
+description: Reproducible local Binja microbenchmarks and measurement methodology.
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+## Latest audit run
 
-The published comparison snapshot below was recorded on a Mac Studio M1 Max with Bun 1.3.5.
-Use the repository benchmark command to measure the current checkout and Bun version locally.
+Recorded 2026-07-23 on macOS arm64, Apple M1 Max, 32 GiB RAM, Bun 1.3.14. Each result is the median of 15 warmed rounds; setup and compilation are outside the timed region.
 
-## Two Rendering Modes
+| Case | Mode | Median ops/s | Min–max ops/s | RSD | Median batch |
+|---|:---:|---:|---:|---:|---:|
+| Lexer / default delimiters (2.3K chars) | sync | 207,164 | 188,383–218,412 | 4.5% | 48.27 ms |
+| Lexer / custom delimiters (2.3K chars) | sync | 209,161 | 196,276–212,770 | 2.6% | 47.81 ms |
+| Runtime / simple cached AST | async | 2,420,551 | 1,443,419–2,554,591 | 11.4% | 8.26 ms |
+| Runtime / loop (100 items) | async | 59,213 | 49,758–62,054 | 5.3% | 33.78 ms |
+| AOT / simple | sync | 10,008,841 | 8,418,069–10,499,377 | 6.6% | 19.98 ms |
+| AOT / loop (100 items) | sync | 124,117 | 119,064–125,873 | 1.7% | 80.57 ms |
+| Liquid / loop modifiers (100 items) | async | 185,745 | 167,322–200,620 | 5.5% | 10.77 ms |
+| Filter / `rejectattr` (20K items) | sync | 6,013 | 5,870–6,089 | 1.0% | 166.31 ms |
 
-<CardGrid stagger>
-  <Card title="Runtime Mode" icon="rocket">
-    `render()` - Best for development and templates with dynamic inheritance. **2-4x faster** than Nunjucks.
-  </Card>
-  <Card title="AOT Mode" icon="lightning">
-    `compile()` - Pre-compile templates to JavaScript functions. **160x faster** than Nunjucks.
-  </Card>
-</CardGrid>
+The relatively high RSD for the simple runtime and AOT cases is disclosed rather than hidden; use more rounds and controlled system load for performance decisions.
 
-## Runtime Performance vs Nunjucks
+## What the harness guarantees
 
-| Benchmark | binja | Nunjucks | Speedup |
-|-----------|-------|----------|---------|
-| Simple Template | 371K ops/s | 96K ops/s | **3.9x** |
-| Complex Template | 44K ops/s | 23K ops/s | **2.0x** |
-| Multiple Filters | 246K ops/s | 63K ops/s | **3.9x** |
-| Nested Loops | 76K ops/s | 26K ops/s | **3.0x** |
-| Conditionals | 84K ops/s | 25K ops/s | **3.4x** |
-| HTML Escaping | 985K ops/s | 242K ops/s | **4.1x** |
-| Large Dataset | 9.6K ops/s | 6.6K ops/s | **1.5x** |
+Before timing, it verifies:
 
-## AOT Compilation Performance
+- runtime and AOT output equality for the simple and loop templates;
+- default/custom-delimiter lexer equivalence;
+- expected Liquid offset/limit/reversed output;
+- expected `rejectattr` result size and predicate.
 
-AOT compilation provides massive speedups by pre-compiling templates to optimized JavaScript functions:
+The harness then warms each case, separates synchronous and asynchronous loops, consumes every result, and reports every sample through JSON mode.
 
-| Benchmark | binja AOT | binja Runtime | Speedup |
-|-----------|-----------|---------------|---------|
-| Simple Template | **14.3M ops/s** | 371K ops/s | 39x |
-| Complex Template | **1.07M ops/s** | 44K ops/s | 24x |
-| Nested Loops | **1.75M ops/s** | 76K ops/s | 23x |
+## Run it
 
-### vs Nunjucks
-
-| Benchmark | binja AOT | Nunjucks | Speedup |
-|-----------|-----------|----------|---------|
-| Simple Template | 14.3M ops/s | 96K ops/s | **160x** |
-| Complex Template | 1.07M ops/s | 23K ops/s | **46x** |
-
-## Why binja is Faster
-
-### 1. Pure TypeScript for Bun
-
-binja is built from scratch in TypeScript, optimized specifically for the Bun runtime. No legacy code or Node.js compatibility layers.
-
-### 2. Inline Filter Optimization
-
-~70 common filters have inline implementations to avoid function call overhead:
-
-```typescript
-// Instead of:
-filters['upper'](value)
-
-// binja does:
-value.toUpperCase()
-```
-
-This provides 10-15% speedup on filter-heavy templates.
-
-### 3. AOT Compilation
-
-Pre-compiling templates eliminates:
-- Lexing overhead
-- Parsing overhead
-- AST traversal
-- Filter lookup
-
-```typescript
-// Compile once at startup
-const template = compile('<h1>{{ title|upper }}</h1>')
-
-// Renders in microseconds
-const html = template({ title: 'hello' })
-```
-
-### 4. Efficient AST Representation
-
-binja's AST is optimized for fast traversal and minimal memory allocation.
-
-## Running Benchmarks
-
-```bash
-# Clone the repo
-git clone https://github.com/egeominotti/binja.git
-cd binja
-
-# Install dependencies
+```sh
 bun install
-
-# Run benchmarks
 bun run benchmark
+
+# Longer, machine-readable run
+BENCH_ROUNDS=15 bun run benchmark -- --json
 ```
 
-The command reports warmed-up median results for cached runtime rendering, AOT rendering,
-Liquid loop modifiers, and algorithm-sensitive filters. It consumes every output to prevent
-the JavaScript engine from eliminating work. Results vary by hardware and Bun version, so use
-the same machine and runtime when comparing commits.
+`BENCH_ROUNDS` must be an integer of at least 3; invalid values fall back to 7.
 
-## Production Recommendations
+## Interpreting results
 
-1. **Use AOT in Production** - `compile()` for static templates
-2. **Pre-compile at Startup** - Compile templates once, use many times
-3. **Enable Caching** - Use `cache: true` in Environment
-4. **Monitor Cache** - Use `env.cacheStats()` to optimize `cacheMaxSize`
+These cases are microbenchmarks, not HTTP throughput or latency tests. Do not compare their ops/s across different workloads. In particular, a simple AOT function and an asynchronous loader-backed render solve different problems.
 
-```typescript
-import { compile } from 'binja'
+For a useful before/after comparison:
 
-// Best practice: compile at startup
-const templates = {
-  home: compile(await Bun.file('./views/home.html').text()),
-  user: compile(await Bun.file('./views/user.html').text()),
-}
+1. use the same checkout dependencies, Bun version, machine, power mode, and round count;
+2. close background workloads;
+3. compare identical cases and inspect RSD plus min/max, not only the median;
+4. retain correctness tests alongside any optimization;
+5. benchmark the real application template and context shape before making deployment claims.
 
-// Sync rendering, extremely fast
-app.get('/', () => templates.home({ title: 'Home' }))
-```
+Historical competitor ratios were removed because the repository did not retain a current, equivalent cross-engine harness that could reproduce them.

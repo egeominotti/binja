@@ -59,8 +59,8 @@ export async function detectProvider(options: LintOptions = {}): Promise<AIProvi
     'No AI provider available.\n\n' +
       'Configure one of the following:\n' +
       '  - ANTHROPIC_API_KEY (Claude)\n' +
-      '  - OPENAI_API_KEY (GPT-4)\n' +
-      '  - GROQ_API_KEY (Llama, free tier)\n' +
+      '  - OPENAI_API_KEY (OpenAI)\n' +
+      '  - GROQ_API_KEY (Groq OpenAI-compatible endpoint)\n' +
       '  - Ollama running locally (http://localhost:11434)\n\n' +
       'Install SDK if needed:\n' +
       '  bun add @anthropic-ai/sdk   # for Claude\n' +
@@ -75,6 +75,9 @@ export async function resolveProvider(options: LintOptions = {}): Promise<AIProv
   const providerName = options.provider || 'auto'
 
   if (providerName === 'auto') {
+    if (options.apiKey) {
+      throw new Error("Set 'provider' when passing an explicit AI API key")
+    }
     return detectProvider(options)
   }
 
