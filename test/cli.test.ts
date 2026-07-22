@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 const projectRoot = dirname(import.meta.dir)
@@ -38,10 +38,18 @@ describe('CLI integration', () => {
     const source = join(workspace, 'views', 'card.html')
     const output = join(workspace, 'compiled')
     await mkdir(dirname(source), { recursive: true })
-    // Generated modules import the published package name. Mirror the package
-    // resolution layout so this integration test behaves like a consumer.
-    await mkdir(join(workspace, 'node_modules'), { recursive: true })
-    await symlink(projectRoot, join(workspace, 'node_modules', 'binja'), 'dir')
+    // Generated modules import the published package name. Mirror package
+    // resolution while testing from source (CI has not built dist yet).
+    const packageDir = join(workspace, 'node_modules', 'binja')
+    await mkdir(packageDir, { recursive: true })
+    await writeFile(
+      join(packageDir, 'package.json'),
+      JSON.stringify({ name: 'binja', type: 'module', main: './index.js' })
+    )
+    await writeFile(
+      join(packageDir, 'index.js'),
+      `export { builtinFilters, builtinTests } from ${JSON.stringify(join(projectRoot, 'src/index.ts'))}`
+    )
     await writeFile(source, '{{ items|length }}:{% if value is even %}even{% else %}odd{% endif %}')
 
     const result = await runCli(['compile', source, '-o', output, '--name', 'renderCard'])
