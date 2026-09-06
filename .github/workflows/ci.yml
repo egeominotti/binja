@@ -26,7 +26,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.2
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -60,15 +60,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: Ubuntu / minimum
+          - label: Ubuntu / Bun 1.4.2
             os: ubuntu-latest
-            bun-version: 1.3.14
+            bun-version: 1.4.2
           - label: Ubuntu / latest
             os: ubuntu-latest
             bun-version: latest
-          - label: macOS / minimum
+          - label: macOS / Bun 1.4.2
             os: macos-latest
-            bun-version: 1.3.14
+            bun-version: 1.4.2
           - label: macOS / latest
             os: macos-latest
             bun-version: latest
@@ -103,7 +103,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.2
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
