@@ -59,7 +59,7 @@ app.use(binja({
 | `extension` | `string` | `.html` | Default file extension |
 | `engine` | `string` | `jinja2` | Template engine |
 | `cache` | `boolean` | production only | Cache parsed templates/functions |
-| `cacheMaxSize` | `number` | `100` | Per-adapter LRU bound for core and secondary compiled templates |
+| `cacheMaxSize` | `number` | `100` | Per-adapter LRU bound including templates and layouts |
 | `debug` | `boolean` | `false` | Enable the core Environment debug panel |
 | `globals` | `object` | `{}` | Global context variables |
 | `layout` | `string` | - | Layout template path |
@@ -115,6 +115,8 @@ For `jinja2`, both cache settings use the same configured `Environment`, preserv
 ```
 
 ## Cache Management
+
+Templates and layouts share the instance’s `cacheMaxSize` LRU limit. With caching enabled, file edits (including layout edits) become visible after eviction or `clearCache()`; set `cache: false` for live file updates. Names are checked on every request, and symlink containment is verified whenever source is loaded. A cache hit renders only the previously validated source without filesystem access. Discarded adapter instances are tracked weakly and their registry entries are cleaned up automatically.
 
 ```typescript
 import { clearCache, getCacheStats } from 'binja/elysia'

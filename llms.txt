@@ -122,7 +122,8 @@ import { binja } from 'binja/hono'
 import { binja as elysiaBinja } from 'binja/elysia'
 ```
 
-Options include root, extension, engine, debug, cache, globals, layout, and contentVar.
+Options include root, extension, engine, debug, cache, cacheMaxSize, globals, layout, and contentVar.
+Templates and layouts share a bounded per-instance LRU cache. Cached edits require eviction or clearCache; cache:false reloads files. Cache hits use validated source without filesystem checks; source loads validate symlinks. Registries automatically clean up discarded adapter instances.
 
 ## Security
 

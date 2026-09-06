@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "test/views/**",
+    "dist/**",
+    "node_modules/**",
+    "examples/**",
+    "docs/**",
+    "website/**"
+  ],
+  "rules": {
+    "eslint/no-case-declarations": "off",
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "args": "all",
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrors": "all",
+        "caughtErrorsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "eslint/prefer-const": "error",
+    "eslint/eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
+    "eslint/no-shadow-restricted-names": "off",
+    "typescript/no-explicit-any": "off",
+    "typescript/no-non-null-assertion": "off",
+    "unicorn/no-new-array": "off"
+  }
+}

@@ -31,6 +31,7 @@ import type { PanelOptions } from './debug'
 import { TemplateNotFoundError } from './errors'
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import * as path from 'node:path'
+import { resolveContainedLexically } from './paths'
 
 // Pre-compiled regex for URL parameter replacement (avoid per-call compilation)
 const URL_PARAM_REGEX = /<[^>]+>|:[a-zA-Z_]+|\(\?P<[^>]+>\[[^\]]+\]\)/g
@@ -44,10 +45,8 @@ const URL_PARAM_REGEX = /<[^>]+>|:[a-zA-Z_]+|\(\?P<[^>]+>\[[^\]]+\]\)/g
  */
 function resolveContained(root: string, name: string): string | null {
   const normalizedRoot = path.resolve(root)
-  const resolved = path.resolve(normalizedRoot, name)
-  if (!isPathInside(normalizedRoot, resolved)) {
-    return null
-  }
+  const resolved = resolveContainedLexically(normalizedRoot, name)
+  if (resolved === null) return null
 
   // Lexical containment alone is insufficient when a path component is a
   // symlink. Resolve the closest existing ancestor so both existing files and

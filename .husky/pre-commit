@@ -11,10 +11,10 @@ if [ $? -ne 0 ]; then
 fi
 
 # Lint and format
-echo "🔎 Biome check..."
+echo "🔎 oxlint and oxfmt checks..."
 bun run check
 if [ $? -ne 0 ]; then
-  echo "❌ Biome issues found. Run 'bun run check:fix' to fix safe issues."
+  echo "❌ Lint or formatting issues found. Run 'bun run check:fix' to fix safe issues."
   exit 1
 fi
 

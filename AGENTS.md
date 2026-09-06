@@ -77,7 +77,7 @@ Treat compatibility claims as tested subsets, not blanket upstream compatibility
 ## Style and maintenance
 
 - Target Bun `>=1.3.14` and strict TypeScript.
-- Use the existing Biome configuration; run `bun run format` only for touched code.
+- Use the existing oxlint and oxfmt configurations; run `bun run format` only for touched code.
 - Prefer small shared helpers over duplicated security or semantic logic, but measure hot-path changes.
 - Use `Object.create(null)`, `Map`, or explicit own-property checks when external strings become keys.
 - Avoid stale numeric claims, counts, versions, model names, and benchmark ratios in docs. Derive or remeasure them.

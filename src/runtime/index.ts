@@ -85,6 +85,7 @@ export class Runtime {
   // Parsed ASTs are immutable during rendering. Cache their execution mode so
   // repeated renders do not recursively scan the same tree.
   private readonly templateAsyncCache = new WeakMap<TemplateNode, boolean>()
+  private readonly subtreeAsyncCache = new WeakMap<ASTNode, boolean>()
   private source?: string // Template source for error messages
 
   constructor(options: RuntimeOptions = {}) {
@@ -178,39 +179,54 @@ export class Runtime {
     return needsAsync
   }
 
-  private nodesNeedAsync(nodes: ASTNode[]): boolean {
+  private nodesNeedAsync(nodes: ASTNode[], dynamicBlocks = false): boolean {
     for (const node of nodes) {
-      if (node.type === 'Extends' || node.type === 'Include') return true
-      if (node.type === 'If') {
-        const ifNode = node as IfNode
-        if (this.nodesNeedAsync(ifNode.body)) return true
-        for (const elif of ifNode.elifs) {
-          if (this.nodesNeedAsync(elif.body)) return true
-        }
-        if (this.nodesNeedAsync(ifNode.else_)) return true
-      }
-      if (node.type === 'For') {
-        const forNode = node as ForNode
-        if (this.nodesNeedAsync(forNode.body)) return true
-        if (this.nodesNeedAsync(forNode.else_)) return true
-      }
-      if (node.type === 'Block') {
-        if (this.nodesNeedAsync((node as BlockNode).body)) return true
-      }
-      if (node.type === 'With') {
-        if (this.nodesNeedAsync((node as WithNode).body)) return true
-      }
-      if (node.type === 'Autoescape') {
-        if (this.nodesNeedAsync((node as AutoescapeNode).body)) return true
-      }
-      if (node.type === 'Spaceless') {
-        if (this.nodesNeedAsync((node as SpacelessNode).body)) return true
-      }
-      if (node.type === 'Capture') {
-        if (this.nodesNeedAsync((node as CaptureNode).body)) return true
-      }
+      if (this.nodeNeedsAsync(node, dynamicBlocks)) return true
     }
     return false
+  }
+
+  private nodeNeedsAsync(node: ASTNode, dynamicBlocks: boolean): boolean {
+    switch (node.type) {
+      case 'Extends':
+      case 'Include':
+        return true
+      case 'If': {
+        const ifNode = node as IfNode
+        if (this.nodesNeedAsync(ifNode.body, dynamicBlocks)) return true
+        for (const elif of ifNode.elifs) {
+          if (this.nodesNeedAsync(elif.body, dynamicBlocks)) return true
+        }
+        return this.nodesNeedAsync(ifNode.else_, dynamicBlocks)
+      }
+      case 'For': {
+        const forNode = node as ForNode
+        return (
+          this.nodesNeedAsync(forNode.body, dynamicBlocks) ||
+          this.nodesNeedAsync(forNode.else_, dynamicBlocks)
+        )
+      }
+      case 'Block':
+        // In an inheritance render the selected override, including block.super,
+        // may load templates even if this particular block's body is synchronous.
+        return dynamicBlocks || this.nodesNeedAsync(node.body, dynamicBlocks)
+      case 'With':
+      case 'Autoescape':
+      case 'Spaceless':
+      case 'Capture':
+        return this.nodesNeedAsync(node.body, dynamicBlocks)
+      default:
+        return false
+    }
+  }
+
+  private subtreeNeedsAsync(node: ASTNode): boolean {
+    if (node.type === 'Text' || node.type === 'Output') return false
+    const cached = this.subtreeAsyncCache.get(node)
+    if (cached !== undefined) return cached
+    const needsAsync = this.nodeNeedsAsync(node, true)
+    this.subtreeAsyncCache.set(node, needsAsync)
+    return needsAsync
   }
 
   // ==================== SYNC PATH (FAST) ====================
@@ -2005,12 +2021,7 @@ export class Runtime {
 
     this.activeState.renderingTemplates.add(ast)
     try {
-      const parts: string[] = []
-      for (const node of ast.body) {
-        const result = await this.renderNodeAsync(node, ctx)
-        if (result !== null) parts.push(result)
-      }
-      return parts.join('')
+      return await this.renderNodesAsync(ast.body, ctx)
     } finally {
       this.activeState.renderingTemplates.delete(ast)
     }
@@ -2226,7 +2237,9 @@ export class Runtime {
   private async renderNodesAsync(nodes: ASTNode[], ctx: Context): Promise<string> {
     const parts: string[] = []
     for (const node of nodes) {
-      const result = await this.renderNodeAsync(node, ctx)
+      const result = this.subtreeNeedsAsync(node)
+        ? await this.renderNodeAsync(node, ctx)
+        : this.renderNodeSync(node, ctx)
       if (result !== null) parts.push(result)
     }
     return parts.join('')
