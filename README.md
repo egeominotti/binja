@@ -314,6 +314,8 @@ new Elysia()
 
 For the core engine, cached and uncached adapter modes both use `Environment`, so includes and inheritance keep the same semantics. Adapter template and layout paths remain contained under `root`.
 
+Templates and layouts share the per-instance `cacheMaxSize` LRU limit. Cached file edits become visible after eviction or `clearCache()`; use `cache: false` for live updates. Cache hits render previously validated source without filesystem access, while source loads validate symlink containment. Adapter registries automatically clean up discarded instances.
+
 ## CLI
 
 ```sh
@@ -392,7 +394,7 @@ Function names are validated before code generation.
 
 The repository harness measures separate synchronous and asynchronous paths, performs correctness checks, excludes setup/compile time, consumes outputs, warms each case, and reports medians, min/max, and relative standard deviation.
 
-Latest local audit run (2026-07-23, Apple M1 Max, 32 GiB, macOS arm64, Bun 1.3.14, 15 warmed rounds):
+Recorded local audit run (2026-07-23, Apple M1 Max, 32 GiB, macOS arm64, Bun 1.3.14, 15 warmed rounds):
 
 | Case | Mode | Median ops/s | Min–max ops/s | RSD |
 |---|:---:|---:|---:|---:|

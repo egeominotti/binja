@@ -26,11 +26,11 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-  Name[Template name] --> Contain{Inside configured root?}
-  Contain -- no --> NotFound[TemplateNotFoundError]
-  Contain -- yes --> Cache{AST cache hit?}
+  Name[Template name] --> Cache{AST cache hit?}
   Cache -- yes --> AST
-  Cache -- no --> Extensions[Try configured extensions]
+  Cache -- no --> Contain{Inside configured root?}
+  Contain -- no --> NotFound[TemplateNotFoundError]
+  Contain -- yes --> Extensions[Try configured extensions]
   Extensions --> Realpath{File and symlink stay inside root?}
   Realpath -- no --> NotFound
   Realpath -- yes --> Read[Read source]
@@ -59,7 +59,7 @@ sequenceDiagram
   RT-->>App: final HTML
 ```
 
-`ignore missing` catches only `TemplateNotFoundError`. Parser/filter/runtime errors from an existing include remain visible. Includes containing their own inheritance chain are rendered through an isolated block state.
+`ignore missing` catches only `TemplateNotFoundError`. Parser/filter/runtime errors from an existing include remain visible. Includes containing their own inheritance chain are rendered through an isolated block state. Synchronous subtrees render directly within the asynchronous traversal. Blocks remain on the asynchronous path because an override or `block.super` can load dependencies.
 
 ## Render-local state
 
@@ -162,7 +162,7 @@ The shared AST does not imply complete upstream compatibility. The direct second
 ```mermaid
 flowchart TD
   Request --> Adapter[Hono middleware / Elysia derive]
-  Adapter --> Resolve[Root-contained template path]
+  Adapter --> Resolve[Lexically contained template name]
   Resolve --> Engine{Configured engine}
   Engine -- core --> Env[Configured Environment]
   Engine -- secondary --> ParsedCache[Optional parsed render-function cache]
@@ -170,13 +170,13 @@ flowchart TD
   ParsedCache --> HTML
   HTML --> Layout{Layout configured?}
   Layout -- core --> SafeContent[Trusted rendered content into Environment layout]
-  Layout -- secondary --> SecondaryLayout[Secondary source render]
+  Layout -- secondary --> SecondaryLayout[Secondary layout through the same LRU cache]
   SafeContent --> Response
   SecondaryLayout --> Response
   Layout -- no --> Response[HTML response]
 ```
 
-Core cached and uncached modes both use `Environment`, preserving include/inheritance semantics.
+Core cached and uncached modes both use `Environment`, preserving include/inheritance semantics. Both adapters share one loading implementation, with a per-instance cache covering templates and layouts. Source loads validate symlink containment; cache hits use the previously validated code. Secondary cache misses for the same path share compilation, and invalidation prevents older loads from repopulating the cache. Module-level registries weakly track live renderers and remove finalized entries.
 
 ## Debug/query telemetry
 

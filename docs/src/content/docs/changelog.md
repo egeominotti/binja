@@ -15,6 +15,8 @@ description: Verified release history and pending changes.
 
 ### Core runtime and AOT
 
+- Render synchronous subtrees directly inside include/inheritance renders while preserving asynchronous block overrides and render-local scope cleanup.
+
 - Implemented real `autoescape` and `spaceless` block bodies, include/inheritance cycle detection, include-with-inheritance rendering, and request-local state cleanup through `try/finally`.
 - Aligned runtime/AOT truthiness, boolean stringification, protected lookup, membership, filter arguments, built-in tests, chained comparisons, loop aliases, and `set` scope behavior.
 - Added Twig-style `??`, `? :`, `elseif`, and `is divisible by`; fixed Django numeric path tokenization and custom delimiter scanning.
@@ -30,12 +32,19 @@ description: Verified release history and pending changes.
 
 ### Adapters, CLI, debug, and package
 
+- Share bounded template/layout caches across the loading paths within each adapter instance, coalesce secondary-engine loads, and prevent invalidation from being undone by older in-flight loads.
+- Avoid filesystem checks on adapter cache hits; validate names on every request and resolve symlinks when loading source.
+- Automatically release registry entries for discarded Hono/Elysia adapter instances.
+
 - Core Hono/Elysia rendering now uses one configured `Environment` in cached and uncached modes, preserving include/inheritance behavior; layout content and debug errors use explicit safe handling.
 - CLI `check` now performs flattening and AOT generation, directory failures exit non-zero, and generated modules execute built-in filters/tests with protected lookup.
 - Debug collection now records lexer/parser totals, cache/filter/test/template activity, tolerates cycles/invalid dates, and begins before middleware request work so query telemetry is captured.
 - Added package exports/build entries/smoke checks for `binja/engines` and each engine subpath.
 
 ### Quality and documentation
+
+- Replaced Biome with oxlint and oxfmt for lint, formatting, pre-commit, and CI release checks.
+- Updated CI/CD pinned Bun versions to 1.4.2.
 
 - Added fast-check property invariants, stateful LRU/registry model checks, corpus-seeded parser/loader fuzzing with replayable seeds, and an extended generative release campaign.
 - Fixed prototype-inherited filter/test dispatch, mapping length over inherited keys, order-dependent `ifchanged` Map/Set equality, invalid batch/column/wordwrap progress values, URL/static resolver escaping, stale cross-adapter secondary caches, and malformed AI responses being reported as clean.

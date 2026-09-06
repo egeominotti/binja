@@ -48,6 +48,9 @@ const loopContext = {
 const simpleAst = environment.compile(simpleSource)
 const loopAst = environment.compile(loopSource)
 const runtime = new Runtime({ autoescape: false })
+const emptyAst = environment.compile('')
+const includeLoopAst = environment.compile('{% include "empty" %}' + loopSource)
+const includeRuntime = new Runtime({ autoescape: false, templateLoader: async () => emptyAst })
 const simpleAot = compile(simpleSource, { autoescape: false })
 const loopAot = compile(loopSource, { autoescape: false })
 const liquidLoop = liquid.compile(
@@ -90,6 +93,12 @@ const cases: BenchmarkCase[] = [
     mode: 'async',
     name: 'Runtime / loop (100 items)',
     run: () => runtime.render(loopAst, loopContext),
+  },
+  {
+    iterations: 2_000,
+    mode: 'async',
+    name: 'Runtime / loop with cached include (100 items)',
+    run: () => includeRuntime.render(includeLoopAst, loopContext),
   },
   {
     iterations: 200_000,
@@ -162,6 +171,9 @@ async function verifyCorrectness(): Promise<void> {
   const aotLoop = loopAot(loopContext)
   if (runtimeSimple !== aotSimple || runtimeLoop !== aotLoop) {
     throw new Error('Runtime/AOT correctness check failed; benchmark aborted')
+  }
+  if ((await includeRuntime.render(includeLoopAst, loopContext)) !== runtimeLoop) {
+    throw new Error('Cached-include correctness check failed; benchmark aborted')
   }
 
   const defaultTokens = new Lexer(lexerSource).tokenize()

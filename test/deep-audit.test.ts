@@ -165,6 +165,93 @@ describe('deep audit regressions', () => {
   })
 
   describe('runtime and AOT parity', () => {
+    test('synchronous subtrees after an include preserve escaping, scope and loop state', async () => {
+      const sources = [
+        '{% autoescape off %}{{ html }}{% endautoescape %}|{{ html }}',
+        '{% with value="local" %}{{ value }}{% endwith %}|{{ value }}',
+        '{% for item in items %}{% if item %}{{ forloop.counter }}:{{ item }}{% else %}zero{% endif %};{% endfor %}',
+        '{% for item in empty %}unused{% else %}{% set value = "empty" %}{{ value }}{% endfor %}|{{ value }}',
+        '{% if enabled %}{% set value="yes" %}{% elif html %}other{% else %}no{% endif %}{{ value }}',
+        '{% spaceless %}<b> {{ value }} </b> <i>{{ html }}</i>{% endspaceless %}',
+      ]
+      const empty = parse('')
+      const runtime = new Runtime({ templateLoader: async () => empty })
+      const context = {
+        html: '<script>',
+        value: 'outer',
+        items: [0, 1, 1, 2],
+        empty: [],
+        enabled: true,
+      }
+      for (const source of sources) {
+        const ast = parse('{% include "empty" %}' + source)
+        const expected = compile(source)(context)
+        expect(await runtime.render(ast, context)).toBe(expected)
+        expect(await runtime.render(ast, context)).toBe(expected)
+      }
+      const cycle = parse(
+        '{% include "empty" %}{% for item in items %}{% cycle "A" "B" %}{{ item }};{% endfor %}'
+      )
+      expect(await runtime.render(cycle, context)).toBe('A0;B1;A1;B2;')
+      expect(await runtime.render(cycle, context)).toBe('A0;B1;A1;B2;')
+    })
+
+    test('blocks nested in otherwise synchronous subtrees can select asynchronous overrides', async () => {
+      const wrappers = [
+        ['{% if enabled %}', '{% endif %}'],
+        ['{% for item in items %}', '{% endfor %}'],
+        ['{% with value="local" %}', '{% endwith %}'],
+        ['{% autoescape off %}', '{% endautoescape %}'],
+        ['{% spaceless %}', '{% endspaceless %}'],
+      ]
+      for (const [open, close] of wrappers) {
+        const base = parse(`${open}{% block cell %}base{% endblock %}${close}`)
+        const child = parse(
+          '{% extends "base" %}{% block cell %}{% include "part" %}{% endblock %}'
+        )
+        const part = parse('{{ marker }}')
+        const runtime = new Runtime({
+          templateLoader: async (name) => {
+            await Bun.sleep(0)
+            return name === 'base' ? base : part
+          },
+        })
+        const results = await Promise.all(
+          Array.from({ length: 20 }, (_, marker) =>
+            runtime.render(child, { marker, enabled: true, items: [1] })
+          )
+        )
+        expect(results).toEqual(Array.from({ length: 20 }, (_, marker) => String(marker)))
+        expect(await runtime.render(base, { enabled: true, items: [1] })).toBe('base')
+      }
+    })
+
+    test('hybrid rendering preserves asynchronous block.super and cleans up failed scopes', async () => {
+      const base = parse('{% block cell %}base:{% include "part" %}{% endblock %}')
+      const part = parse('{{ marker }}')
+      const empty = parse('')
+      const runtime = new Runtime({
+        templateLoader: async (name) => {
+          await Bun.sleep(0)
+          return name === 'base' ? base : name === 'part' ? part : empty
+        },
+        filters: {
+          fail: () => {
+            throw new Error('expected failure')
+          },
+        },
+      })
+      const child = parse(
+        '{% extends "base" %}{% block cell %}{{ block.super }}|child{% endblock %}'
+      )
+      expect(await runtime.render(child, { marker: '<value>' })).toBe('base:&lt;value&gt;|child')
+      const failure = parse(
+        '{% include "empty" %}{% autoescape off %}{% with value="local" %}{{ value|fail }}{% endwith %}{% endautoescape %}'
+      )
+      await expect(runtime.render(failure)).rejects.toThrow('expected failure')
+      expect(await runtime.render(child, { marker: '<after>' })).toBe('base:&lt;after&gt;|child')
+    })
+
     const parityCases = [
       '{{ 3 < 2 < 1 }}',
       '{{ [] or "fallback" }}',
