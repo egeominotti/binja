@@ -43,6 +43,8 @@ description: Verified release history and pending changes.
 
 ### Quality and documentation
 
+- Disabled automatic CodeRabbit reviews and chat replies for this repository.
+
 - Replaced Biome with oxlint and oxfmt for lint, formatting, pre-commit, and CI release checks.
 - Updated CI/CD pinned Bun versions to 1.4.2.
 
